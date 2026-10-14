@@ -3,7 +3,8 @@
 ## Current milestone
 
 Real Mapzen/NAIP terrain now has **offline Sun/Moon calculations and UTC-driven
-Sun/Moon lighting**, advancing Phase 3 after terrain/imagery and cache streaming.
+Sun/Moon lighting, estimated local-time display and automatic playback**,
+advancing Phase 3 after terrain/imagery and cache streaming.
 The public MVP, full astronomy phase and cross-platform Phase 0 gate remain incomplete.
 
 ## Available
@@ -35,12 +36,20 @@ The public MVP, full astronomy phase and cross-platform Phase 0 gate remain inco
 - Sun/Moon geodesic map bearing guides with altitude labels, dashed below
   horizontal and explicitly distinguished from terrain visibility predictions.
 - Shared UTC-day slider at minute resolution, retaining camera and appearance state.
-- Validated 1900–2100 date range, with disabled hour steps at the boundaries.
+- Validated 1900–2100 UTC date range, with disabled hour steps at the boundaries.
+- Offline estimated local clock for camera coordinates: IANA zone, abbreviation,
+  local date/time and UTC offset, including DST and fractional offsets.
+- Local clock restricted to 1970–2037 because bundled transition tables end in
+  2037; other dates explicitly show unavailable instead of a stale offset.
+- Play/pause at five simulated minutes per second, stopping on manual time edits,
+  backgrounding, disposal or the date limit; UTC remains authoritative.
 - No paid service, secrets, custom shaders or fabricated imagery.
 
 ## Responsibility boundaries
 
 - `lib/core/astronomy.dart`: offline ephemerides and observer/renderer transforms.
+- `lib/core/local_time.dart`: approximate offline zone lookup and local presentation.
+- `lib/app/app.dart`: authoritative shared state, playback timer and lifecycle cleanup.
 - `lib/render/moon.dart`: lunar geometry, phase shading and approximate moonlight.
 - `lib/core/terrain_geo.dart`: XYZ/Web Mercator bounds, WGS84 and local frames.
 - `lib/data/terrain/`: raster elevations, CPU meshes, elevation repository.
@@ -64,7 +73,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- Forty-six passing unit/widget tests: optics/state/geographic precision, elevations,
+- Fifty-four passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
   resolutions/metadata/cache, missing detail, corruption and out-of-coverage behavior.
@@ -73,6 +82,10 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   boundaries and shared readout changes are tested offline.
 - Widget tests verify celestial guide bearings/markers and horizon styling;
   the time slider rounds minutes and preserves state at both date boundaries.
+- Offline local-clock tests cover multiple zones, fractional offsets, DST gaps/folds,
+  southern-hemisphere DST, rollover, instant preservation and unavailable years.
+- Widget tests check playback, stopping on edits/backgrounding/disposal, the upper
+  date boundary, and the estimated local readout.
 - Native workflow loads nine real Yosemite terrain patches and nine NAIP textures;
   the camera patch receives an additional higher-resolution image.
 - Returning to 3D reports **9 cached / 0 downloaded** elevation patches and
@@ -82,7 +95,8 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   camera controls, projection synchronization, timeline changes and teardown.
 - Using the actual shared time slider changes solar direction and GPU-rendered brightness;
   nighttime light follows the Moon with phase/elevation-dependent intensity.
-  Geometry and download counters stay unchanged.
+  Native playback advances shared UTC time, the estimated local readout is visible,
+  and geometry and download counters stay unchanged.
 - Native pixel checks verify the lunar bright limb, visible phase pixels with
   terrain isolated, actual canyon occlusion and a foreground depth blocker.
   Moon phase updates preserve its geometry; numerical tests check illuminated area.
@@ -118,8 +132,30 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
   Accuracy checks cover selected cases, not the entire supported date range.
 - Solar brightness/color and ambient twilight are approximate; the built-in
   sky becomes black below the solar horizon. Natural imagery retains its lighting.
-- Local timezone display, automatic playback, saved plans and exports remain open.
+- Approximate static timezone boundaries; local display only for 1970–2037.
+  No local-wall-time input or timezone override. Civil-time rules can change.
+- Saved plans and exports remain open.
 
 See [astronomy notes](astronomy.md) for the calculation contract, reference
-sources and accuracy limits. Next: location-based timezone display and
-optional automatic playback, then stars and the Milky Way.
+sources and accuracy limits. Next: stars and the Milky Way, then saved plans.
+
+## Remaining roadmap gates
+
+The roadmap is **not complete**. Remaining MVP work includes:
+
+1. A licensed offline star catalog, epoch corrections, batched star rendering,
+   sky rotation, terrain occlusion and solar/lunar visibility approximation.
+2. A licensed simplified Milky Way representation, Galactic-center position,
+   map/3D markers, target selection and field-of-view checks.
+3. Versioned JSON saved plans with reopen support, including selected target.
+4. Responsive-layout validation, adaptive quality, frustum/LOD improvements,
+   defined-device FPS/latency profiling and long-running GPU-resource checks.
+5. Android, Web/WebGL2, Windows and macOS scaffolding and actual-platform
+   build/render validation. Linux success does not close the Phase 0 gate.
+6. The documented Shenandoah save/close/reopen demonstration and complete
+   workflow regression tests on all five target platforms.
+
+Post-MVP priorities in the roadmap, including advanced weather and photographic
+exports, are not part of the MVP completion claim. Windows/macOS verification
+requires those operating systems or suitable CI runners; none has been verified
+in this Linux session.

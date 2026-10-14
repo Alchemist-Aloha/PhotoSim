@@ -230,6 +230,19 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(camera().timestamp.day, original.timestamp.day);
     expect(camera().timestamp.hour, 6);
+    final beforePlayback = camera().timestamp;
+    await tester.tap(
+      find.byTooltip('Play time (5 simulated minutes per second)'),
+    );
+    await tester.pump(const Duration(milliseconds: 650));
+    await tester.tap(find.byTooltip('Pause time'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(camera().timestamp.isAfter(beforePlayback), isTrue);
+    expect(
+      tester.widget<scene.SceneView>(find.byType(scene.SceneView)).scene,
+      same(world),
+    );
+    expect(find.textContaining('America/Los_Angeles'), findsOneWidget);
     expect(
       world.directionalLight!.intensity,
       closeTo(moonlightIntensity(camera().sky), 1e-12),

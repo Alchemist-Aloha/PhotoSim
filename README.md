@@ -34,6 +34,8 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - UTC-driven Sun/Moon lighting, cascaded terrain shadows and approximate clear sky.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
 - Collapsible inspector, UTC date/time controls and shared minute-resolution day slider.
+- Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
+- Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
 
 The preview maintains the sensor's aspect ratio so map and 3D fields of view
 agree. Camera controls never translate the 3D camera implicitly.
@@ -64,9 +66,11 @@ labeled green fallback material. Sun/Moon calculations and solar lighting now
 work locally, including a phase-lit lunar sphere and approximate moonlight.
 Lunar surface detail, stars, saved plans and exports remain unimplemented.
 Map rays indicate bearings, not rise/set or terrain visibility predictions.
-Dates are limited to 1900–2100; local timezone display and automatic playback
-are not implemented. See [astronomy notes](docs/astronomy.md) for reference tests
-and accuracy/lighting limitations.
+UTC dates are limited to 1900–2100. Estimated local display supports only
+1970–2037 because the bundled timezone transitions stop in 2037; other dates
+show an explicit warning. Coordinate-to-zone boundaries are approximate.
+All editing remains UTC. See [astronomy notes](docs/astronomy.md) for reference
+tests and accuracy/lighting/timezone limitations.
 
 Natural imagery preserves existing colors and baked-in shadows. Opt-in
 relighting is approximate and may double those shadows. Imagery dates do not

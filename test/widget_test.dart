@@ -16,6 +16,12 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(const PhotoSimApp());
+      expect(
+        find.text(
+          'Estimated local: 2026-06-21 12:00 PDT (UTC-07:00) · America/Los_Angeles',
+        ),
+        findsOneWidget,
+      );
       void checkGuides() {
         final state = tester
             .widget<CameraInspector>(find.byType(CameraInspector))
@@ -97,6 +103,75 @@ void main() {
         );
       }
       await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'playback pauses for time edits/background and stops at date bounds',
+    (tester) async {
+      tester.view.physicalSize = const Size(1600, 960);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const PhotoSimApp());
+      SimulationState camera() =>
+          tester.widget<CameraInspector>(find.byType(CameraInspector)).state;
+      const play = 'Play time (5 simulated minutes per second)';
+      final original = camera().timestamp;
+      await tester.tap(find.byTooltip(play));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(camera().timestamp, original.add(const Duration(minutes: 3)));
+      tester
+          .widget<CameraInspector>(find.byType(CameraInspector))
+          .onChanged(camera().copyWith(focalLength: 50));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(camera().timestamp, original.add(const Duration(minutes: 4)));
+      await tester.tap(find.byTooltip('Pause time'));
+      await tester.pump(const Duration(seconds: 1));
+      expect(camera().timestamp, original.add(const Duration(minutes: 4)));
+      await tester.tap(find.byTooltip(play));
+      await tester.pump(const Duration(milliseconds: 200));
+      tester
+          .widget<Slider>(find.byKey(const ValueKey('utc-day-slider')))
+          .onChanged!(400);
+      await tester.pump(const Duration(seconds: 1));
+      expect(camera().timestamp, DateTime.utc(2026, 6, 21, 6, 40));
+      expect(find.byTooltip(play), findsOneWidget);
+      await tester.tap(find.byTooltip(play));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump(const Duration(seconds: 1));
+      expect(camera().timestamp, DateTime.utc(2026, 6, 21, 6, 40));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester
+          .widget<CameraInspector>(find.byType(CameraInspector))
+          .onChanged(
+            camera().copyWith(
+              timestamp: DateTime.utc(2100, 12, 31, 23, 58, 30),
+            ),
+          );
+      await tester.pump();
+      await tester.tap(find.byTooltip(play));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(camera().timestamp, DateTime.utc(2100, 12, 31, 23, 59, 30));
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (w) => w is IconButton && w.tooltip == play,
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.textContaining('Local time unavailable:'), findsOneWidget);
+      tester
+          .widget<CameraInspector>(find.byType(CameraInspector))
+          .onChanged(camera().copyWith(timestamp: original));
+      await tester.pump();
+      await tester.tap(find.byTooltip(play));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
       expect(tester.takeException(), isNull);
     },
   );

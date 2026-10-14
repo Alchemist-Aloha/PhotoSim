@@ -58,13 +58,47 @@ Sun/Moon directions coincide; screen-spaced labels remain future work.
 `lib/ui/time_slider.dart` provides a shared UTC-day slider from 00:00 to 23:59
 at minute resolution. It preserves the selected UTC date and all camera/imagery
 preferences; scrubbing clears seconds/subseconds. Use the date picker or hour
-steps to cross dates. Endpoint dates remain inside 1900–2100. Local timezone
-conversion and automatic playback are not yet implemented.
+steps to cross dates. Endpoint dates remain inside 1900–2100. Date/time pickers
+are explicitly UTC; the local clock described below is presentation-only.
+
+Play/pause advances one simulated minute every 200 ms (five minutes per second).
+Playback stops on manual time edits, app backgrounding, disposal, or the upper
+date limit. Camera/appearance changes and workspace switching preserve playback.
+It changes shared UTC state, not terrain geometry or geographic downloads.
 
 Widget tests check guide bearings, marker alignment, below-horizontal styling,
 slider minute rounding, UTC/date bounds and state preservation. The native GPU
 workflow uses the actual slider to change lighting while retaining terrain
-geometry and terrain/imagery download counters.
+geometry and terrain/imagery download counters, including during playback.
+
+## Estimated local clock
+
+`lib/core/local_time.dart` maps the camera coordinates to an IANA timezone
+using pinned `lat_lng_to_timezone` 0.2.0 (MIT), then converts the UTC instant
+with `timezone` 0.11.2 (BSD-2-Clause). Both operate offline. The UI shows the
+local date/time, IANA zone, abbreviation and UTC offset; fractional offsets
+and daylight-saving transitions are preserved. Moving the camera recomputes
+the displayed zone without changing the simulation instant.
+
+The coordinate lookup is an approximate static boundary map, not a maintained
+political-boundary dataset; border, offshore and historical-location results
+may be wrong. The UI deliberately calls this an **estimated** local time.
+
+The bundled full timezone database is IANA **2026e**, but its transition tables
+stop in **2037** and do not apply the future POSIX recurrence rules. A direct
+probe incorrectly returned standard time for Los Angeles in July 2050. Rather
+than silently displaying a wrong offset, local display is restricted to
+**1970–2037**, with an explicit unavailable warning outside that range or for
+missing zones. UTC editing and astronomy still support **1900–2100**. Future
+political changes also require database updates; this is not a legal guarantee
+of future civil time. There is no local-wall-time input or timezone override.
+
+Offline tests cover US spring gaps/autumn folds, European and southern-hemisphere
+DST, fractional offsets, local date rollover, instant preservation, invalid
+coordinates and the supported-year guard. Playback widget tests cover manual
+edits, disposal/backgrounding and the upper date boundary. The native Linux
+workflow verifies the local readout and actual playback with unchanged terrain
+geometry/download counters.
 
 ## Rendering
 
@@ -118,5 +152,5 @@ terrain hidden and the right-hand bright limb for the selected waxing phase.
 The workflow also verifies lunar color changes without replacing its geometry.
 Unit tests check phase-lit projected area, limb rotation and brightness ramps.
 
-Next: location-based local timezone display and automatic time playback,
-then stars and the Milky Way.
+Next: stars and the Milky Way, followed by saved plans and the release gates.
+The full roadmap remains incomplete.

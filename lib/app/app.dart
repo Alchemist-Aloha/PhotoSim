@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../core/local_time.dart';
 
 import '../models/simulation_state.dart';
 import '../ui/camera_inspector.dart';
@@ -34,16 +38,64 @@ class WorkspaceShell extends StatefulWidget {
   State<WorkspaceShell> createState() => _WorkspaceShellState();
 }
 
-class _WorkspaceShellState extends State<WorkspaceShell> {
+class _WorkspaceShellState extends State<WorkspaceShell>
+    with WidgetsBindingObserver {
   SimulationState state = SimulationState();
   Workspace workspace = Workspace.map;
   bool inspectorVisible = true;
 
-  void update(SimulationState next) => setState(() => state = next);
+  Timer? playback;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  void stopPlayback() {
+    playback?.cancel();
+    playback = null;
+  }
+
+  void togglePlayback() => setState(() {
+    if (playback != null) {
+      stopPlayback();
+    } else {
+      playback = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        final next = state.timestamp.add(const Duration(minutes: 1));
+        if (next.year > 2100) {
+          setState(stopPlayback);
+        } else {
+          setState(() => state = state.copyWith(timestamp: next));
+        }
+      });
+    }
+  });
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+    if (lifecycle != AppLifecycleState.resumed && playback != null) {
+      setState(stopPlayback);
+    }
+  }
+
+  @override
+  void dispose() {
+    stopPlayback();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void update(SimulationState next) => setState(() {
+    if (next.timestamp != state.timestamp) stopPlayback();
+    state = next;
+  });
 
   Future<void> chooseTime() async {
+    setState(stopPlayback);
     final date = await showDatePicker(
       context: context,
+      helpText: 'Choose simulation date (UTC)',
       initialDate: state.timestamp,
       firstDate: DateTime(1900),
       lastDate: DateTime(2100, 12, 31),
@@ -51,6 +103,7 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
+      helpText: 'Choose simulation time (UTC)',
       initialTime: TimeOfDay.fromDateTime(state.timestamp),
     );
     if (time == null || !mounted) return;
@@ -81,6 +134,12 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
   @override
   Widget build(BuildContext context) {
     final sky = state.sky;
+    final clock = localClock(
+      timestamp: state.timestamp,
+      latitude: state.latitude,
+      longitude: state.longitude,
+    );
+    final local = clock.time;
     final inspector = CameraInspector(state: state, onChanged: update);
     return Scaffold(
       appBar: AppBar(
@@ -135,6 +194,23 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
                 SizedBox(height: 240, child: inspector),
               const Divider(height: 1),
               Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                child: Tooltip(
+                  message:
+                      'Estimated timezone from bundled coordinate mapping. Verify near borders and offshore. '
+                      'Local rules are supported for 1970–2037; all controls and astronomy remain UTC.',
+                  child: Text(
+                    local == null
+                        ? clock.warning!
+                        : 'Estimated local: ${local.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
+                              '${local.timeZoneName} (${formatUtcOffset(local.timeZoneOffset)}) · ${clock.zoneId}',
+                  ),
+                ),
+              ),
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TimeSlider(state: state, onChanged: update),
               ),
@@ -156,6 +232,22 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
                     ),
                     timeStep(-1),
                     timeStep(1),
+                    IconButton(
+                      tooltip: playback == null
+                          ? 'Play time (5 simulated minutes per second)'
+                          : 'Pause time',
+                      icon: Icon(
+                        playback == null ? Icons.play_arrow : Icons.pause,
+                      ),
+                      onPressed:
+                          playback == null &&
+                              state.timestamp
+                                      .add(const Duration(minutes: 1))
+                                      .year >
+                                  2100
+                          ? null
+                          : togglePlayback,
+                    ),
                     Text(
                       'Sun az ${sky.sun.azimuth.toStringAsFixed(1)}° · alt ${sky.sun.altitude.toStringAsFixed(1)}°',
                     ),
