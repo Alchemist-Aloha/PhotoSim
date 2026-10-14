@@ -399,7 +399,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       ..sunDirection = sunDirection
       ..sunAngularRadius = sun.angularRadius;
     // shortcut: clear-sky color/brightness ramps, use calibrated radiometry for exposure simulation.
-    active.environmentIntensity = 0.005 + 0.245 * twilight;
+    // Keep night terrain distinguishable from the sky without adding directional shadows.
+    active.environmentIntensity = 0.04 + 0.21 * twilight;
     final moon = sky.moon.direction;
     // The one shadow-casting light follows the Moon once the Sun is below horizontal.
     active.directionalLight!

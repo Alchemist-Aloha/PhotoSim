@@ -20,7 +20,7 @@ The software will combine real terrain elevation data, satellite imagery, local 
 
 The application must provide two primary, synchronized workspaces:
 
-1. **2D Map View:** A geographic planning interface in which users place a virtual camera, select the viewing direction, configure a lens, and examine terrain and celestial alignments.
+1. **2D Map View:** A geographic planning interface in which users place a virtual camera, select the viewing direction, set sensor format and focal length, and examine terrain and celestial alignments.
 2. **3D Simulation View:** An interactive virtual camera showing the terrain, celestial objects, atmospheric conditions, and simulated lighting from the selected viewpoint.
 
 Both workspaces must share the same simulation state. Switching between them must not reset camera parameters, time, or geographic location.
@@ -33,8 +33,8 @@ The finished application must support:
 
 - Interactive 2D geographic maps.
 - Precise camera placement and orientation.
-- Named camera-body presets and custom sensor dimensions.
-- Named lens presets, zoom lenses, prime lenses, and custom focal lengths.
+- A pill selector for APS-C and full-frame sensor formats.
+- A single continuous focal-length slider spanning 8–600 mm, without lens presets.
 - Accurate photographic field-of-view calculation.
 - Real 3D terrain reconstructed from elevation data.
 - Satellite and aerial imagery projected onto terrain.
@@ -82,7 +82,7 @@ On desktop, optional side-by-side viewing may display both workspaces simultaneo
 
 Both workspaces observe and modify a single shared simulation state.
 
-Secondary functionality—including lens controls, astronomical information, weather, saved plans, and settings—must be presented through toolbars, panels, dialogs, or bottom sheets.
+Secondary functionality—including optics controls, astronomical information, weather, saved plans, and settings—must be presented through toolbars, panels, dialogs, or bottom sheets.
 
 ## 2.2 Map View — Geographic planning
 
@@ -120,7 +120,7 @@ The camera's field of view must be displayed as a translucent wedge extending fr
 
 The wedge angle must correspond to the actual horizontal field of view calculated from the selected camera sensor and focal length.
 
-The wedge must update immediately when the user rotates the camera, changes focal length, or changes sensor dimensions.
+The wedge must update immediately when the user rotates the camera, changes focal length, or changes sensor format.
 
 A drag handle must allow the camera direction to be rotated without moving the camera position.
 
@@ -222,7 +222,7 @@ The 3D renderer must respond to:
 | Satellite imagery source | Replace surface textures |
 | Terrain resolution | Refine or simplify terrain meshes |
 
-Changing time, lens, or camera direction must not reload geographic data unnecessarily.
+Changing time, sensor format, focal length, or camera direction must not reload geographic data unnecessarily.
 
 ## 3.4 Visual overlays
 
@@ -246,91 +246,38 @@ A clean fullscreen photographic preview must always be available.
 
 ---
 
-# 4. Camera Body and Lens System
+# 4. Sensor Format and Focal Length
 
-## 4.1 Camera body presets
+## 4.1 Sensor format selector
 
-Implement a database of camera bodies and sensor formats.
+Provide one single-selection pill control with two options:
 
-Each camera preset must specify:
+| Format | Sensor width | Sensor height |
+|---|---|---|
+| APS-C | 23.5 mm | 15.6 mm |
+| Full-frame | 36 mm | 24 mm |
 
-- Manufacturer.
-- Model.
-- Sensor width and height.
-- Sensor orientation.
-- Default aspect ratio.
-- Optional native image resolution.
-- Optional lens mount.
+Full-frame is selected by default. Changing sensor format must preserve focal length, camera location/orientation, and simulation time while immediately updating the map wedge and 3D projection.
 
-Initial generic sensor formats:
+Do not provide a camera-body dropdown, named camera-body database, additional sensor formats, or custom sensor dimensions in the initial optics system.
 
-- Full-frame.
-- APS-C.
-- Micro Four Thirds.
-- 1-inch type.
-- Custom sensor dimensions.
+## 4.2 Simplified optics model
 
-Include a small collection of real camera-body examples, such as:
+The optics UI consists only of the sensor-format pill and a focal-length slider, with read-only focal-length and field-of-view information.
 
-- Fujifilm X-T3.
-- Sony A7 series.
-- Nikon Z series.
-- Canon EOS R series.
+Do not provide lens selection, prime/zoom categories, lens presets, custom lens definitions, mount compatibility, or per-lens focal-length restrictions. All focal lengths use the same rectilinear projection model.
 
-Camera definitions must be stored as editable, versioned data rather than hard-coded into the renderer.
+Exposure controls are separate photography tools, not additional lens-selection controls.
 
-Users must be able to create and save custom camera bodies.
+## 4.3 Focal length slider
 
-## 4.2 Lens presets
+Provide one continuous slider spanning **8–600 mm**, with **24 mm** as the default. The range is independent of the selected sensor format.
 
-Support a database of interchangeable lenses.
+Display the actual focal length in millimeters and the horizontal/vertical field of view. The selected sensor format must remain visible in the pill control.
 
-Each lens must define:
+Changing focal length must immediately modify the virtual camera projection and the 2D map's field-of-view wedge. It must not physically move the virtual camera, change simulation time, or reload geographic data.
 
-- Manufacturer and model.
-- Lens mount.
-- Minimum focal length.
-- Maximum focal length.
-- Maximum aperture.
-- Optional focal-length-dependent maximum aperture.
-- Minimum aperture, when known.
-- Compatible image circle or sensor format.
-- Projection type.
-
-Initial representative lens presets:
-
-- 14–24mm f/2.8.
-- 16–35mm f/2.8.
-- 24–70mm f/2.8.
-- 24–120mm f/4.
-- 70–200mm f/2.8.
-- 20mm f/1.8.
-- 24mm f/1.4.
-- 35mm f/1.8.
-- 50mm f/1.8.
-
-Users must also be able to create custom lenses.
-
-Lens-mount compatibility should be checked when reliable compatibility information exists, with manual override available.
-
-## 4.3 Focal length controls
-
-For a zoom lens, show a continuous focal-length slider within the specified optical zoom range.
-
-For a prime lens, focal length remains fixed.
-
-Display:
-
-- Actual focal length.
-- Full-frame-equivalent focal length.
-- Horizontal field of view.
-- Vertical field of view.
-- Diagonal field of view.
-- Current sensor format.
-
-Changing focal length must modify the virtual camera projection and the 2D map's field-of-view wedge.
-
-It must not physically move the virtual camera.
+Validate that focal length is finite and within 8–600 mm when constructing camera state or importing saved plans.
 
 ## 4.4 Perspective calculation
 
@@ -342,7 +289,7 @@ Calculate the vertical field of view as:
 
 VFOV = 2 × atan(sensorHeight / (2 × focalLength))
 
-Use the active sensor crop, image aspect ratio, and sensor orientation.
+Use the selected sensor format's physical dimensions and the preview's image orientation/aspect ratio. Sensor dimensions are derived from the format, not independently editable.
 
 Build the 3D projection matrix from the calculated camera parameters.
 
@@ -1145,30 +1092,19 @@ Suggested state models:
 - Pitch.
 - Roll.
 
-### CameraBody
+### CameraOptics
 
-- Camera ID.
-- Sensor dimensions.
-- Sensor crop.
-- Image orientation.
-- Default aspect ratio.
+- Sensor format (`apsC` or `fullFrame`).
+- Sensor dimensions derived from the format.
+- Current focal length (8–600 mm).
+- Image orientation and derived aspect ratio.
+- Rectilinear projection.
 
-### LensDefinition
-
-- Lens ID.
-- Minimum focal length.
-- Maximum focal length.
-- Aperture limits.
-- Projection type.
-
-### LensState
-
-- Selected lens.
-- Current focal length.
-- Current aperture.
+Do not store a selected camera-body or lens-preset identifier in the active optics state.
 
 ### ExposureState
 
+- Aperture.
 - ISO.
 - Shutter speed.
 - Exposure compensation.
@@ -1216,7 +1152,7 @@ Examples:
 
 - Rotating the camera on the map immediately changes the 3D camera.
 - Rotating the camera in the 3D view updates the map's directional wedge.
-- Changing the lens in either workspace updates both.
+- Changing focal length or sensor format in either workspace updates both without resetting the other optics setting.
 - Adjusting simulation time changes celestial overlays and rendered illumination.
 - Repositioning the camera on the map updates the 3D scene progressively.
 
@@ -1277,7 +1213,7 @@ Display:
 - Target altitude.
 - Angular offset from camera center.
 - Terrain obstruction status.
-- Whether the target is inside the selected lens field of view.
+- Whether the target is inside the field of view determined by sensor format and focal length.
 
 Automated searches for ideal alignment dates and locations may be added in a later version.
 
@@ -1345,9 +1281,8 @@ A plan includes:
 - Camera location.
 - Camera orientation.
 - Camera height.
-- Selected camera body.
-- Selected lens.
-- Focal length.
+- Sensor format (`apsC` or `fullFrame`).
+- Focal length (8–600 mm).
 - Exposure parameters.
 - Date and time.
 - Selected celestial target.
@@ -1369,7 +1304,9 @@ Support:
 
 Saved plans must be portable between devices through a versioned JSON format.
 
-The system must gracefully handle missing camera presets or unavailable geographic tiles when opening an older plan.
+New plans use version-2 JSON and omit lens-preset identifiers. Legacy version-1 plans remain readable: ignore their obsolete `lens` field while preserving focal length and sensor format. Validate sensor identifiers and focal-length bounds rather than depending on a preset database. Older application builds are not required to read version-2 plans.
+
+The system must gracefully handle unavailable geographic tiles when opening a saved plan.
 
 ---
 
@@ -1413,8 +1350,7 @@ Suggested layout:
 Collapsible sections for:
 
 - Camera position.
-- Camera body.
-- Lens.
+- Camera optics: sensor-format pill and focal-length slider.
 - Exposure.
 - Astronomy.
 - Atmosphere.
@@ -1482,8 +1418,7 @@ Optional overlays or accompanying JSON may include:
 
 - Geographic coordinates.
 - Simulation date/time.
-- Camera body.
-- Lens.
+- Sensor format.
 - Focal length.
 - Camera direction.
 - Camera altitude.
@@ -1539,10 +1474,13 @@ Test atmospheric refraction separately, especially near the horizon.
 Verify:
 
 - Horizontal and vertical field of view.
-- Sensor cropping.
+- APS-C and full-frame sensor dimensions.
 - Portrait orientation.
-- Zoom-lens focal range.
-- Prime-lens restrictions.
+- The shared 8–600 mm focal-length range and invalid-input rejection.
+- Focal-length preservation when changing sensor format.
+- Sensor-format preservation when changing focal length.
+- Sensor pills and focal-length slider with no preset dropdowns.
+- Legacy-plan compatibility after removal of lens presets.
 - Camera pitch and roll.
 - Celestial angular separation.
 - Agreement between 2D FOV wedge and 3D projection.
@@ -1585,15 +1523,14 @@ An automated end-to-end test must cover:
 2. Select map location.
 3. Place camera.
 4. Set direction.
-5. Select camera body.
-6. Select lens.
-7. Adjust focal length.
-8. Switch to 3D.
-9. Change date/time.
-10. Observe astronomy and lighting updates.
-11. Save photography plan.
-12. Reopen plan.
-13. Export preview.
+5. Select APS-C or full-frame using the sensor pill.
+6. Adjust focal length using the 8–600 mm slider.
+7. Switch to 3D.
+8. Change date/time.
+9. Observe astronomy and lighting updates.
+10. Save photography plan.
+11. Reopen plan and verify sensor format and focal length are preserved.
+12. Export preview.
 
 ---
 
@@ -1635,12 +1572,12 @@ Features:
 - Field-of-view wedge.
 - Map/3D switcher.
 - Shared camera state.
-- Generic sensor presets.
-- Prime and zoom lens presets.
+- APS-C/full-frame sensor-format pill.
+- Single 8–600 mm focal-length slider.
 - Accurate perspective projection.
 - Basic 3D viewport.
 
-**Exit criteria:** Users can place a camera on the map, choose a lens, set direction and focal length, and see corresponding 3D camera movement.
+**Exit criteria:** Users can place a camera on the map, select sensor format, set direction and focal length, and see the corresponding 3D perspective. Changing optics must not move the camera.
 
 Procedural terrain may still be used at this stage.
 
@@ -1709,7 +1646,7 @@ Features:
 - Night sky brightness.
 - Terrain occlusion.
 
-**Exit criteria:** A user can preview the Milky Way relative to real geographic terrain and determine its position within a selected lens field of view.
+**Exit criteria:** A user can preview the Milky Way relative to real geographic terrain and determine its position within the field of view determined by sensor format and focal length.
 
 ## Phase 6 — Photography Tools and Saved Plans
 
@@ -1717,8 +1654,8 @@ Features:
 
 Features:
 
-- Camera/lens database.
-- Custom presets.
+- Simplified sensor-format and focal-length controls.
+- Persistence of optics settings, including legacy-plan compatibility.
 - Exposure controls.
 - Camera overlays.
 - Saved plans.
@@ -1780,7 +1717,7 @@ landscape_simulator/
 │   │   ├── map_view/
 │   │   ├── simulation_view/
 │   │   ├── camera_controls/
-│   │   ├── lens_controls/
+│   │   ├── optics_controls/
 │   │   ├── astronomy_controls/
 │   │   ├── timeline/
 │   │   ├── saved_plans/
@@ -1796,7 +1733,6 @@ landscape_simulator/
 │   │   ├── terrain/
 │   │   ├── imagery/
 │   │   ├── weather/
-│   │   ├── camera_database/
 │   │   ├── cache/
 │   │   └── persistence/
 │   ├── render/
@@ -1811,8 +1747,6 @@ landscape_simulator/
 │   └── models/
 ├── assets/
 │   ├── astronomy/
-│   ├── cameras/
-│   ├── lenses/
 │   └── textures/
 ├── test/
 │   ├── geo/
@@ -1884,7 +1818,7 @@ The initial public release is complete when:
 2. The 2D Map View allows precise virtual-camera placement.
 3. Users can rotate the camera and visualize its field of view on the map.
 4. The 3D Simulation View displays the corresponding camera perspective.
-5. Users can select named or custom camera bodies and lenses.
+5. Users can select APS-C or full-frame with a pill control and adjust focal length with a single 8–600 mm slider; no camera-body or lens-preset selection is required.
 6. Focal-length adjustment updates the 2D field-of-view wedge and 3D perspective simultaneously.
 7. The application downloads and renders real terrain elevation data.
 8. Satellite or aerial imagery is correctly mapped onto the terrain.
@@ -1971,7 +1905,7 @@ These extensions must build on the existing camera, terrain, astronomy, and rend
 
 Build the project as an accurate, interactive **landscape and astrophotography planning simulator** with two tightly synchronized workspaces.
 
-The **2D Map View** is used to plan camera location, orientation, lens selection, geographic framing, and astronomical alignment.
+The **2D Map View** is used to plan camera location, orientation, sensor format, focal length, geographic framing, and astronomical alignment.
 
 The **3D Simulation View** is used to preview the scene through the selected photographic equipment, using actual terrain, geographic imagery, locally calculated celestial positions, and real-time lighting.
 
@@ -1980,7 +1914,7 @@ Both workspaces must operate on the same camera and simulation state.
 Prioritize the following implementation sequence:
 
 1. Validate the GPU rendering architecture across every target platform.
-2. Implement the two synchronized workspaces and accurate camera/lens model.
+2. Implement the two synchronized workspaces and accurate sensor/focal-length projection model.
 3. Render real geographic terrain with satellite textures.
 4. Add locally calculated Sun/Moon positions and physically informed lighting.
 5. Integrate stars, the Milky Way, and terrain-aware celestial visibility.
@@ -2000,4 +1934,4 @@ Maintain strict separation between:
 
 The architecture should allow future improvements to scientific accuracy, geographic data resolution, and rendering quality without replacing the application or rewriting its core calculations.
 
-**The primary product goal is to let a photographer choose a location, camera, lens, and time, then immediately see an astronomically and geographically consistent preview of the photograph they could capture.**
+**The primary product goal is to let a photographer choose a location, sensor format, focal length, direction, and time, then immediately see an astronomically and geographically consistent preview of the photograph they could capture.**

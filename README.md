@@ -22,7 +22,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Interactive OpenStreetMap map centered on Yosemite.
 - Click to place a camera; drag its marker to move it and its green handle to aim.
 - Geographic field-of-view wedge calculated from physical sensor and focal length.
-- Full-frame / APS-C sensors, three zoom presets, and custom focal lengths.
+- Full-frame / APS-C sensor pills and a single 8–600 mm focal-length slider.
 - Shared camera position, azimuth, pitch, height, focal length, and UTC timestamp.
 - Real Mapzen elevation terrain rendered in a camera-relative WGS84 frame.
 - Terrain-derived camera height, progressive loading, simple distance LOD, and tile skirts.

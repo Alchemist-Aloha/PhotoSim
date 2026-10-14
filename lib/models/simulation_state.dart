@@ -29,20 +29,10 @@ enum Sensor {
   final double height;
 }
 
-enum Lens {
-  wide('16–35 mm', 16, 35),
-  standard('24–70 mm', 24, 70),
-  telephoto('70–200 mm', 70, 200),
-  custom('Custom focal length', 8, 600);
-
-  const Lens(this.label, this.min, this.max);
-  final String label;
-  final double min;
-  final double max;
-}
-
 @immutable
 class SimulationState {
+  static const minFocalLength = 8.0, maxFocalLength = 600.0;
+
   SimulationState({
     this.latitude = 37.744,
     this.longitude = -119.59,
@@ -50,7 +40,6 @@ class SimulationState {
     this.pitch = 8,
     this.height = 1.7,
     this.sensor = Sensor.fullFrame,
-    this.lens = Lens.standard,
     this.focalLength = 24,
     this.groundElevation,
     this.relitImagery = false,
@@ -72,8 +61,8 @@ class SimulationState {
         height < 0.1 ||
         height > 100 ||
         !focalLength.isFinite ||
-        focalLength < lens.min ||
-        focalLength > lens.max ||
+        focalLength < minFocalLength ||
+        focalLength > maxFocalLength ||
         (groundElevation != null &&
             (!groundElevation!.isFinite ||
                 groundElevation! < -12000 ||
@@ -86,7 +75,6 @@ class SimulationState {
   final double? groundElevation;
   final bool relitImagery;
   final Sensor sensor;
-  final Lens lens;
   final DateTime timestamp;
   final CelestialTarget target;
 
@@ -138,14 +126,12 @@ class SimulationState {
     double? pitch,
     double? height,
     Sensor? sensor,
-    Lens? lens,
     double? focalLength,
     double? groundElevation,
     bool? relitImagery,
     CelestialTarget? target,
     DateTime? timestamp,
   }) {
-    final selectedLens = lens ?? this.lens;
     return SimulationState(
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
@@ -153,10 +139,9 @@ class SimulationState {
       pitch: (pitch ?? this.pitch).clamp(-85, 85),
       height: height ?? this.height,
       sensor: sensor ?? this.sensor,
-      lens: selectedLens,
       focalLength: (focalLength ?? this.focalLength).clamp(
-        selectedLens.min,
-        selectedLens.max,
+        minFocalLength,
+        maxFocalLength,
       ),
       groundElevation:
           (latitude != null && latitude != this.latitude) ||

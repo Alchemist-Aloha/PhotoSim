@@ -136,12 +136,7 @@ void main() {
       expect(state.containsDirection(direction(359, 70)), isFalse);
       final edge = direction(374, 30);
       expect(state.containsDirection(edge), isTrue);
-      expect(
-        state
-            .copyWith(lens: Lens.telephoto, focalLength: 200)
-            .containsDirection(edge),
-        isFalse,
-      );
+      expect(state.copyWith(focalLength: 200).containsDirection(edge), isFalse);
       final gc = state.copyWith(target: CelestialTarget.galacticCenter);
       expect(gc.targetPosition!.direction, gc.galacticCenter.direction);
       expect(

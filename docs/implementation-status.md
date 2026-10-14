@@ -10,7 +10,9 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
 ## Available
 
 - Two synchronized map/3D workspaces with camera placement, draggable aim,
-  physical sensor/lens fields of view, height and UTC timeline controls.
+  physical sensor/focal-length fields of view, height and UTC timeline controls.
+- APS-C/full-frame sensor pills and one 8–600 mm focal-length slider; no lens presets.
+  Existing saved-plan focal lengths and sensor selections remain readable.
 - Terrarium decoding, pixel-center elevation interpolation, double-precision
   WGS84 ECEF/ENU, meter-scale camera-relative geometry and ellipsoid curvature.
 - Progressive 3×3 zoom-13 terrain, generated normals/UVs, camera ground vertex,
@@ -47,7 +49,7 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
   J2000 precession/nutation/sidereal rotation, immutable GPU batches and terrain depth tests.
 - Approximate solar/lunar night-sky visibility, Galactic-center map/3D markers,
   Sun/Moon/Galactic-center selection, explicit aim action and rectangular FOV checks.
-- Named version-1 JSON photography snapshots: camera, optics, UTC, selected target
+- Named version-2 JSON photography snapshots (legacy version-1 files remain readable): camera, optics, UTC, selected target
   and imagery preference; local save/open, fresh-app restoration and corruption warnings.
 - No paid service, secrets, custom shaders or fabricated imagery.
 
@@ -82,7 +84,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- Seventy-one passing unit/widget tests: optics/state/geographic precision, elevations,
+- Seventy-two passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
   resolutions/metadata/cache, missing detail, corruption and out-of-coverage behavior.

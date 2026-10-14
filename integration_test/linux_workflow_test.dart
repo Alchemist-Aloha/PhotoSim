@@ -289,9 +289,36 @@ void main() {
       world.directionalLight!.direction.y,
       closeTo(-camera().sky.moon.direction.y, 1e-6),
     );
-    expect(world.environmentIntensity, closeTo(0.005, 1e-12));
+    expect(world.environmentIntensity, closeTo(0.04, 1e-12));
     expect(skySource.sunDirection.y, lessThan(0));
     await capture('linux-solar-night');
+    // Isolate ambient fill from moonlight: it lifts terrain, not the sky.
+    final ambient = world.environmentIntensity;
+    final lunarIntensity = world.directionalLight!.intensity;
+    world.directionalLight!.intensity = 0;
+    await tester.pump(const Duration(milliseconds: 300));
+    final filledTerrain = await viewportBrightness(tester, captureKey);
+    world.environmentIntensity = 0;
+    await tester.pump(const Duration(milliseconds: 300));
+    final unfilledTerrain = await viewportBrightness(tester, captureKey);
+    expect(filledTerrain, greaterThan(unfilledTerrain + 1));
+    expect(filledTerrain, lessThan(dayBrightness * 0.25));
+    for (final node in texturedMeshes) {
+      node.visible = false;
+    }
+    await tester.pump(const Duration(milliseconds: 300));
+    final unfilledSky = await viewportBrightness(tester, captureKey);
+    world.environmentIntensity = ambient;
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      await viewportBrightness(tester, captureKey),
+      closeTo(unfilledSky, 0.05),
+    );
+    for (final node in texturedMeshes) {
+      node.visible = true;
+    }
+    world.directionalLight!.intensity = lunarIntensity;
+    await tester.pump(const Duration(milliseconds: 300));
     expect(
       await viewportBrightness(tester, captureKey),
       lessThan(dayBrightness * 0.5),
@@ -325,7 +352,6 @@ void main() {
           moonState.copyWith(
             azimuth: moonState.sky.moon.azimuth,
             pitch: moonState.sky.moon.altitude,
-            lens: Lens.custom,
             focalLength: 600,
           ),
         );
@@ -427,7 +453,6 @@ void main() {
     final night = beforeMoon.copyWith(
       timestamp: DateTime.utc(2026, 6, 21, 9),
       target: CelestialTarget.galacticCenter,
-      lens: Lens.wide,
       focalLength: 16,
     );
     tester
@@ -500,7 +525,6 @@ void main() {
             // Keep the star away from the UI crosshair excluded by pixel checks.
             azimuth: antares.azimuth + 0.3,
             pitch: antares.altitude,
-            lens: Lens.custom,
             focalLength: 600,
             target: CelestialTarget.none,
           ),
@@ -587,9 +611,7 @@ void main() {
     final rotated = camera();
     expect(rotated.azimuth, isNot(aimed.azimuth));
     expect(rotated.latitude, placed.latitude);
-    await tester.tap(find.text('Full-frame'));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('APS-C').last);
+    await tester.tap(find.text('APS-C'));
     await tester.pump(const Duration(milliseconds: 300));
     final updatedView = tester.widget<scene.SceneView>(
       find.byType(scene.SceneView),
@@ -658,7 +680,6 @@ void main() {
         .onChanged(
           camera().copyWith(
             target: CelestialTarget.galacticCenter,
-            lens: Lens.telephoto,
             focalLength: 85,
             height: 4.2,
           ),

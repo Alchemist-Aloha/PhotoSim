@@ -1,4 +1,4 @@
-# Local photography plans (version 1)
+# Local photography plans (version 2)
 
 Use the toolbar folder menu:
 
@@ -14,12 +14,17 @@ Native storage is currently **verified only on Linux**.
 
 Each snapshot is a standalone UTF-8 JSON file containing:
 
-- `version: 1` and a user-provided name (1–80 UTF-16 code units).
+- `version: 2` and a user-provided name (1–80 UTF-16 code units).
 - Latitude, longitude, azimuth, pitch and camera height above ground.
-- Sensor/lens enum identifiers and focal length in millimeters.
+- Sensor enum identifier and focal length in millimeters (8–600 mm).
 - Canonical UTC ISO-8601 simulation timestamp.
 - Selected target (`none`, `sun`, `moon`, `galacticCenter`).
 - Natural/approximate-relighting preference.
+
+Legacy version-1 files remain readable: their obsolete `lens` preset field is
+ignored, while focal length and sensor are preserved. New version-2 files omit
+that field. The existing `plans-v1` storage folder is retained so old plans stay
+accessible; older app builds may not support version-2 files.
 
 Ground elevation, downloaded data, playback state and derived sky positions
 are not stored. Elevation is recalculated when terrain loads. Copy JSON files

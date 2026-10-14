@@ -108,8 +108,11 @@ and calculated solar angular radius; the skybox draws behind terrain. The
 manual test-light slider has been removed.
 
 Direct intensity ramps from zero at solar center altitude 0° to 3 at 15°;
-color warms at low altitude. Ambient intensity ramps between 0.005 at −18°
-and 0.25 at 0°. These are approximate clear-sky appearance controls, **not
+color warms at low altitude. Ambient intensity ramps between 0.04 at −18°
+and 0.25 at 0°. The dim, shadowless night floor keeps lit/fallback and approximately
+relit terrain distinguishable from the dark sky, even without moonlight. It does
+not brighten the sky or unlit celestial objects; natural imagery still retains
+its captured lighting. These are approximate clear-sky appearance controls, **not
 calibrated irradiance, exposure or weather simulation**. The built-in sky
 model goes black below the solar horizon; only ambient terrain lighting has
 a twilight ramp. Stars and a simplified Milky Way brightness map are rendered

@@ -30,15 +30,15 @@ void main() {
     expect(original.focalLength, 24);
   });
 
-  test('lens selection clamps focal length to physical range', () {
-    expect(SimulationState().copyWith(lens: Lens.telephoto).focalLength, 70);
-    expect(
-      SimulationState(
-        lens: Lens.telephoto,
-        focalLength: 200,
-      ).copyWith(lens: Lens.wide).focalLength,
-      35,
-    );
+  test('focal length uses one range and sensor changes preserve it', () {
+    final state = SimulationState(focalLength: 200);
+    expect(state.copyWith(sensor: Sensor.apsC).focalLength, 200);
+    expect(state.copyWith(focalLength: 0).focalLength, 8);
+    expect(state.copyWith(focalLength: 1000).focalLength, 600);
+    expect(SimulationState(focalLength: 8).focalLength, 8);
+    expect(SimulationState(focalLength: 600).focalLength, 600);
+    expect(() => SimulationState(focalLength: 7), throwsArgumentError);
+    expect(() => SimulationState(focalLength: 601), throwsArgumentError);
   });
 
   test(

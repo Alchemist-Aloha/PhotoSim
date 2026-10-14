@@ -13,7 +13,7 @@ class SavedPlan {
   final SimulationState state;
 
   String encode() => const JsonEncoder.withIndent('  ').convert({
-    'version': 1,
+    'version': 2,
     'name': name,
     'timestamp': state.timestamp.toIso8601String(),
     'latitude': state.latitude,
@@ -22,7 +22,6 @@ class SavedPlan {
     'pitch': state.pitch,
     'height': state.height,
     'sensor': state.sensor.name,
-    'lens': state.lens.name,
     'focalLength': state.focalLength,
     'target': state.target.name,
     'relitImagery': state.relitImagery,
@@ -33,7 +32,9 @@ class SavedPlan {
       throw const FormatException('Plan exceeds 32 KiB');
     }
     final json = jsonDecode(source);
-    if (json is! Map || json['version'] != 1 || json['version'] is! int) {
+    if (json is! Map ||
+        json['version'] is! int ||
+        ![1, 2].contains(json['version'])) {
       throw const FormatException('Unsupported plan format/version');
     }
     try {
@@ -53,7 +54,6 @@ class SavedPlan {
           pitch: number('pitch'),
           height: number('height'),
           sensor: Sensor.values.byName(json['sensor'] as String),
-          lens: Lens.values.byName(json['lens'] as String),
           focalLength: number('focalLength'),
           target: CelestialTarget.values.byName(json['target'] as String),
           relitImagery: json['relitImagery'] as bool,

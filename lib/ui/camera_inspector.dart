@@ -51,39 +51,24 @@ class CameraInspector extends StatelessWidget {
         '${state.groundElevation == null ? 'not loaded' : '${state.groundElevation!.toStringAsFixed(1)} m (source datum)'}',
       ),
       const Divider(height: 32),
-      DropdownButtonFormField<Sensor>(
-        isExpanded: true,
-        key: ValueKey(state.sensor),
-        initialValue: state.sensor,
-        decoration: const InputDecoration(labelText: 'Sensor format'),
-        items: [
+      const Text('Sensor format'),
+      const SizedBox(height: 8),
+      SegmentedButton<Sensor>(
+        showSelectedIcon: false,
+        segments: [
           for (final sensor in Sensor.values)
-            DropdownMenuItem(value: sensor, child: Text(sensor.label)),
+            ButtonSegment(value: sensor, label: Text(sensor.label)),
         ],
-        onChanged: (value) {
-          if (value != null) onChanged(state.copyWith(sensor: value));
-        },
-      ),
-      const SizedBox(height: 16),
-      DropdownButtonFormField<Lens>(
-        isExpanded: true,
-        key: ValueKey(state.lens),
-        initialValue: state.lens,
-        decoration: const InputDecoration(labelText: 'Lens'),
-        items: [
-          for (final lens in Lens.values)
-            DropdownMenuItem(value: lens, child: Text(lens.label)),
-        ],
-        onChanged: (value) {
-          if (value != null) onChanged(state.copyWith(lens: value));
-        },
+        selected: {state.sensor},
+        onSelectionChanged: (value) =>
+            onChanged(state.copyWith(sensor: value.single)),
       ),
       const SizedBox(height: 20),
       control(
         'Focal length',
         state.focalLength,
-        state.lens.min,
-        state.lens.max,
+        SimulationState.minFocalLength,
+        SimulationState.maxFocalLength,
         (value) => onChanged(state.copyWith(focalLength: value)),
         ' mm',
       ),

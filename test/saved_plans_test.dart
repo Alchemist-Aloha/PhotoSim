@@ -13,7 +13,6 @@ void main() {
     pitch: -12,
     height: 3.2,
     sensor: Sensor.apsC,
-    lens: Lens.custom,
     focalLength: 321,
     target: CelestialTarget.galacticCenter,
     relitImagery: true,
@@ -34,7 +33,6 @@ void main() {
       expect(plan.state.pitch, state.pitch);
       expect(plan.state.height, state.height);
       expect(plan.state.sensor, state.sensor);
-      expect(plan.state.lens, state.lens);
       expect(plan.state.focalLength, state.focalLength);
       expect(plan.state.target, state.target);
       expect(plan.state.relitImagery, state.relitImagery);
@@ -52,6 +50,20 @@ void main() {
     },
   );
 
+  test('legacy lens presets do not change saved focal length or sensor', () {
+    final json =
+        jsonDecode(SavedPlan('Legacy', state).encode()) as Map<String, dynamic>;
+    for (final lens in ['wide', 'standard', 'telephoto', 'custom']) {
+      final restored = SavedPlan.decode(
+        jsonEncode({...json, 'version': 1, 'lens': lens}),
+      );
+      expect(restored.state.focalLength, state.focalLength);
+      expect(restored.state.sensor, state.sensor);
+      expect(jsonDecode(restored.encode()).containsKey('lens'), isFalse);
+      expect(jsonDecode(restored.encode())['version'], 2);
+    }
+  });
+
   test(
     'invalid versions, fields, names and dates are rejected without clamping',
     () {
@@ -59,7 +71,7 @@ void main() {
         SavedPlan('Valid', state).encode(),
       ) as Map<String, dynamic>;
       for (final entry in [
-        ('version', 2),
+        ('version', 3),
         ('version', 1.0),
         ('latitude', 100),
         ('longitude', '151'),
@@ -67,7 +79,6 @@ void main() {
         ('azimuth', 360),
         ('height', -1),
         ('sensor', 'unknown'),
-        ('lens', 'unknown'),
         ('target', 'unknown'),
         ('focalLength', 1000),
         ('relitImagery', 1),

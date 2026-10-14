@@ -286,9 +286,12 @@ void main() {
       ),
     );
     final initialFov = state.horizontalFov;
-    await tester.tap(find.text('Full-frame'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('APS-C').last);
+    expect(find.byType(SegmentedButton<Sensor>), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<Sensor>), findsNothing);
+    expect(find.text('Lens'), findsNothing);
+    expect(tester.widget<Slider>(find.byType(Slider).first).min, 8);
+    expect(tester.widget<Slider>(find.byType(Slider).first).max, 600);
+    await tester.tap(find.text('APS-C'));
     await tester.pumpAndSettle();
     expect(state.sensor, Sensor.apsC);
     expect(state.horizontalFov, lessThan(initialFov));
