@@ -43,6 +43,11 @@ class _MapWorkspaceState extends State<MapWorkspace> {
   Widget build(BuildContext context) {
     final state = widget.state;
     final handle = destination(state.location, state.azimuth, 450);
+    final sky = state.sky;
+    final bodies = [
+      ('Sun', sky.sun, const Color(0xFFFFC857)),
+      ('Moon', sky.moon, const Color(0xFFADD8FF)),
+    ];
     return Stack(
       children: [
         FlutterMap(
@@ -98,10 +103,56 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                   color: const Color(0xFF169B7C),
                   strokeWidth: 2,
                 ),
+                for (final body in bodies)
+                  Polyline(
+                    points: [
+                      state.location,
+                      destination(state.location, body.$2.azimuth, 1000),
+                    ],
+                    color: body.$3,
+                    strokeWidth: 3,
+                    borderColor: const Color(0xFF16232B),
+                    borderStrokeWidth: 1,
+                    pattern: body.$2.altitude > 0
+                        ? const StrokePattern.solid()
+                        : StrokePattern.dashed(segments: [8, 5]),
+                  ),
               ],
             ),
             MarkerLayer(
               markers: [
+                for (final body in bodies)
+                  Marker(
+                    point: destination(state.location, body.$2.azimuth, 1000),
+                    width: 150,
+                    height: 40,
+                    child: IgnorePointer(
+                      child: Semantics(
+                        label:
+                            '${body.$1} bearing ${body.$2.azimuth.toStringAsFixed(1)} degrees, '
+                            'altitude ${body.$2.altitude.toStringAsFixed(1)} degrees. '
+                            '${body.$2.altitude > 0 ? 'Above' : 'Below'} horizontal; terrain visibility unknown.',
+                        excludeSemantics: true,
+                        child: Center(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF16232B),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Text(
+                                '${body.$1} alt ${body.$2.altitude.toStringAsFixed(1)}°',
+                                style: TextStyle(color: body.$3),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 Marker(
                   point: state.location,
                   width: 44,
@@ -162,10 +213,22 @@ class _MapWorkspaceState extends State<MapWorkspace> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Text(
-                    tileError
-                        ? 'Map tiles unavailable. Check your connection.\nCamera controls still work; switch workspaces to retry.'
-                        : 'Click to place camera · Drag camera to move · Drag green handle to aim',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tileError
+                            ? 'Map tiles unavailable. Check your connection.\nCamera controls still work; switch workspaces to retry.'
+                            : 'Click to place camera · Drag camera to move · Drag green handle to aim',
+                      ),
+                      const Text(
+                        'Amber: Sun · Blue: Moon · Dashed: below horizontal',
+                      ),
+                      const Text(
+                        'Bearing guides only · Not rise/set or terrain visibility predictions',
+                      ),
+                    ],
                   ),
                 ),
               ),

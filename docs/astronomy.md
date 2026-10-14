@@ -1,4 +1,4 @@
-# Local astronomy and solar lighting
+# Local astronomy and Sun/Moon lighting
 
 ## Calculation interface
 
@@ -45,6 +45,27 @@ are not implemented. Pre-1962 Horizons fixture times are UT1, treated as the
 same clock reading in the tests. These readouts are **not refracted rise/set
 times or terrain-horizon visibility predictions**.
 
+## Planning controls
+
+The map shows fixed 1 km geodesic bearing guides from the camera: amber Sun,
+blue Moon, with altitude labels. Rays at or below horizontal are dashed; solid
+rays indicate centers above horizontal, **not terrain visibility**. Guide length
+is a display aid, not celestial distance. They are not rise/set bearings or
+terrain-horizon predictions. Labels do not intercept map placement/dragging.
+Fixed-length guides can leave the viewport or overlap when zoomed out or when
+Sun/Moon directions coincide; screen-spaced labels remain future work.
+
+`lib/ui/time_slider.dart` provides a shared UTC-day slider from 00:00 to 23:59
+at minute resolution. It preserves the selected UTC date and all camera/imagery
+preferences; scrubbing clears seconds/subseconds. Use the date picker or hour
+steps to cross dates. Endpoint dates remain inside 1900–2100. Local timezone
+conversion and automatic playback are not yet implemented.
+
+Widget tests check guide bearings, marker alignment, below-horizontal styling,
+slider minute rounding, UTC/date bounds and state preservation. The native GPU
+workflow uses the actual slider to change lighting while retaining terrain
+geometry and terrain/imagery download counters.
+
 ## Rendering
 
 The calculated solar direction drives the existing shadow-casting directional
@@ -57,7 +78,28 @@ color warms at low altitude. Ambient intensity ramps between 0.005 at −18°
 and 0.25 at 0°. These are approximate clear-sky appearance controls, **not
 calibrated irradiance, exposure or weather simulation**. The built-in sky
 model goes black below the solar horizon; only ambient terrain lighting has
-a twilight ramp. Moonlight, stars and a resolved Moon disk are not yet rendered.
+a twilight ramp. Stars are not yet rendered.
+
+`lib/render/moon.dart` renders a 128-segment, 64-ring untextured lunar sphere,
+rescaled to 30 km with radius `distance × sin(angularRadius)` to preserve its
+apparent size. Observer-derived Moon-to-Sun direction drives Lambertian vertex
+colors, so the terminator and bright-limb orientation follow astronomical geometry.
+Only colors update when illumination changes; geometry stays resident. It is unlit
+by scene lights and does not cast an artificial nearby-object shadow.
+
+The sphere depth-tests against terrain. The geographic viewport corrects Flutter
+Scene's +Z-forward camera handedness with a horizontal flip, preserving east/west
+and the Moon's bright-limb orientation. Camera/terrain coordinates remain unchanged.
+Occlusion is limited to loaded terrain, not a complete Earth/terrain horizon model.
+No albedo map, craters, libration, earthshine or atmospheric lunar scattering is
+modeled; especially near the Sun, the dark hemisphere can appear too conspicuous.
+
+Below solar center altitude 0°, the existing shadow-casting light switches to
+lunar direction. Its intensity is `0.03 × illumination² × max(0, sin(moonAltitude))`
+with a darkness ramp from 0° to −6° solar altitude. The blue-white tint and intensity
+are artistic approximations, **not the physical Sun/Moon radiance ratio**.
+Above solar altitude 0°, the primary light remains solar; simultaneous daytime
+moonlight is omitted. Natural imagery remains unaffected by either light.
 
 Natural NAIP imagery remains unlit and retains captured shadows/colors when
 time changes. Enable **Approximate relighting** to see solar shading and
@@ -65,10 +107,16 @@ shadows on imagery; baked-in source shadows can still be doubled. Missing
 imagery uses the existing lit terrain fallback.
 
 The native Linux workflow checks time-driven solar direction, solar angular
-radius, zero nighttime direct intensity and an actual rendered brightness
+radius, phase/altitude-dependent nighttime moonlight and an actual rendered brightness
 reduction. It also verifies unchanged terrain geometry and terrain/imagery
 download counters across time updates. Screenshots:
-`build/validation/linux-solar-day.png` and `linux-solar-night.png`.
+`build/validation/linux-solar-day.png`, `linux-solar-night.png` and
+`linux-moon-phase.png`. The lunar screenshot deliberately hides terrain to isolate
+the disk: the selected canyon sightline is blocked by actual terrain. Pixel checks
+verify that blocking, a separate foreground occluder, visible lunar pixels with
+terrain hidden and the right-hand bright limb for the selected waxing phase.
+The workflow also verifies lunar color changes without replacing its geometry.
+Unit tests check phase-lit projected area, limb rotation and brightness ramps.
 
-Next: resolved Moon disk with phase/limb orientation, approximate moonlight,
-map direction overlays, local timezone display and fuller time controls.
+Next: location-based local timezone display and automatic time playback,
+then stars and the Milky Way.

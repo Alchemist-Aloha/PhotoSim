@@ -38,6 +38,9 @@ class SkyState {
   final double moonPhaseAngle;
   final bool moonWaxing;
   double get moonIllumination => (1 + math.cos(moonPhaseAngle)) / 2;
+  Vector3 get moonToSunDirection =>
+      (sun.direction * sun.distanceKm - moon.direction * moon.distanceKm)
+          .normalized();
 }
 
 /// Offline Meeus ephemerides. Elevation is meters above the reference ellipsoid.

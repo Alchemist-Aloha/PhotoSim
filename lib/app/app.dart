@@ -4,6 +4,7 @@ import '../models/simulation_state.dart';
 import '../ui/camera_inspector.dart';
 import '../ui/map_workspace.dart';
 import '../ui/simulation_workspace.dart';
+import '../ui/time_slider.dart';
 
 class PhotoSimApp extends StatelessWidget {
   const PhotoSimApp({super.key});
@@ -133,6 +134,10 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
               if (inspectorVisible && constraints.maxWidth < 900)
                 SizedBox(height: 240, child: inspector),
               const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TimeSlider(state: state, onChanged: update),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,

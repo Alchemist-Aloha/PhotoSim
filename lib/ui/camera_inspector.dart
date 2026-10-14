@@ -118,7 +118,7 @@ class CameraInspector extends StatelessWidget {
       ),
       const Divider(height: 32),
       const Text(
-        'Early development build\nSun/Moon readouts are airless topocentric centers; no refraction or terrain-horizon prediction. Solar lighting is approximate. Natural imagery retains its original lighting.',
+        'Early development build\nSun/Moon readouts are airless topocentric centers; no refraction or terrain-horizon prediction. Sun/Moon lighting is approximate. Natural imagery retains its original lighting.',
       ),
     ],
   );

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:photosim/app/app.dart';
 import 'package:photosim/core/geo.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/render/moon.dart';
 
 Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
   final boundary =
@@ -124,12 +126,12 @@ void main() {
     );
     final world = initialView.scene;
     final meshes = world!.root.children
-        .where((node) => node.mesh != null)
+        .where((node) => node.mesh != null && node.name != 'Moon')
         .map((node) => node.mesh!.primitives.single.geometry)
         .toList();
     await waitForImagery();
     final texturedMeshes = world.root.children
-        .where((node) => node.mesh != null)
+        .where((node) => node.mesh != null && node.name != 'Moon')
         .toList();
     expect(texturedMeshes.length, 9);
     for (var i = 0; i < meshes.length; i++) {
@@ -216,15 +218,26 @@ void main() {
     expect(skySource.sunAngularRadius, sun.angularRadius);
     await capture('linux-solar-day');
     final dayBrightness = await viewportBrightness(tester, captureKey);
-    tester
-        .widget<CameraInspector>(find.byType(CameraInspector))
-        .onChanged(
-          camera().copyWith(
-            timestamp: original.timestamp.add(const Duration(hours: 11)),
-          ),
-        );
+    final timeSlider = tester.getRect(
+      find.byKey(const ValueKey('utc-day-slider')),
+    );
+    await tester.tapAt(
+      Offset(
+        timeSlider.left + 24 + (timeSlider.width - 48) * 390 / 1439,
+        timeSlider.center.dy,
+      ),
+    );
     await tester.pump(const Duration(seconds: 1));
-    expect(world.directionalLight!.intensity, 0);
+    expect(camera().timestamp.day, original.timestamp.day);
+    expect(camera().timestamp.hour, 6);
+    expect(
+      world.directionalLight!.intensity,
+      closeTo(moonlightIntensity(camera().sky), 1e-12),
+    );
+    expect(
+      world.directionalLight!.direction.y,
+      closeTo(-camera().sky.moon.direction.y, 1e-6),
+    );
     expect(world.environmentIntensity, closeTo(0.005, 1e-12));
     expect(skySource.sunDirection.y, lessThan(0));
     await capture('linux-solar-night');
@@ -251,6 +264,113 @@ void main() {
         .onChanged(camera().copyWith(timestamp: original.timestamp));
     await tester.pump(const Duration(seconds: 1));
     expect(world.directionalLight!.intensity, greaterThan(0));
+    final beforeMoon = camera();
+    final moonState = beforeMoon.copyWith(
+      timestamp: DateTime.utc(2026, 6, 22, 3),
+    );
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(
+          moonState.copyWith(
+            azimuth: moonState.sky.moon.azimuth,
+            pitch: moonState.sky.moon.altitude,
+            lens: Lens.custom,
+            focalLength: 600,
+          ),
+        );
+    await tester.pump(const Duration(seconds: 1));
+    final moonNode = world.root.children.singleWhere(
+      (node) => node.name == 'Moon',
+    );
+    final moonGeometry = moonNode.mesh!.primitives.single.geometry;
+    expect(moonNode.shadowCastingMode, scene.ShadowCastingMode.off);
+    expect(
+      moonNode.scale.x / MoonRenderer.distance,
+      closeTo(math.sin(camera().sky.moon.angularRadius), 1e-8),
+    );
+    final terrainBlocked = await viewportBrightness(tester, captureKey);
+    moonNode.visible = false;
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      await viewportBrightness(tester, captureKey),
+      closeTo(terrainBlocked, 0.05),
+    );
+    moonNode.visible = true;
+    // This selected canyon sightline is terrain-blocked. Isolate the sky to
+    // validate phase pixels, then independently exercise foreground depth.
+    for (final node in texturedMeshes) {
+      node.visible = false;
+    }
+    await tester.pump(const Duration(seconds: 1));
+    await capture('linux-moon-phase');
+    final moonBrightness = await viewportBrightness(tester, captureKey);
+    final phaseColors = moonGeometry.extractMeshData().colors!;
+    final phaseImage =
+        await (captureKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary)
+            .toImage();
+    final phasePixels = (await phaseImage.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    ))!;
+    final center = tester.getCenter(find.byType(scene.SceneView));
+    var left = 0, right = 0;
+    for (var y = -30; y <= 30; y += 5) {
+      for (var x = 15; x <= 45; x += 5) {
+        left += phasePixels.getUint8(
+          ((center.dy.toInt() + y) * phaseImage.width + center.dx.toInt() - x) *
+              4,
+        );
+        right += phasePixels.getUint8(
+          ((center.dy.toInt() + y) * phaseImage.width + center.dx.toInt() + x) *
+              4,
+        );
+      }
+    }
+    phaseImage.dispose();
+    // The Sun lies to the right of the Moon at this northern-site waxing phase.
+    expect(right, greaterThan(left * 2));
+    moonNode.visible = false;
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      moonBrightness,
+      greaterThan(await viewportBrightness(tester, captureKey) + 0.3),
+    );
+    moonNode.visible = true;
+    // A foreground opaque blocker exercises the same depth test as terrain.
+    final moonEye =
+        (tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
+                as scene.PerspectiveCamera)
+            .position;
+    final blocker = scene.Node(
+      name: 'Moon occlusion test',
+      mesh: scene.Mesh(scene.SphereGeometry(radius: 20), scene.UnlitMaterial()),
+    )..position = moonEye + (moonNode.position - moonEye).normalized() * 1000;
+    world.add(blocker);
+    await tester.pump(const Duration(seconds: 1));
+    final blocked = await viewportBrightness(tester, captureKey);
+    moonNode.visible = false;
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      await viewportBrightness(tester, captureKey),
+      closeTo(blocked, 0.05),
+    );
+    world.remove(blocker);
+    for (final node in texturedMeshes) {
+      node.visible = true;
+    }
+    moonNode.visible = true;
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(beforeMoon);
+    await tester.pump(const Duration(seconds: 1));
+    expect(moonNode.mesh!.primitives.single.geometry, same(moonGeometry));
+    expect(moonGeometry.extractMeshData().colors, isNot(phaseColors));
+    for (var i = 0; i < meshes.length; i++) {
+      expect(
+        texturedMeshes[i].mesh!.primitives.single.geometry,
+        same(meshes[i]),
+      );
+    }
     await tester.drag(find.byType(scene.SceneView), const Offset(100, -20));
     await tester.pump();
     final rotated = camera();

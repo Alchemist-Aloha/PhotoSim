@@ -15,6 +15,7 @@ import '../data/imagery/imagery_repository.dart';
 import '../data/terrain/terrain_repository.dart';
 import '../data/terrain/tile_cache.dart';
 import '../models/simulation_state.dart';
+import '../render/moon.dart';
 
 class SimulationWorkspace extends StatefulWidget {
   const SimulationWorkspace({
@@ -49,6 +50,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   Object? error;
   bool loading = true;
   scene.PhysicalSkySource? skySource;
+  MoonRenderer? moonRenderer;
 
   @override
   void initState() {
@@ -90,6 +92,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         shadowNormalBias: 2,
         intensity: 3,
       );
+      moonRenderer = MoonRenderer();
+      world!.add(moonRenderer!.node);
       await loadTerrain();
     } catch (failure, stack) {
       debugPrint('PhotoSim 3D initialization failed: $failure\n$stack');
@@ -315,7 +319,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'Natural imagery preserves original colors and baked-in lighting. Relighting is approximate and can double existing shadows. '
             'Where NAIP is missing, the green surface remains a labeled fallback material. '
             'Solar direction is calculated locally with Astronomia (Meeus, MIT); brightness and sky appearance are approximate. '
-            'Sun/Moon readouts omit atmospheric refraction. Moon rendering and moonlight are not yet implemented.',
+            'Sun/Moon readouts omit atmospheric refraction. The Moon is an untextured phase-lit sphere; '
+            'moonlight brightness is an artistic approximation, not calibrated exposure.',
           ),
         ),
       ),
@@ -360,7 +365,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       math.sin(pitch),
       -math.cos(yaw) * math.cos(pitch),
     );
-    final sun = state.sky.sun;
+    final sky = state.sky;
+    final sun = sky.sun;
+    moonRenderer!.update(sky, eye);
     final sunDirection = vm.Vector3(
       sun.direction.x,
       sun.direction.y,
@@ -373,10 +380,16 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       ..sunAngularRadius = sun.angularRadius;
     // shortcut: clear-sky color/brightness ramps, use calibrated radiometry for exposure simulation.
     active.environmentIntensity = 0.005 + 0.245 * twilight;
+    final moon = sky.moon.direction;
+    // The one shadow-casting light follows the Moon once the Sun is below horizontal.
     active.directionalLight!
-      ..direction = -sunDirection
-      ..intensity = 3 * daylight
-      ..color = vm.Vector3(1, 0.45 + 0.53 * daylight, 0.15 + 0.80 * daylight);
+      ..direction = sun.altitude > 0
+          ? -sunDirection
+          : -vm.Vector3(moon.x, moon.y, moon.z)
+      ..intensity = sun.altitude > 0 ? 3 * daylight : moonlightIntensity(sky)
+      ..color = sun.altitude > 0
+          ? vm.Vector3(1, 0.45 + 0.53 * daylight, 0.15 + 0.80 * daylight)
+          : vm.Vector3(0.85, 0.90, 1);
     return Column(
       children: [
         Material(
@@ -402,7 +415,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 ),
                 Text(
                   state.relitImagery
-                      ? 'UTC-driven sunlight · approximate clear sky'
+                      ? 'UTC-driven Sun/Moon light · approximate clear sky'
                       : 'Natural imagery retains captured lighting',
                 ),
               ],
@@ -474,14 +487,18 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          scene.SceneView(
-                            active,
-                            camera: scene.PerspectiveCamera(
-                              position: eye,
-                              target: eye + direction,
-                              fovRadiansY: state.verticalFov,
-                              fovNear: 0.5,
-                              fovFar: 20000,
+                          // Scene's +Z-forward camera reverses east/west in our ENU axes.
+                          Transform.flip(
+                            flipX: true,
+                            child: scene.SceneView(
+                              active,
+                              camera: scene.PerspectiveCamera(
+                                position: eye,
+                                target: eye + direction,
+                                fovRadiansY: state.verticalFov,
+                                fovNear: 0.5,
+                                fovFar: 50000,
+                              ),
                             ),
                           ),
                           const IgnorePointer(

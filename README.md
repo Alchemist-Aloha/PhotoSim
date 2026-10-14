@@ -1,7 +1,7 @@
 # PhotoSim
 
 Linux-first landscape photography simulator built with Flutter. This is the
-terrain, imagery and initial solar-lighting milestone of [the MVP roadmap](docs/roadmap.md), **not the complete MVP**.
+terrain, imagery and Sun/Moon-lighting milestone of [the MVP roadmap](docs/roadmap.md), **not the complete MVP**.
 
 ## Run on Linux
 
@@ -30,8 +30,10 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Independent bounded terrain/imagery caches with corruption recovery and source metadata.
 - Drag the 3D preview to look around; change focal length to zoom optically.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
-- UTC-driven sunlight, cascaded terrain shadows and an approximate clear-sky background.
-- Collapsible inspector and UTC date/time controls.
+- Phase-lit Moon at its calculated position and angular size, with terrain occlusion.
+- UTC-driven Sun/Moon lighting, cascaded terrain shadows and approximate clear sky.
+- Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
+- Collapsible inspector, UTC date/time controls and shared minute-resolution day slider.
 
 The preview maintains the sensor's aspect ratio so map and 3D fields of view
 agree. Camera controls never translate the 3D camera implicitly.
@@ -59,9 +61,11 @@ evidence, rendering limitations, and the next roadmap milestone.
 The 3D surface uses **real elevation and USGS NAIP aerial imagery** where
 available in the conterminous US. Other regions and missing image pixels use a
 labeled green fallback material. Sun/Moon calculations and solar lighting now
-work locally; a resolved Moon disk, moonlight, stars, saved plans and exports
-remain unimplemented. Dates are limited to 1900–2100; local timezone display
-is not implemented. See [astronomy notes](docs/astronomy.md) for reference tests
+work locally, including a phase-lit lunar sphere and approximate moonlight.
+Lunar surface detail, stars, saved plans and exports remain unimplemented.
+Map rays indicate bearings, not rise/set or terrain visibility predictions.
+Dates are limited to 1900–2100; local timezone display and automatic playback
+are not implemented. See [astronomy notes](docs/astronomy.md) for reference tests
 and accuracy/lighting limitations.
 
 Natural imagery preserves existing colors and baked-in shadows. Opt-in
