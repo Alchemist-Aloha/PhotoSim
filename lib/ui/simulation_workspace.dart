@@ -11,6 +11,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 import '../core/geo.dart';
+import '../core/constellations.dart';
+import '../render/constellations.dart';
 import '../core/night_sky.dart';
 import '../core/terrain_geo.dart';
 import '../data/imagery/imagery_repository.dart';
@@ -104,7 +106,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       if (!mounted) return;
       final band = await scene.Texture2D.fromAsset('assets/sky/milky_way.png');
       if (!mounted) return;
-      nightRenderer = NightSkyRenderer(stars, band);
+      final figures = parseConstellations(
+        await rootBundle.loadString('assets/sky/constellations.json'),
+      );
+      final constellations = await ConstellationRenderer.create(figures);
+      if (!mounted) return;
+      nightRenderer = NightSkyRenderer(stars, band, constellations);
       world!.add(nightRenderer!.root);
       await loadTerrain();
     } catch (failure, stack) {
@@ -334,7 +341,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'Sun/Moon readouts omit atmospheric refraction. The Moon is an untextured phase-lit sphere; '
             'moonlight brightness is an artistic approximation, not calibrated exposure. '
             'Stars: XHIP (Anderson & Francis, 2012); Milky Way outlines: Jose R. Vieira, '
-            'via D3-Celestial (Olaf Frohn, BSD-3-Clause). Night-sky brightness and star sizes are artistic.',
+            'via D3-Celestial (Olaf Frohn, BSD-3-Clause). Constellation names and illustrative connecting figures '
+            'also come from D3-Celestial; figures are not official IAU boundaries. Night-sky brightness and star sizes are artistic.',
           ),
         ),
       ),
@@ -430,6 +438,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 if (textures.length < loaded || partialImagery.isNotEmpty)
                   const Text('Fallback surface where imagery is missing'),
                 FilterChip(
+                  label: const Text('Constellations'),
+                  tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
+                  selected: state.showConstellations,
+                  onSelected: (value) => widget.onChanged(
+                    state.copyWith(showConstellations: value),
+                  ),
+                ),
+                FilterChip(
                   label: const Text('Approximate relighting'),
                   selected: state.relitImagery,
                   onSelected: setRelighting,
@@ -505,33 +521,46 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                           pitch: state.pitch - details.delta.dy * 0.2,
                         ),
                       ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Scene's +Z-forward camera reverses east/west in our ENU axes.
-                          Transform.flip(
-                            flipX: true,
-                            child: scene.SceneView(
-                              active,
-                              camera: scene.PerspectiveCamera(
-                                position: eye,
-                                target: eye + direction,
-                                fovRadiansY: state.verticalFov,
-                                fovNear: 0.5,
-                                fovFar: 50000,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          nightRenderer?.updateLabels(
+                            state,
+                            constraints.biggest,
+                          );
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // Scene's +Z-forward camera reverses east/west in our ENU axes.
+                              Semantics(
+                                label: state.showConstellations
+                                    ? 'Constellation guides. Labels in the field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
+                                    : '3D photography preview',
+                                child: Transform.flip(
+                                  flipX: true,
+                                  child: scene.SceneView(
+                                    active,
+                                    camera: scene.PerspectiveCamera(
+                                      position: eye,
+                                      target: eye + direction,
+                                      fovRadiansY: state.verticalFov,
+                                      fovNear: 0.5,
+                                      fovFar: 50000,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const IgnorePointer(
-                            child: Center(
-                              child: Icon(
-                                Icons.add,
-                                color: Colors.white54,
-                                size: 20,
+                              const IgnorePointer(
+                                child: Center(
+                                  child: Icon(
+                                    Icons.add,
+                                    color: Colors.white54,
+                                    size: 20,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ],
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),

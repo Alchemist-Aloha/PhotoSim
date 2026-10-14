@@ -16,6 +16,7 @@ void main() {
     focalLength: 321,
     target: CelestialTarget.galacticCenter,
     relitImagery: true,
+    showConstellations: true,
     groundElevation: 90,
     timestamp: DateTime.parse('2026-01-01T20:00:00+08:00'),
   );
@@ -36,6 +37,7 @@ void main() {
       expect(plan.state.focalLength, state.focalLength);
       expect(plan.state.target, state.target);
       expect(plan.state.relitImagery, state.relitImagery);
+      expect(plan.state.showConstellations, isTrue);
       expect(plan.state.timestamp, state.timestamp);
       expect(plan.state.timestamp.isUtc, isTrue);
       expect(plan.state.groundElevation, isNull);
@@ -49,6 +51,20 @@ void main() {
       }
     },
   );
+
+  test('old plans without constellation preference default to off', () {
+    final json =
+        jsonDecode(SavedPlan('Old', state).encode()) as Map<String, dynamic>;
+    json.remove('showConstellations');
+    for (final version in [1, 2]) {
+      expect(
+        SavedPlan.decode(jsonEncode({...json, 'version': version}))
+            .state
+            .showConstellations,
+        isFalse,
+      );
+    }
+  });
 
   test('legacy lens presets do not change saved focal length or sensor', () {
     final json =
@@ -82,6 +98,7 @@ void main() {
         ('target', 'unknown'),
         ('focalLength', 1000),
         ('relitImagery', 1),
+        ('showConstellations', 1),
         ('name', ''),
         ('name', 'x' * 81),
         ('timestamp', '2026-02-30T00:00:00.000Z'),

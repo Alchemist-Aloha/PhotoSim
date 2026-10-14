@@ -20,6 +20,7 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Canonical UTC ISO-8601 simulation timestamp.
 - Selected target (`none`, `sun`, `moon`, `galacticCenter`).
 - Natural/approximate-relighting preference.
+- Optional `showConstellations` toggle; missing in older plans defaults to off.
 
 Legacy version-1 files remain readable: their obsolete `lens` preset field is
 ignored, while focal length and sensor are preserved. New version-2 files omit

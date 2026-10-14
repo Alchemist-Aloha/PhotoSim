@@ -43,6 +43,7 @@ class SimulationState {
     this.focalLength = 24,
     this.groundElevation,
     this.relitImagery = false,
+    this.showConstellations = false,
     this.target = CelestialTarget.none,
     DateTime? timestamp,
   }) : timestamp = (timestamp ?? DateTime.utc(2026, 6, 21, 19)).toUtc() {
@@ -73,7 +74,7 @@ class SimulationState {
 
   final double latitude, longitude, azimuth, pitch, height, focalLength;
   final double? groundElevation;
-  final bool relitImagery;
+  final bool relitImagery, showConstellations;
   final Sensor sensor;
   final DateTime timestamp;
   final CelestialTarget target;
@@ -129,6 +130,7 @@ class SimulationState {
     double? focalLength,
     double? groundElevation,
     bool? relitImagery,
+    bool? showConstellations,
     CelestialTarget? target,
     DateTime? timestamp,
   }) {
@@ -149,6 +151,7 @@ class SimulationState {
           ? null
           : groundElevation ?? this.groundElevation,
       relitImagery: relitImagery ?? this.relitImagery,
+      showConstellations: showConstellations ?? this.showConstellations,
       target: target ?? this.target,
       timestamp: timestamp ?? this.timestamp,
     );

@@ -491,6 +491,54 @@ void main() {
     }
     await tester.pump(const Duration(seconds: 1));
     await capture('linux-night-sky-isolated');
+    final guides = nightRoot.children.singleWhere(
+      (node) => node.name == 'Constellations',
+    );
+    final guideGeometry =
+        guides.children.first.mesh!.primitives.single.geometry;
+    final labels =
+        guides.children.last.mesh!.primitives.single.geometry
+            as scene.BillboardGeometry;
+    expect(guides.visible, isFalse);
+    final withoutGuides = await brightSkyPixels(tester, captureKey);
+    await tester.tap(find.text('Constellations'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(camera().showConstellations, isTrue);
+    expect(guides.visible, isTrue);
+    expect(labels.instanceCount, greaterThan(0));
+    expect(
+      await brightSkyPixels(tester, captureKey),
+      greaterThan(withoutGuides + 30),
+    );
+    await capture('linux-constellations');
+    final guideCamera =
+        tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
+            as scene.PerspectiveCamera;
+    final guideBlocker =
+        scene.Node(
+            name: 'Constellation occlusion test',
+            mesh: scene.Mesh(
+              scene.SphereGeometry(radius: 990),
+              scene.UnlitMaterial()..baseColorFactor.setValues(0, 0, 0, 1),
+            ),
+          )
+          ..position =
+              guideCamera.position +
+              (guideCamera.target - guideCamera.position).normalized() * 1000
+          ..shadowCastingMode = scene.ShadowCastingMode.off;
+    world.add(guideBlocker);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(await brightSkyPixels(tester, captureKey), lessThan(5));
+    world.remove(guideBlocker);
+    await tester.tap(find.text('Constellations'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(camera().showConstellations, isFalse);
+    expect(guides.visible, isFalse);
+    expect(
+      guides.children.first.mesh!.primitives.single.geometry,
+      same(guideGeometry),
+    );
+    expect(guides.children.last.mesh!.primitives.single.geometry, same(labels));
     final visibleStars = await brightSkyPixels(
       tester,
       captureKey,
@@ -682,6 +730,7 @@ void main() {
             target: CelestialTarget.galacticCenter,
             focalLength: 85,
             height: 4.2,
+            showConstellations: true,
           ),
         );
     await tester.pump(const Duration(milliseconds: 300));

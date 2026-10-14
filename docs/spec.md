@@ -237,6 +237,15 @@ The 3D viewport should optionally display:
 - Sun/Moon position markers.
 - Galactic center marker.
 - Selected-star or constellation labels.
+
+Provide a **Constellations** toggle in the 3D toolbar, off by default. It enables
+constellation name labels and highlighted connecting figures together. Use a
+licensed offline catalog, with J2000 positions transformed by the same local-sky
+rotation as the stars. Figures are illustrative asterisms, not official IAU
+boundaries. Names and highlights must depth-test against terrain, remain usable
+as planning guides in daylight, and not intercept camera aiming gestures. Preserve
+the toggle across workspace changes and saved plans; missing preferences in
+older plans default to off.
 - Terrain-distance information.
 - Current time and date.
 

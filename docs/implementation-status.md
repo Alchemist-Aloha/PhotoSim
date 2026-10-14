@@ -49,6 +49,8 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
   J2000 precession/nutation/sidereal rotation, immutable GPU batches and terrain depth tests.
 - Approximate solar/lunar night-sky visibility, Galactic-center map/3D markers,
   Sun/Moon/Galactic-center selection, explicit aim action and rectangular FOV checks.
+- Toggleable 3D constellation names and connecting figures, default off; a shared
+  sky rotation, two GPU batches, terrain depth tests and saved layer preference.
 - Named version-2 JSON photography snapshots (legacy version-1 files remain readable): camera, optics, UTC, selected target
   and imagery preference; local save/open, fresh-app restoration and corruption warnings.
 - No paid service, secrets, custom shaders or fabricated imagery.
@@ -84,7 +86,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- Seventy-two passing unit/widget tests: optics/state/geographic precision, elevations,
+- Seventy-seven passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
   resolutions/metadata/cache, missing detail, corruption and out-of-coverage behavior.
@@ -119,6 +121,10 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 - Native pixels verify stars, Milky Way, actual canyon occlusion of Antares,
   a foreground blocker, daylight suppression and resident sky/terrain geometry.
 - Target selection/aiming and rectangular FOV tests cover pitch, wrapping and optical zoom.
+- Constellation tests cover the 88 constellations (89 label regions), malformed data,
+  inward-facing great-circle ribbons, RA wrapping and preference persistence.
+  Native pixels verify toggle visibility, readable labels and foreground occlusion,
+  while toggling retains GPU geometry and the save/reopen workflow retains the preference.
 - Snapshot tests cover all fields, validation, corruption, size limits, concurrent saves
   and failed writes preserving existing data. The native UI saves, destroys/recreates
   the app, reopens every field, recenters the map and restores cached 3D geography.
@@ -127,7 +133,7 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   `linux-solar-day.png`, `linux-solar-night.png`, `linux-map.png`, and
   `linux-terrain-moved.png`, plus the terrain-isolated `linux-moon-phase.png`,
   `linux-night-sky-terrain.png`, `linux-night-sky-isolated.png`,
-  `linux-star-isolated.png` and `linux-reopened-plan.png`.
+  `linux-star-isolated.png`, `linux-constellations.png` and `linux-reopened-plan.png`.
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live
@@ -148,7 +154,8 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
 - No lunar albedo/detail, libration, earthshine or atmospheric lunar scattering.
   Moonlight is artistically scaled, not calibrated; daytime moonlight is omitted.
 - Night-sky intensity and point sizes are artistic; no calibrated PSF/exposure,
-  proper motion, annual aberration/parallax, extinction, light pollution or labels.
+  proper motion, annual aberration/parallax, extinction, light pollution or individual star labels.
+  Constellation names have fixed-size placement without collision decluttering.
   Fixed-length celestial guides may overlap or leave the map viewport;
   no rise/set event overlays or terrain visibility classification.
 - No atmospheric refraction, rise/set events or measured Earth orientation.

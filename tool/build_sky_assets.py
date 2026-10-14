@@ -3,7 +3,6 @@
 Source: D3-Celestial (BSD-3-Clause), pinned below. No runtime downloads.
 """
 import hashlib
-import io
 import json
 from pathlib import Path
 from urllib.request import urlopen
@@ -52,6 +51,16 @@ brightness = brightness.filter(ImageFilter.GaussianBlur(1))
 image = Image.new("RGBA", brightness.size, (190, 205, 255, 0))
 image.putalpha(brightness)
 image.save(OUT / "milky_way.png")
+names_raw = download("data/constellations.json")
+lines_raw = download("data/constellations.lines.json")
+names = json.loads(names_raw)["features"]
+lines = json.loads(lines_raw)["features"]
+assert len(names) == len(lines) == 89  # Serpens has two separately labeled halves.
+assert all(n["id"] == line["id"] for n, line in zip(names, lines))
+constellations = [[n["properties"]["name"], *n["geometry"]["coordinates"],
+                   line["geometry"]["coordinates"]] for n, line in zip(names, lines)]
+assert len({n["id"] for n in names}) == 88
+(OUT / "constellations.json").write_text(json.dumps(constellations, separators=(",", ":")) + "\n")
 (OUT / "LICENSE.txt").write_bytes(download("LICENSE"))
 (OUT / "provenance.json").write_text(json.dumps({
     "commit": COMMIT,
@@ -59,10 +68,15 @@ image.save(OUT / "milky_way.png")
     "starsSha256": hashlib.sha256(stars_raw).hexdigest(),
     "milkyWaySource": BASE + "data/mw.json",
     "milkyWaySha256": hashlib.sha256(mw_raw).hexdigest(),
+    "constellationNamesSource": BASE + "data/constellations.json",
+    "constellationNamesSha256": hashlib.sha256(names_raw).hexdigest(),
+    "constellationLinesSource": BASE + "data/constellations.lines.json",
+    "constellationLinesSha256": hashlib.sha256(lines_raw).hexdigest(),
+    "constellations": "IAU names and D3-Celestial illustrative connecting figures (not IAU boundaries)",
     "epoch": "J2000.0",
     "stars": "XHIP (Anderson & Francis, 2012), via D3-Celestial",
     "milkyWay": "Jose R. Vieira Milky Way Outline Catalog, via D3-Celestial",
-    "changes": "Compact star rows; rasterized and feathered five brightness contours",
+    "changes": "Compact star and constellation rows; rasterized and feathered five brightness contours",
     "license": "D3-Celestial BSD-3-Clause; see LICENSE.txt",
 }, indent=2) + "\n")
 print(f"Bundled {len(rows)} stars and {len(mw)} Milky Way contours")

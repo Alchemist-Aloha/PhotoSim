@@ -25,6 +25,7 @@ class SavedPlan {
     'focalLength': state.focalLength,
     'target': state.target.name,
     'relitImagery': state.relitImagery,
+    'showConstellations': state.showConstellations,
   });
 
   static SavedPlan decode(String source) {
@@ -57,6 +58,7 @@ class SavedPlan {
           focalLength: number('focalLength'),
           target: CelestialTarget.values.byName(json['target'] as String),
           relitImagery: json['relitImagery'] as bool,
+          showConstellations: json['showConstellations'] as bool? ?? false,
         ),
       );
     } on Object {

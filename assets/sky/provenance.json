@@ -4,9 +4,14 @@
   "starsSha256": "0297b8fa3adfbce1dc26566f61c4abcc1df4f29c6a28729ca06b56d1c6d25602",
   "milkyWaySource": "https://raw.githubusercontent.com/ofrohn/d3-celestial/7e720a3de062059d4c5400a379146a601d9010e0/data/mw.json",
   "milkyWaySha256": "aee221a7a0e879418e685de00c3e68fbdfac5667c0a8aab74929ef9cf4aab4fb",
+  "constellationNamesSource": "https://raw.githubusercontent.com/ofrohn/d3-celestial/7e720a3de062059d4c5400a379146a601d9010e0/data/constellations.json",
+  "constellationNamesSha256": "ab4ae692027cbc042c0d6791a84456a65eb7c55656107fd00c58ff6e55d4d8b2",
+  "constellationLinesSource": "https://raw.githubusercontent.com/ofrohn/d3-celestial/7e720a3de062059d4c5400a379146a601d9010e0/data/constellations.lines.json",
+  "constellationLinesSha256": "294f66bef5d5cf50b1e17f16d2efa1d97a15131612c68dd935adef6e7373e13c",
+  "constellations": "IAU names and D3-Celestial illustrative connecting figures (not IAU boundaries)",
   "epoch": "J2000.0",
   "stars": "XHIP (Anderson & Francis, 2012), via D3-Celestial",
   "milkyWay": "Jose R. Vieira Milky Way Outline Catalog, via D3-Celestial",
-  "changes": "Compact star rows; rasterized and feathered five brightness contours",
+  "changes": "Compact star and constellation rows; rasterized and feathered five brightness contours",
   "license": "D3-Celestial BSD-3-Clause; see LICENSE.txt"
 }

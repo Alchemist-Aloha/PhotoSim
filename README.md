@@ -40,6 +40,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - 5,044 bundled stars and licensed simplified Milky Way brightness contours.
 - Time/location-driven sky rotation, approximate twilight/moonlight visibility and terrain occlusion.
 - Sun/Moon/Galactic-center targeting, aim action and rectangular lens-FOV readout.
+- Toggleable constellation names and blue connecting figures in 3D, depth-tested against terrain.
 - Named versioned JSON snapshots, with local save/open and restoration after app restart.
 
 The preview maintains the sensor's aspect ratio so map and 3D fields of view

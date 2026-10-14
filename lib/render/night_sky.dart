@@ -2,6 +2,10 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_scene/scene.dart' as scene;
+import 'package:flutter/material.dart' show Size;
+
+import 'constellations.dart';
+
 import 'package:vector_math/vector_math.dart' as vm;
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 
@@ -75,7 +79,11 @@ scene.MeshGeometry _milkyWayGeometry() {
 }
 
 class NightSkyRenderer {
-  NightSkyRenderer(List<Star> stars, scene.Texture2D milkyWay) {
+  NightSkyRenderer(
+    List<Star> stars,
+    scene.Texture2D milkyWay,
+    this.constellations,
+  ) {
     final data = starMesh(stars);
     starGeometry = scene.MeshGeometry.fromArrays(
       positions: data.positions,
@@ -110,8 +118,14 @@ class NightSkyRenderer {
     root = scene.Node(name: 'Night sky')
       ..add(starNode)
       ..add(bandNode)
-      ..add(marker);
+      ..add(marker)
+      ..add(constellations.root);
   }
+  final ConstellationRenderer constellations;
+
+  void updateLabels(SimulationState state, Size viewport) =>
+      constellations.update(state, viewport, _rotation);
+
   static const starDistance = 40000.0, bandDistance = 45000.0;
   late final scene.Node root, starNode, bandNode, marker;
   late final scene.MeshGeometry starGeometry;
@@ -148,5 +162,6 @@ class NightSkyRenderer {
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);
     bandMaterial.baseColorFactor = vm.Vector4(1, 1, 1, band);
     marker.visible = state.target == CelestialTarget.galacticCenter;
+    constellations.root.visible = state.showConstellations;
   }
 }
