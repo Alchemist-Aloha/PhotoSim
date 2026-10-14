@@ -8,6 +8,47 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 
 void main() {
+  testWidgets('target selection and aiming preserve location and UTC', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const PhotoSimApp());
+    SimulationState camera() =>
+        tester.widget<CameraInspector>(find.byType(CameraInspector)).state;
+    final original = camera();
+    await tester.tap(find.byTooltip('Select astronomical target'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Galactic center').last);
+    await tester.pump();
+    expect(camera().target, CelestialTarget.galacticCenter);
+    expect(camera().azimuth, original.azimuth);
+    await tester.tap(find.byTooltip('Aim at selected target'));
+    await tester.pump();
+    expect(
+      camera().containsDirection(camera().galacticCenter.direction),
+      isTrue,
+    );
+    expect(find.textContaining('Galactic center: inside FOV'), findsOneWidget);
+    expect(camera().location, original.location);
+    expect(camera().timestamp, original.timestamp);
+    await tester.tap(find.byTooltip('Later by one hour'));
+    await tester.pump();
+    expect(camera().target, CelestialTarget.galacticCenter);
+    await tester.tap(find.byTooltip('Select astronomical target'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No target').last);
+    await tester.pump();
+    expect(camera().targetPosition, isNull);
+    expect(
+      tester
+          .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.gps_fixed))
+          .onPressed,
+      isNull,
+    );
+  });
   testWidgets(
     'shared UTC timeline updates astronomy and respects date bounds',
     (tester) async {
@@ -29,8 +70,8 @@ void main() {
         final lines = tester
             .widget<PolylineLayer>(find.byType(PolylineLayer))
             .polylines;
-        expect(lines.length, 3);
-        final bodies = [state.sky.sun, state.sky.moon];
+        expect(lines.length, 4);
+        final bodies = [state.sky.sun, state.sky.moon, state.galacticCenter];
         final markers = tester
             .widget<MarkerLayer>(find.byType(MarkerLayer))
             .markers;

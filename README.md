@@ -1,7 +1,8 @@
 # PhotoSim
 
 Linux-first landscape photography simulator built with Flutter. This is the
-terrain, imagery and Sun/Moon-lighting milestone of [the MVP roadmap](docs/roadmap.md), **not the complete MVP**.
+night-sky and saved-composition milestone of [the MVP roadmap](docs/roadmap.md),
+**not the complete cross-platform MVP**.
 
 ## Run on Linux
 
@@ -36,6 +37,10 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Collapsible inspector, UTC date/time controls and shared minute-resolution day slider.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
+- 5,044 bundled stars and licensed simplified Milky Way brightness contours.
+- Time/location-driven sky rotation, approximate twilight/moonlight visibility and terrain occlusion.
+- Sun/Moon/Galactic-center targeting, aim action and rectangular lens-FOV readout.
+- Named versioned JSON snapshots, with local save/open and restoration after app restart.
 
 The preview maintains the sensor's aspect ratio so map and 3D fields of view
 agree. Camera controls never translate the 3D camera implicitly.
@@ -64,7 +69,11 @@ The 3D surface uses **real elevation and USGS NAIP aerial imagery** where
 available in the conterminous US. Other regions and missing image pixels use a
 labeled green fallback material. Sun/Moon calculations and solar lighting now
 work locally, including a phase-lit lunar sphere and approximate moonlight.
-Lunar surface detail, stars, saved plans and exports remain unimplemented.
+Lunar surface detail and photographic exports remain unimplemented. Night-sky
+brightness and stellar point sizes are artistic, not calibrated exposure;
+proper motion, aberration and atmospheric extinction are omitted. See
+[night-sky data notes](docs/data-sources/night-sky.md). Saved plans are local,
+unencrypted JSON snapshots; see [saving and reopening](docs/saved-plans.md).
 Map rays indicate bearings, not rise/set or terrain visibility predictions.
 UTC dates are limited to 1900–2100. Estimated local display supports only
 1970–2037 because the bundled timezone transitions stop in 2037; other dates

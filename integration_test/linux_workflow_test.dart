@@ -10,6 +10,8 @@ import 'package:flutter_scene/scene.dart' as scene;
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/app/app.dart';
 import 'package:photosim/core/geo.dart';
+import 'package:photosim/core/night_sky.dart';
+import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/render/moon.dart';
@@ -43,10 +45,43 @@ Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
   return total / count;
 }
 
+Future<int> brightSkyPixels(
+  WidgetTester tester,
+  GlobalKey key, {
+  int threshold = 100,
+}) async {
+  final boundary =
+      key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  final image = await boundary.toImage();
+  final raw = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+  final rect = tester.getRect(find.byType(scene.SceneView));
+  var count = 0;
+  for (var y = rect.top.toInt() + 8; y < rect.bottom.toInt() - 8; y++) {
+    for (var x = rect.left.toInt() + 8; x < rect.right.toInt() - 8; x++) {
+      if ((x - rect.center.dx).abs() < 16 && (y - rect.center.dy).abs() < 16) {
+        continue;
+      }
+      final offset = (y * image.width + x) * 4;
+      if (raw.getUint8(offset) > threshold ||
+          raw.getUint8(offset + 1) > threshold ||
+          raw.getUint8(offset + 2) > threshold) {
+        count++;
+      }
+    }
+  }
+  image.dispose();
+  return count;
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('Linux map and GPU camera workflow', (tester) async {
     final captureKey = GlobalKey();
+    final planDirectory = await Directory.systemTemp.createTemp(
+      'photosim-workflow-plans-',
+    );
+    addTearDown(() => planDirectory.delete(recursive: true));
+    final planStore = PlanRepository(planDirectory);
     SimulationState camera() =>
         tester.widget<CameraInspector>(find.byType(CameraInspector)).state;
     Future<void> waitForImagery() async {
@@ -73,7 +108,10 @@ void main() {
     }
 
     await tester.pumpWidget(
-      RepaintBoundary(key: captureKey, child: const PhotoSimApp()),
+      RepaintBoundary(
+        key: captureKey,
+        child: PhotoSimApp(plans: planStore),
+      ),
     );
     await tester.pump(const Duration(seconds: 3));
     final original = camera();
@@ -384,6 +422,166 @@ void main() {
         same(meshes[i]),
       );
     }
+    // Real native sky rendering: immutable batches rotate, dim in daylight,
+    // and depth-test against terrain and a controlled foreground blocker.
+    final night = beforeMoon.copyWith(
+      timestamp: DateTime.utc(2026, 6, 21, 9),
+      target: CelestialTarget.galacticCenter,
+      lens: Lens.wide,
+      focalLength: 16,
+    );
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(
+          night.copyWith(
+            azimuth: night.galacticCenter.azimuth,
+            pitch: night.galacticCenter.altitude,
+          ),
+        );
+    await tester.pump(const Duration(seconds: 1));
+    final nightRoot = world.root.children.singleWhere(
+      (node) => node.name == 'Night sky',
+    );
+    final stars = nightRoot.children.singleWhere(
+      (node) => node.name == 'Stars',
+    );
+    final band = nightRoot.children.singleWhere(
+      (node) => node.name == 'Milky Way',
+    );
+    final marker = nightRoot.children.singleWhere(
+      (node) => node.name == 'Galactic center',
+    );
+    final starGeometry = stars.mesh!.primitives.single.geometry;
+    final bandGeometry = band.mesh!.primitives.single.geometry;
+    final rotation = nightRoot.localTransform.clone();
+    expect(stars.visible, isTrue);
+    expect(band.visible, isTrue);
+    expect(marker.visible, isTrue);
+    expect(find.textContaining('Galactic center: inside FOV'), findsOneWidget);
+    await capture('linux-night-sky-terrain');
+    moonNode.visible = false;
+    marker.visible = false;
+    for (final node in texturedMeshes) {
+      node.visible = false;
+    }
+    await tester.pump(const Duration(seconds: 1));
+    await capture('linux-night-sky-isolated');
+    final visibleStars = await brightSkyPixels(
+      tester,
+      captureKey,
+      threshold: 10,
+    );
+    stars.visible = false;
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      visibleStars,
+      greaterThan(
+        await brightSkyPixels(tester, captureKey, threshold: 10) + 30,
+      ),
+    );
+    final bandBrightness = await viewportBrightness(tester, captureKey);
+    band.visible = false;
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      bandBrightness,
+      greaterThan(await viewportBrightness(tester, captureKey) + 0.1),
+    );
+    // Resolve one bright star at telephoto scale so the actual canyon
+    // occlusion check is not dependent on subpixel star sampling.
+    final antares = ObserverSkyFrame(
+      timestamp: night.timestamp,
+      latitude: night.latitude,
+      longitude: night.longitude,
+    ).position(247.3519 * radians, -26.4320 * radians);
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(
+          night.copyWith(
+            // Keep the star away from the UI crosshair excluded by pixel checks.
+            azimuth: antares.azimuth + 0.3,
+            pitch: antares.altitude,
+            lens: Lens.custom,
+            focalLength: 600,
+            target: CelestialTarget.none,
+          ),
+        );
+    await tester.pump(const Duration(seconds: 1));
+    band.visible = false;
+    moonNode.visible = false;
+    await tester.pump(const Duration(seconds: 1));
+    final isolatedStar = await brightSkyPixels(tester, captureKey);
+    expect(isolatedStar, greaterThan(30));
+    await capture('linux-star-isolated');
+    for (final node in texturedMeshes) {
+      node.visible = true;
+    }
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      await brightSkyPixels(tester, captureKey),
+      lessThan(isolatedStar / 2),
+    );
+    for (final node in texturedMeshes) {
+      node.visible = false;
+    }
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(
+          night.copyWith(
+            azimuth: night.galacticCenter.azimuth,
+            pitch: night.galacticCenter.altitude,
+          ),
+        );
+    await tester.pump(const Duration(seconds: 1));
+    marker.visible = false;
+    moonNode.visible = false;
+    final skyCamera =
+        tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
+            as scene.PerspectiveCamera;
+    final skyBlocker =
+        scene.Node(
+            name: 'Night sky occlusion test',
+            mesh: scene.Mesh(
+              scene.SphereGeometry(radius: 990),
+              scene.UnlitMaterial()..baseColorFactor.setValues(0, 0, 0, 1),
+            ),
+          )
+          ..position =
+              skyCamera.position +
+              (skyCamera.target - skyCamera.position).normalized() * 1000
+          ..shadowCastingMode = scene.ShadowCastingMode.off;
+    world.add(skyBlocker);
+    await tester.pump(const Duration(seconds: 1));
+    expect(await brightSkyPixels(tester, captureKey), lessThan(5));
+    world.remove(skyBlocker);
+    for (final node in texturedMeshes) {
+      node.visible = true;
+    }
+    await tester.tap(find.byTooltip('Later by one hour'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(nightRoot.localTransform, isNot(rotation));
+    expect(stars.mesh!.primitives.single.geometry, same(starGeometry));
+    expect(band.mesh!.primitives.single.geometry, same(bandGeometry));
+    expect(
+      tester
+          .widgetList<Text>(find.byType(Text))
+          .map((text) => text.data)
+          .where((text) => text?.endsWith('downloaded') ?? false)
+          .toList(),
+      counters,
+    );
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(beforeMoon);
+    await tester.pump(const Duration(seconds: 1));
+    expect(stars.visible, isFalse);
+    expect(band.visible, isFalse);
+    expect(marker.visible, isFalse);
+    for (var i = 0; i < meshes.length; i++) {
+      expect(
+        texturedMeshes[i].mesh!.primitives.single.geometry,
+        same(meshes[i]),
+      );
+    }
     await tester.drag(find.byType(scene.SceneView), const Offset(100, -20));
     await tester.pump();
     final rotated = camera();
@@ -455,6 +653,84 @@ void main() {
     expect(camera().groundElevation, isNot(beforeMove.groundElevation));
     await waitForImagery();
     await capture('linux-terrain-moved');
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(
+          camera().copyWith(
+            target: CelestialTarget.galacticCenter,
+            lens: Lens.telephoto,
+            focalLength: 85,
+            height: 4.2,
+          ),
+        );
+    await tester.pump(const Duration(milliseconds: 300));
+    final composition = camera();
+    await tester.tap(find.byTooltip('Photography plans'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Save plan').last);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextFormField), 'Night ridge');
+    await tester.tap(find.widgetWithText(TextButton, 'Save'));
+    for (
+      var i = 0;
+      i < 30 && find.textContaining('Saved Night ridge').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.textContaining('Saved Night ridge'), findsOneWidget);
+    expect((await planStore.loadAll()).plans.single.name, 'Night ridge');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 300));
+    // Recreate the entire app and repository, not just the workspace.
+    await File('${planDirectory.path}/broken.json').writeAsString('{bad');
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: captureKey,
+        child: PhotoSimApp(plans: PlanRepository(planDirectory)),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(camera().target, CelestialTarget.none);
+    await tester.tap(find.byTooltip('Photography plans'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Open plan').last);
+    for (
+      var i = 0;
+      i < 30 && find.text('Night ridge').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('1 unreadable plans left unchanged.'), findsOneWidget);
+    await tester.tap(find.text('Night ridge'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      SavedPlan('Compare', camera()).encode(),
+      SavedPlan('Compare', composition).encode(),
+    );
+    expect(camera().groundElevation, isNull);
+    expect(
+      tester.widget<FlutterMap>(find.byType(FlutterMap)).options.initialCenter,
+      composition.location,
+    );
+    await capture('linux-reopened-plan');
+    await tester.tap(find.text('3D Preview'));
+    for (
+      var i = 0;
+      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    await waitForImagery();
+    expect(find.text('9 cached · 0 downloaded'), findsOneWidget);
+    expect(find.text('NAIP: 10 cached · 0 downloaded'), findsOneWidget);
+    expect(
+      SavedPlan('Compare', camera()).encode(),
+      SavedPlan('Compare', composition).encode(),
+    );
+    expect(camera().groundElevation, isNotNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
     expect(tester.takeException(), isNull);

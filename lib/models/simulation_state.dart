@@ -4,6 +4,20 @@ import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/astronomy.dart';
+import '../core/geo.dart' show radians;
+import '../core/night_sky.dart';
+
+import 'package:vector_math/vector_math_64.dart' show Vector3;
+
+enum CelestialTarget {
+  none('No target'),
+  sun('Sun'),
+  moon('Moon'),
+  galacticCenter('Galactic center');
+
+  const CelestialTarget(this.label);
+  final String label;
+}
 
 enum Sensor {
   fullFrame('Full-frame', 36, 24),
@@ -40,6 +54,7 @@ class SimulationState {
     this.focalLength = 24,
     this.groundElevation,
     this.relitImagery = false,
+    this.target = CelestialTarget.none,
     DateTime? timestamp,
   }) : timestamp = (timestamp ?? DateTime.utc(2026, 6, 21, 19)).toUtc() {
     if (this.timestamp.year < 1900 ||
@@ -73,6 +88,37 @@ class SimulationState {
   final Sensor sensor;
   final Lens lens;
   final DateTime timestamp;
+  final CelestialTarget target;
+
+  CelestialPosition get galacticCenter => ObserverSkyFrame(
+    timestamp: timestamp,
+    latitude: latitude,
+    longitude: longitude,
+  ).galacticCenter;
+
+  CelestialPosition? get targetPosition => switch (target) {
+    CelestialTarget.none => null,
+    CelestialTarget.sun => sky.sun,
+    CelestialTarget.moon => sky.moon,
+    CelestialTarget.galacticCenter => galacticCenter,
+  };
+
+  /// Rectangular optical frustum, not a terrain visibility prediction.
+  bool containsDirection(Vector3 direction) {
+    final yaw = azimuth * radians, tilt = pitch * radians;
+    final forward = Vector3(
+      math.sin(yaw) * math.cos(tilt),
+      math.sin(tilt),
+      -math.cos(yaw) * math.cos(tilt),
+    );
+    final right = Vector3(math.cos(yaw), 0, math.sin(yaw));
+    final up = right.cross(forward);
+    final depth = direction.dot(forward);
+    return depth > 0 &&
+        direction.dot(right).abs() <=
+            depth * math.tan(horizontalFov / 2) + 1e-12 &&
+        direction.dot(up).abs() <= depth * math.tan(verticalFov / 2) + 1e-12;
+  }
 
   SkyState get sky => calculateSky(
     timestamp: timestamp,
@@ -96,6 +142,7 @@ class SimulationState {
     double? focalLength,
     double? groundElevation,
     bool? relitImagery,
+    CelestialTarget? target,
     DateTime? timestamp,
   }) {
     final selectedLens = lens ?? this.lens;
@@ -117,6 +164,7 @@ class SimulationState {
           ? null
           : groundElevation ?? this.groundElevation,
       relitImagery: relitImagery ?? this.relitImagery,
+      target: target ?? this.target,
       timestamp: timestamp ?? this.timestamp,
     );
   }

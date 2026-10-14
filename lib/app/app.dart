@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../data/saved_plans.dart';
 
 import '../core/local_time.dart';
 
@@ -11,7 +15,8 @@ import '../ui/simulation_workspace.dart';
 import '../ui/time_slider.dart';
 
 class PhotoSimApp extends StatelessWidget {
-  const PhotoSimApp({super.key});
+  const PhotoSimApp({super.key, this.plans});
+  final PlanRepository? plans;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -25,14 +30,15 @@ class PhotoSimApp extends StatelessWidget {
         border: OutlineInputBorder(),
       ),
     ),
-    home: const WorkspaceShell(),
+    home: WorkspaceShell(plans: plans),
   );
 }
 
 enum Workspace { map, simulation }
 
 class WorkspaceShell extends StatefulWidget {
-  const WorkspaceShell({super.key});
+  const WorkspaceShell({super.key, this.plans});
+  final PlanRepository? plans;
 
   @override
   State<WorkspaceShell> createState() => _WorkspaceShellState();
@@ -45,6 +51,126 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   bool inspectorVisible = true;
 
   Timer? playback;
+  PlanRepository? _plans;
+  bool planBusy = false;
+  int openedPlan = 0;
+
+  Future<void> managePlans(bool save) async {
+    if (planBusy) return;
+    setState(() {
+      stopPlayback();
+      planBusy = true;
+    });
+    try {
+      final store = _plans ??=
+          widget.plans ??
+          PlanRepository(
+            Directory(
+              '${(await getApplicationSupportDirectory()).path}/photosim/plans-v1',
+            ),
+          );
+      if (!mounted) return;
+      if (save) {
+        var planName = 'Photography plan';
+        final name = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Save photography plan'),
+            content: TextFormField(
+              initialValue: planName,
+              onChanged: (value) => planName = value,
+              autofocus: true,
+              maxLength: 80,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter a plan name'
+                  : null,
+              decoration: const InputDecoration(labelText: 'Plan name'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (planName.trim().isNotEmpty) {
+                    Navigator.pop(context, planName.trim());
+                  }
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || name == null) return;
+        final file = await store.save(SavedPlan(name, state));
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Saved $name · ${file.path}')));
+      } else {
+        final loaded = await store.loadAll();
+        if (!mounted) return;
+        final selected = await showDialog<SavedPlan>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Open photography plan'),
+            content: SizedBox(
+              width: 520,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (loaded.unreadable > 0)
+                    Text(
+                      '${loaded.unreadable} unreadable plans left unchanged.',
+                    ),
+                  if (loaded.plans.isEmpty) const Text('No saved plans found.'),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: loaded.plans.length,
+                      itemBuilder: (_, i) => ListTile(
+                        title: Text(loaded.plans[i].name),
+                        subtitle: Text(
+                          '${loaded.plans[i].state.timestamp.toIso8601String()} · ${loaded.plans[i].state.target.label}',
+                        ),
+                        onTap: () => Navigator.pop(context, loaded.plans[i]),
+                      ),
+                    ),
+                  ),
+                  SelectableText('Storage: ${store.directory.path}'),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+        if (selected != null && mounted) {
+          setState(() {
+            state = selected.state;
+            workspace = Workspace.map;
+            openedPlan++;
+          });
+        }
+      }
+    } catch (failure) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Plan ${save ? 'save' : 'load'} failed: $failure'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => planBusy = false);
+    }
+  }
 
   @override
   void initState() {
@@ -134,6 +260,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   @override
   Widget build(BuildContext context) {
     final sky = state.sky;
+    final target = state.targetPosition;
     final clock = localClock(
       timestamp: state.timestamp,
       latitude: state.latitude,
@@ -163,6 +290,38 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                 setState(() => workspace = value.single),
           ),
           const SizedBox(width: 16),
+          PopupMenuButton<bool>(
+            tooltip: 'Photography plans',
+            enabled: !planBusy,
+            icon: const Icon(Icons.folder_outlined),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: true, child: Text('Save plan')),
+              PopupMenuItem(value: false, child: Text('Open plan')),
+            ],
+            onSelected: managePlans,
+          ),
+          PopupMenuButton<CelestialTarget>(
+            tooltip: 'Select astronomical target',
+            icon: const Icon(Icons.track_changes),
+            initialValue: state.target,
+            itemBuilder: (_) => [
+              for (final target in CelestialTarget.values)
+                PopupMenuItem(value: target, child: Text(target.label)),
+            ],
+            onSelected: (value) => update(state.copyWith(target: value)),
+          ),
+          IconButton(
+            tooltip: 'Aim at selected target',
+            icon: const Icon(Icons.gps_fixed),
+            onPressed: target == null
+                ? null
+                : () => update(
+                    state.copyWith(
+                      azimuth: target.azimuth,
+                      pitch: target.altitude,
+                    ),
+                  ),
+          ),
           IconButton(
             tooltip: 'Toggle camera inspector',
             onPressed: () =>
@@ -175,7 +334,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       body: LayoutBuilder(
         builder: (context, constraints) {
           final viewport = workspace == Workspace.map
-              ? MapWorkspace(state: state, onChanged: update)
+              ? MapWorkspace(
+                  key: ValueKey(openedPlan),
+                  state: state,
+                  onChanged: update,
+                )
               : SimulationWorkspace(state: state, onChanged: update);
           return Column(
             children: [
@@ -223,6 +386,13 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   spacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
+                    if (target != null)
+                      Tooltip(
+                        message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
+                        child: Text(
+                          '${state.target.label}: ${state.containsDirection(target.direction) ? 'inside' : 'outside'} FOV · alt ${target.altitude.toStringAsFixed(1)}°',
+                        ),
+                      ),
                     const Icon(Icons.schedule, size: 20),
                     TextButton(
                       onPressed: chooseTime,

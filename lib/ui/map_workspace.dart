@@ -47,6 +47,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
     final bodies = [
       ('Sun', sky.sun, const Color(0xFFFFC857)),
       ('Moon', sky.moon, const Color(0xFFADD8FF)),
+      ('Galactic center', state.galacticCenter, const Color(0xFFD4ADFF)),
     ];
     return Stack(
       children: [
@@ -124,7 +125,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                 for (final body in bodies)
                   Marker(
                     point: destination(state.location, body.$2.azimuth, 1000),
-                    width: 150,
+                    width: 210,
                     height: 40,
                     child: IgnorePointer(
                       child: Semantics(
@@ -223,7 +224,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                             : 'Click to place camera · Drag camera to move · Drag green handle to aim',
                       ),
                       const Text(
-                        'Amber: Sun · Blue: Moon · Dashed: below horizontal',
+                        'Amber: Sun · Blue: Moon · Violet: Galactic center · Dashed: below horizontal',
                       ),
                       const Text(
                         'Bearing guides only · Not rise/set or terrain visibility predictions',

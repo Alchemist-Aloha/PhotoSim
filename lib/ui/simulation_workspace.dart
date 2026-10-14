@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_scene/gpu.dart' as gpu;
 import 'package:http/http.dart' as http;
@@ -10,12 +11,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 import '../core/geo.dart';
+import '../core/night_sky.dart';
 import '../core/terrain_geo.dart';
 import '../data/imagery/imagery_repository.dart';
 import '../data/terrain/terrain_repository.dart';
 import '../data/terrain/tile_cache.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
+import '../render/night_sky.dart';
 
 class SimulationWorkspace extends StatefulWidget {
   const SimulationWorkspace({
@@ -51,6 +54,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   bool loading = true;
   scene.PhysicalSkySource? skySource;
   MoonRenderer? moonRenderer;
+  NightSkyRenderer? nightRenderer;
 
   @override
   void initState() {
@@ -94,6 +98,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       );
       moonRenderer = MoonRenderer();
       world!.add(moonRenderer!.node);
+      final stars = parseStarCatalog(
+        await rootBundle.loadString('assets/sky/stars.json'),
+      );
+      if (!mounted) return;
+      final band = await scene.Texture2D.fromAsset('assets/sky/milky_way.png');
+      if (!mounted) return;
+      nightRenderer = NightSkyRenderer(stars, band);
+      world!.add(nightRenderer!.root);
       await loadTerrain();
     } catch (failure, stack) {
       debugPrint('PhotoSim 3D initialization failed: $failure\n$stack');
@@ -320,11 +332,18 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'Where NAIP is missing, the green surface remains a labeled fallback material. '
             'Solar direction is calculated locally with Astronomia (Meeus, MIT); brightness and sky appearance are approximate. '
             'Sun/Moon readouts omit atmospheric refraction. The Moon is an untextured phase-lit sphere; '
-            'moonlight brightness is an artistic approximation, not calibrated exposure.',
+            'moonlight brightness is an artistic approximation, not calibrated exposure. '
+            'Stars: XHIP (Anderson & Francis, 2012); Milky Way outlines: Jose R. Vieira, '
+            'via D3-Celestial (Olaf Frohn, BSD-3-Clause). Night-sky brightness and star sizes are artistic.',
           ),
         ),
       ),
       actions: [
+        TextButton(
+          onPressed: () =>
+              showLicensePage(context: context, applicationName: 'PhotoSim'),
+          child: const Text('Software & sky-data licenses'),
+        ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Close'),
@@ -368,6 +387,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final sky = state.sky;
     final sun = sky.sun;
     moonRenderer!.update(sky, eye);
+    nightRenderer?.update(state, eye);
     final sunDirection = vm.Vector3(
       sun.direction.x,
       sun.direction.y,

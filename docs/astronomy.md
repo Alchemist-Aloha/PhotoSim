@@ -112,7 +112,9 @@ color warms at low altitude. Ambient intensity ramps between 0.005 at −18°
 and 0.25 at 0°. These are approximate clear-sky appearance controls, **not
 calibrated irradiance, exposure or weather simulation**. The built-in sky
 model goes black below the solar horizon; only ambient terrain lighting has
-a twilight ramp. Stars are not yet rendered.
+a twilight ramp. Stars and a simplified Milky Way brightness map are rendered
+by the separate [night-sky module](data-sources/night-sky.md), with their own
+solar/lunar visibility approximation.
 
 `lib/render/moon.dart` renders a 128-segment, 64-ring untextured lunar sphere,
 rescaled to 30 km with radius `distance × sin(angularRadius)` to preserve its
@@ -152,5 +154,6 @@ terrain hidden and the right-hand bright limb for the selected waxing phase.
 The workflow also verifies lunar color changes without replacing its geometry.
 Unit tests check phase-lit projected area, limb rotation and brightness ramps.
 
-Next: stars and the Milky Way, followed by saved plans and the release gates.
-The full roadmap remains incomplete.
+Stars, Milky Way planning and [saved compositions](saved-plans.md) are now
+implemented and verified on Linux. Performance, responsive-layout and actual
+cross-platform release gates remain open; the full roadmap is incomplete.

@@ -2,10 +2,10 @@
 
 ## Current milestone
 
-Real Mapzen/NAIP terrain now has **offline Sun/Moon calculations and UTC-driven
-Sun/Moon lighting, estimated local-time display and automatic playback**,
-advancing Phase 3 after terrain/imagery and cache streaming.
-The public MVP, full astronomy phase and cross-platform Phase 0 gate remain incomplete.
+The Linux workflow now includes **offline stars/Milky Way planning and saved
+compositions**, in addition to real Mapzen/NAIP terrain, Sun/Moon lighting,
+estimated local time and playback. This advances Phase 4 and saved-plan integration.
+The public MVP and cross-platform Phase 0/release gates remain incomplete.
 
 ## Available
 
@@ -43,12 +43,21 @@ The public MVP, full astronomy phase and cross-platform Phase 0 gate remain inco
   2037; other dates explicitly show unavailable instead of a stale offset.
 - Play/pause at five simulated minutes per second, stopping on manual time edits,
   backgrounding, disposal or the date limit; UTC remains authoritative.
+- 5,044 offline XHIP stars and five licensed Milky Way brightness contours;
+  J2000 precession/nutation/sidereal rotation, immutable GPU batches and terrain depth tests.
+- Approximate solar/lunar night-sky visibility, Galactic-center map/3D markers,
+  Sun/Moon/Galactic-center selection, explicit aim action and rectangular FOV checks.
+- Named version-1 JSON photography snapshots: camera, optics, UTC, selected target
+  and imagery preference; local save/open, fresh-app restoration and corruption warnings.
 - No paid service, secrets, custom shaders or fabricated imagery.
 
 ## Responsibility boundaries
 
 - `lib/core/astronomy.dart`: offline ephemerides and observer/renderer transforms.
 - `lib/core/local_time.dart`: approximate offline zone lookup and local presentation.
+- `lib/core/night_sky.dart`: catalog parsing, rigid observer sky frame and visibility model.
+- `lib/render/night_sky.dart`: immutable star/band geometry and target marker.
+- `lib/data/saved_plans.dart`: bounded versioned JSON and native snapshot repository.
 - `lib/app/app.dart`: authoritative shared state, playback timer and lifecycle cleanup.
 - `lib/render/moon.dart`: lunar geometry, phase shading and approximate moonlight.
 - `lib/core/terrain_geo.dart`: XYZ/Web Mercator bounds, WGS84 and local frames.
@@ -73,7 +82,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- Fifty-four passing unit/widget tests: optics/state/geographic precision, elevations,
+- Seventy-one passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
   resolutions/metadata/cache, missing detail, corruption and out-of-coverage behavior.
@@ -103,10 +112,20 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 - A native screenshot pixel-diversity assertion catches the previous
   loaded-but-still-green rendering regression.
 - Moving the camera loads rebased terrain and aligned imagery at the new location.
+- Six independent ERFA/SOFA sky-rotation fixtures pass <0.01° checks, including
+  1900/2100, both hemispheres and a pole; these test transforms, not full stellar astrometry.
+- Native pixels verify stars, Milky Way, actual canyon occlusion of Antares,
+  a foreground blocker, daylight suppression and resident sky/terrain geometry.
+- Target selection/aiming and rectangular FOV tests cover pitch, wrapping and optical zoom.
+- Snapshot tests cover all fields, validation, corruption, size limits, concurrent saves
+  and failed writes preserving existing data. The native UI saves, destroys/recreates
+  the app, reopens every field, recenters the map and restores cached 3D geography.
 - Native screenshots captured and inspected:
   `build/validation/linux-naip-natural.png`, `linux-preview.png`,
   `linux-solar-day.png`, `linux-solar-night.png`, `linux-map.png`, and
-  `linux-terrain-moved.png`, plus the terrain-isolated `linux-moon-phase.png`.
+  `linux-terrain-moved.png`, plus the terrain-isolated `linux-moon-phase.png`,
+  `linux-night-sky-terrain.png`, `linux-night-sky-isolated.png`,
+  `linux-star-isolated.png` and `linux-reopened-plan.png`.
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live
@@ -126,33 +145,34 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
   time targets, release-mode interaction and long-run GPU-memory stability are unmeasured.
 - No lunar albedo/detail, libration, earthshine or atmospheric lunar scattering.
   Moonlight is artistically scaled, not calibrated; daytime moonlight is omitted.
-- No stars or Milky Way. Fixed-length celestial guides may overlap or leave
-  the map viewport; no rise/set event overlays or terrain visibility classification.
+- Night-sky intensity and point sizes are artistic; no calibrated PSF/exposure,
+  proper motion, annual aberration/parallax, extinction, light pollution or labels.
+  Fixed-length celestial guides may overlap or leave the map viewport;
+  no rise/set event overlays or terrain visibility classification.
 - No atmospheric refraction, rise/set events or measured Earth orientation.
   Accuracy checks cover selected cases, not the entire supported date range.
 - Solar brightness/color and ambient twilight are approximate; the built-in
   sky becomes black below the solar horizon. Natural imagery retains its lighting.
 - Approximate static timezone boundaries; local display only for 1970–2037.
   No local-wall-time input or timezone override. Civil-time rules can change.
-- Saved plans and exports remain open.
+- Plans are unencrypted native local snapshots; no file-picker import/export,
+  cloud storage, editing/deletion UI or power-loss durability guarantee.
+- Photographic exports remain post-MVP.
 
 See [astronomy notes](astronomy.md) for the calculation contract, reference
-sources and accuracy limits. Next: stars and the Milky Way, then saved plans.
+sources and accuracy limits, [night-sky notes](data-sources/night-sky.md) for
+catalog/brightness limits, and [saved plans](saved-plans.md) for persistence.
+Next: responsive-layout/performance validation and the platform/release gates.
 
 ## Remaining roadmap gates
 
 The roadmap is **not complete**. Remaining MVP work includes:
 
-1. A licensed offline star catalog, epoch corrections, batched star rendering,
-   sky rotation, terrain occlusion and solar/lunar visibility approximation.
-2. A licensed simplified Milky Way representation, Galactic-center position,
-   map/3D markers, target selection and field-of-view checks.
-3. Versioned JSON saved plans with reopen support, including selected target.
-4. Responsive-layout validation, adaptive quality, frustum/LOD improvements,
+1. Responsive-layout validation, adaptive quality, frustum/LOD improvements,
    defined-device FPS/latency profiling and long-running GPU-resource checks.
-5. Android, Web/WebGL2, Windows and macOS scaffolding and actual-platform
+2. Android, Web/WebGL2, Windows and macOS scaffolding and actual-platform
    build/render validation. Linux success does not close the Phase 0 gate.
-6. The documented Shenandoah save/close/reopen demonstration and complete
+3. The documented Shenandoah save/close/reopen demonstration and complete
    workflow regression tests on all five target platforms.
 
 Post-MVP priorities in the roadmap, including advanced weather and photographic
