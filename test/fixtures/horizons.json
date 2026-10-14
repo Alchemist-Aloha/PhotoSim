@@ -1,0 +1,113 @@
+{
+  "source": "NASA/JPL Horizons DE441; airless topocentric apparent centers; east-positive geodetic longitude, ellipsoid height in km; quantities 4,10. Pre-1962 timestamps are UT1, later UTC.",
+  "cases": [
+    {
+      "utc": "2026-06-21T19:00:00Z",
+      "latitude": 37.744,
+      "longitude": -119.59,
+      "elevation": 1201.7,
+      "sun": {
+        "azimuth": 133.700519679,
+        "altitude": 70.745421983,
+        "illumination": 1,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='-119.59%2C37.744%2C1.2017'&START_TIME='2026-06-21%2019%3A00'&STOP_TIME='2026-06-21%2019%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='10'"
+      },
+      "moon": {
+        "azimuth": 83.491062004,
+        "altitude": -12.02991765,
+        "illumination": 0.49645740000000005,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='-119.59%2C37.744%2C1.2017'&START_TIME='2026-06-21%2019%3A00'&STOP_TIME='2026-06-21%2019%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='301'"
+      }
+    },
+    {
+      "utc": "2026-06-22T06:00:00Z",
+      "latitude": 37.744,
+      "longitude": -119.59,
+      "elevation": 1201.7,
+      "sun": {
+        "azimuth": 330.119032555,
+        "altitude": -22.60443855,
+        "illumination": 1,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='-119.59%2C37.744%2C1.2017'&START_TIME='2026-06-22%2006%3A00'&STOP_TIME='2026-06-22%2006%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='10'"
+      },
+      "moon": {
+        "azimuth": 245.17359782,
+        "altitude": 21.197130286,
+        "illumination": 0.5328391,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='-119.59%2C37.744%2C1.2017'&START_TIME='2026-06-22%2006%3A00'&STOP_TIME='2026-06-22%2006%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='301'"
+      }
+    },
+    {
+      "utc": "2024-03-25T06:00:00Z",
+      "latitude": 51.5,
+      "longitude": 0,
+      "elevation": 10,
+      "sun": {
+        "azimuth": 87.593683966,
+        "altitude": 0.662318634,
+        "illumination": 1,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='0%2C51.5%2C0.01'&START_TIME='2024-03-25%2006%3A00'&STOP_TIME='2024-03-25%2006%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='10'"
+      },
+      "moon": {
+        "azimuth": 268.298342388,
+        "altitude": -0.71162584,
+        "illumination": 0.9999616,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='0%2C51.5%2C0.01'&START_TIME='2024-03-25%2006%3A00'&STOP_TIME='2024-03-25%2006%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='301'"
+      }
+    },
+    {
+      "utc": "2000-01-01T00:00:00Z",
+      "latitude": -33.86,
+      "longitude": 151.21,
+      "elevation": 30,
+      "sun": {
+        "azimuth": 75.125796893,
+        "altitude": 61.998701721,
+        "illumination": 1,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='151.21%2C-33.86%2C0.03'&START_TIME='2000-01-01%2000%3A00'&STOP_TIME='2000-01-01%2000%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='10'"
+      },
+      "moon": {
+        "azimuth": 300.044336939,
+        "altitude": 49.134401961,
+        "illumination": 0.2759564,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='151.21%2C-33.86%2C0.03'&START_TIME='2000-01-01%2000%3A00'&STOP_TIME='2000-01-01%2000%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='301'"
+      }
+    },
+    {
+      "utc": "1992-04-12T00:00:00Z",
+      "latitude": 0,
+      "longitude": 0,
+      "elevation": 0,
+      "sun": {
+        "azimuth": 358.604079024,
+        "altitude": -81.301058401,
+        "illumination": 1,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='0%2C0%2C0'&START_TIME='1992-04-12%2000%3A00'&STOP_TIME='1992-04-12%2000%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='10'"
+      },
+      "moon": {
+        "azimuth": 285.039711486,
+        "altitude": 22.59732901,
+        "illumination": 0.6712231,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='0%2C0%2C0'&START_TIME='1992-04-12%2000%3A00'&STOP_TIME='1992-04-12%2000%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='301'"
+      }
+    },
+    {
+      "utc": "2100-12-21T12:00:00Z",
+      "latitude": 69.65,
+      "longitude": 18.96,
+      "elevation": 100,
+      "sun": {
+        "azimuth": 197.861915169,
+        "altitude": -4.128391894,
+        "illumination": 1,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='18.96%2C69.65%2C0.1'&START_TIME='2100-12-21%2012%3A00'&STOP_TIME='2100-12-21%2012%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='10'"
+      },
+      "moon": {
+        "azimuth": 323.367400719,
+        "altitude": -3.335671891,
+        "illumination": 0.7879552,
+        "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&EPHEM_TYPE='OBSERVER'&CENTER='coord%40399'&COORD_TYPE='GEODETIC'&SITE_COORD='18.96%2C69.65%2C0.1'&START_TIME='2100-12-21%2012%3A00'&STOP_TIME='2100-12-21%2012%3A01'&STEP_SIZE='1m'&QUANTITIES='4%2C10'&APPARENT='AIRLESS'&TIME_DIGITS='SECONDS'&CSV_FORMAT='YES'&ANG_FORMAT='DEG'&EXTRA_PREC='YES'&COMMAND='301'"
+      }
+    }
+  ]
+}

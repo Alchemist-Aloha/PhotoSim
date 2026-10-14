@@ -1,0 +1,107 @@
+# Linux-first implementation status
+
+## Current milestone
+
+Real Mapzen/NAIP terrain now has **offline Sun/Moon calculations and UTC-driven
+solar lighting**, advancing Phase 3 after terrain/imagery and cache streaming.
+The public MVP, full astronomy phase and cross-platform Phase 0 gate remain incomplete.
+
+## Available
+
+- Two synchronized map/3D workspaces with camera placement, draggable aim,
+  physical sensor/lens fields of view, height and UTC timeline controls.
+- Terrarium decoding, pixel-center elevation interpolation, double-precision
+  WGS84 ECEF/ENU, meter-scale camera-relative geometry and ellipsoid curvature.
+- Progressive 3×3 zoom-13 terrain, generated normals/UVs, camera ground vertex,
+  coarse distance LOD, skirts and native LRU elevation caching.
+- NAIP provider interface and exact EPSG:3857 raster export bounds, explicit
+  natural-color processing, bounded/cancellable requests and source attribution.
+- Progressive 256×256 image previews and a 1024×1024 camera-tile replacement.
+- Texture swaps preserve existing geometry; switching natural/relit mode also
+  preserves geometry and shared camera/time state.
+- Natural, display-referred imagery by default; opt-in approximate relighting.
+- Transparent/missing imagery stays a labeled fallback surface; unavailable
+  high-resolution imagery retains a successful preview.
+- Independent 256 MiB imagery cache (64 MiB previews, 192 MiB detail), in addition
+  to the existing 256 MiB elevation cache. Corruption recovery and source metadata.
+- Pinned Astronomia 1.1.1 behind an application-level calculation interface.
+- Topocentric solar/lunar positions and angular sizes, observer-dependent Moon
+  illumination and waxing/waning readouts shared by both workspaces.
+- UTC-driven directional sunlight and shadows, approximate color/brightness
+  ramps and Flutter Scene's built-in clear-sky background.
+- Validated 1900–2100 date range, with disabled hour steps at the boundaries.
+- No paid service, secrets, custom shaders or fabricated imagery.
+
+## Responsibility boundaries
+
+- `lib/core/astronomy.dart`: offline ephemerides and observer/renderer transforms.
+- `lib/core/terrain_geo.dart`: XYZ/Web Mercator bounds, WGS84 and local frames.
+- `lib/data/terrain/`: raster elevations, CPU meshes, elevation repository.
+- `lib/data/imagery/`: provider interface, NAIP requests, validation/decode/cache.
+- `lib/data/http_bytes.dart`: shared bounded, cancellable HTTP download.
+- `lib/data/terrain/tile_cache.dart`: reused provider/resolution-scoped native cache.
+- `lib/ui/simulation_workspace.dart`: progressive orchestration and GPU upload.
+- `lib/models/simulation_state.dart`: authoritative camera/time/ground and
+  imagery appearance preference.
+
+Decode and raster preparation use isolates. There are no network requests in the
+render loop, and camera optics/orientation/time changes do not reload source data.
+Mesh reassignment registers material changes with Flutter Scene while reusing the
+same resident geometry; mutating a primitive's material alone did not update
+the rendered scene in the installed backend.
+
+## Verified locally
+
+Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
+
+- Static analysis: no issues.
+- Forty-one passing unit/widget tests: optics/state/geographic precision, elevations,
+  normals/edges/ground vertex, cache behavior, bounded responses and cancellation,
+  imagery export bounds, pixel orientation, no-data handling, independent image
+  resolutions/metadata/cache, missing detail, corruption and out-of-coverage behavior.
+- Six independent NASA/JPL Horizons fixtures pass Sun <0.1° and Moon <0.2°
+  angular separation checks. Phase, observer height, UTC normalization, date
+  boundaries and shared readout changes are tested offline.
+- Native workflow loads nine real Yosemite terrain patches and nine NAIP textures;
+  the camera patch receives an additional higher-resolution image.
+- Returning to 3D reports **9 cached / 0 downloaded** elevation patches and
+  **10 cached / 0 downloaded** imagery entries.
+- Integration assertions verify unchanged geometry during texture updates,
+  natural/relit material switching, shared preference preservation, camera height,
+  camera controls, projection synchronization, timeline changes and teardown.
+- Time updates change the solar direction and actual GPU-rendered brightness;
+  nighttime direct intensity reaches zero. Geometry and download counters stay unchanged.
+- A native screenshot pixel-diversity assertion catches the previous
+  loaded-but-still-green rendering regression.
+- Moving the camera loads rebased terrain and aligned imagery at the new location.
+- Native screenshots captured and inspected:
+  `build/validation/linux-naip-natural.png`, `linux-preview.png`,
+  `linux-solar-day.png`, `linux-solar-night.png`, `linux-map.png`, and
+  `linux-terrain-moved.png`.
+- Linux release bundle builds successfully.
+
+Unit tests use generated images and mocked HTTP; the native workflow uses live
+public data on a first visit, then cached data. Pixel-diversity and UV/bounds tests
+are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
+
+## Remaining limits
+
+- Fixed regional extent and distance LOD, not screen-error quadtree refinement.
+- Uncorrected source elevation datums and no precision terrain-horizon service.
+- Coarse/unequal tile-edge samples, skirts, blurry distant imagery and stretched
+  cliff/foreground textures remain visible.
+- Imagery source acquisition dates are unknown; no date filtering or cache refresh UI.
+- Optional MapTiler/global imagery providers are not implemented.
+- Native-only cache; other platform builds and browser storage remain open.
+- Scene warns about depth precision inside ground patches. Shadow accuracy, frame
+  time targets, release-mode interaction and long-run GPU-memory stability are unmeasured.
+- No resolved Moon disk, moonlight, stars, Milky Way or celestial map overlays.
+- No atmospheric refraction, rise/set events or measured Earth orientation.
+  Accuracy checks cover selected cases, not the entire supported date range.
+- Solar brightness/color and ambient twilight are approximate; the built-in
+  sky becomes black below the solar horizon. Natural imagery retains its lighting.
+- Local timezone display, playback/time slider, saved plans and exports remain open.
+
+See [astronomy notes](astronomy.md) for the calculation contract, reference
+sources and accuracy limits. Next: resolved lunar phase/orientation and
+approximate moonlight, followed by map overlays and fuller time controls.

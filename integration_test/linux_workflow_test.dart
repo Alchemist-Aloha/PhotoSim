@@ -1,0 +1,329 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_scene/scene.dart' as scene;
+import 'package:integration_test/integration_test.dart';
+import 'package:photosim/app/app.dart';
+import 'package:photosim/core/geo.dart';
+import 'package:photosim/models/simulation_state.dart';
+import 'package:photosim/ui/camera_inspector.dart';
+
+Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
+  final boundary =
+      key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  final image = await boundary.toImage();
+  final raw = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+  final viewport = tester.getRect(find.byType(scene.SceneView));
+  var total = 0.0, count = 0;
+  for (
+    var y = viewport.top.toInt() + 8;
+    y < viewport.bottom.toInt() - 8;
+    y += 8
+  ) {
+    for (
+      var x = viewport.left.toInt() + 8;
+      x < viewport.right.toInt() - 8;
+      x += 8
+    ) {
+      final offset = (y * image.width + x) * 4;
+      total +=
+          0.2126 * raw.getUint8(offset) +
+          0.7152 * raw.getUint8(offset + 1) +
+          0.0722 * raw.getUint8(offset + 2);
+      count++;
+    }
+  }
+  image.dispose();
+  return total / count;
+}
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('Linux map and GPU camera workflow', (tester) async {
+    final captureKey = GlobalKey();
+    SimulationState camera() =>
+        tester.widget<CameraInspector>(find.byType(CameraInspector)).state;
+    Future<void> waitForImagery() async {
+      for (
+        var i = 0;
+        i < 240 && find.text('USGS NAIP · 9/9 textures').evaluate().isEmpty;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      expect(find.text('USGS NAIP · 9/9 textures'), findsOneWidget);
+    }
+
+    Future<void> capture(String name) async {
+      final boundary =
+          captureKey.currentContext!.findRenderObject()!
+              as RenderRepaintBoundary;
+      final image = await boundary.toImage();
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      await Directory('build/validation').create(recursive: true);
+      await File('build/validation/$name.png')
+          .writeAsBytes(bytes!.buffer.asUint8List());
+      image.dispose();
+    }
+
+    await tester.pumpWidget(
+      RepaintBoundary(key: captureKey, child: const PhotoSimApp()),
+    );
+    await tester.pump(const Duration(seconds: 3));
+    final original = camera();
+    await tester.tapAt(
+      tester.getCenter(find.byType(FlutterMap)) + const Offset(100, 50),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(camera().latitude, isNot(original.latitude));
+    final clicked = camera();
+    await tester.drag(find.byIcon(Icons.photo_camera), const Offset(50, 20));
+    await tester.pump();
+    final placed = camera();
+    expect(placed.latitude, isNot(clicked.latitude));
+    expect(placed.longitude, isNot(clicked.longitude));
+    await tester.drag(find.byIcon(Icons.open_with), const Offset(70, 0));
+    await tester.pump();
+    expect(camera().azimuth, isNot(placed.azimuth));
+    expect(camera().latitude, placed.latitude);
+    final aimed = camera();
+    final polygon = tester
+        .widget<PolygonLayer>(find.byType(PolygonLayer))
+        .polygons
+        .single;
+    final edgeAngle = bearing(aimed.location, polygon.points.last);
+    final expected = (aimed.azimuth + aimed.horizontalFov / radians / 2) % 360;
+    expect((edgeAngle - expected + 540) % 360 - 180, closeTo(0, 1e-7));
+    await capture('linux-map');
+    await tester.tap(find.text('3D Preview'));
+    for (
+      var i = 0;
+      i < 30 && find.byType(scene.SceneView).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    expect(find.byType(scene.SceneView), findsOneWidget);
+    for (
+      var i = 0;
+      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+    expect(camera().groundElevation, inInclusiveRange(500, 3000));
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+    final initialView = tester.widget<scene.SceneView>(
+      find.byType(scene.SceneView),
+    );
+    final world = initialView.scene;
+    final meshes = world!.root.children
+        .where((node) => node.mesh != null)
+        .map((node) => node.mesh!.primitives.single.geometry)
+        .toList();
+    await waitForImagery();
+    final texturedMeshes = world.root.children
+        .where((node) => node.mesh != null)
+        .toList();
+    expect(texturedMeshes.length, 9);
+    for (var i = 0; i < meshes.length; i++) {
+      expect(
+        texturedMeshes[i].mesh!.primitives.single.geometry,
+        same(meshes[i]),
+      );
+      expect(
+        texturedMeshes[i].mesh!.primitives.single.material,
+        isA<scene.UnlitMaterial>(),
+      );
+    }
+    await tester.pump(const Duration(milliseconds: 500));
+    final naturalImage =
+        await (captureKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary)
+            .toImage();
+    final raw = (await naturalImage.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    ))!;
+    final viewport = tester.getRect(find.byType(scene.SceneView));
+    final colors = <int>{};
+    for (
+      var y = viewport.top.toInt() + 8;
+      y < viewport.bottom.toInt() - 8;
+      y += 8
+    ) {
+      for (
+        var x = viewport.left.toInt() + 8;
+        x < viewport.right.toInt() - 8;
+        x += 8
+      ) {
+        final offset = (y * naturalImage.width + x) * 4;
+        colors.add(
+          (raw.getUint8(offset) << 16) |
+              (raw.getUint8(offset + 1) << 8) |
+              raw.getUint8(offset + 2),
+        );
+      }
+    }
+    naturalImage.dispose();
+    // Actual image detail, not merely a material assignment on a still-green render.
+    expect(colors.length, greaterThan(500));
+    await capture('linux-naip-natural');
+    await tester.tap(find.text('Approximate relighting'));
+    await tester.pump();
+    expect(
+      texturedMeshes.first.mesh!.primitives.single.material,
+      isA<scene.PhysicallyBasedMaterial>(),
+    );
+    expect(
+      (initialView.camera! as scene.PerspectiveCamera).fovRadiansY,
+      aimed.verticalFov,
+    );
+    expect(
+      (initialView.camera! as scene.PerspectiveCamera).position.y,
+      closeTo(camera().groundElevation! + camera().height, 0.001),
+    );
+    expect(world.directionalLight!.castsShadow, isTrue);
+    final lightDirection = world.directionalLight!.direction.clone();
+    final counters = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((text) => text.data)
+        .where((text) => text?.endsWith('downloaded') ?? false)
+        .toList();
+    await tester.tap(find.byTooltip('Later by one hour'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(world.directionalLight!.direction, isNot(lightDirection));
+    final sun = camera().sky.sun;
+    expect(
+      world.directionalLight!.direction.x,
+      closeTo(-sun.direction.x, 1e-6),
+    );
+    expect(
+      world.directionalLight!.direction.y,
+      closeTo(-sun.direction.y, 1e-6),
+    );
+    expect(
+      world.directionalLight!.direction.z,
+      closeTo(-sun.direction.z, 1e-6),
+    );
+    expect(world.skybox!.source, isA<scene.PhysicalSkySource>());
+    final skySource = world.skybox!.source as scene.PhysicalSkySource;
+    expect(skySource.sunAngularRadius, sun.angularRadius);
+    await capture('linux-solar-day');
+    final dayBrightness = await viewportBrightness(tester, captureKey);
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(
+          camera().copyWith(
+            timestamp: original.timestamp.add(const Duration(hours: 11)),
+          ),
+        );
+    await tester.pump(const Duration(seconds: 1));
+    expect(world.directionalLight!.intensity, 0);
+    expect(world.environmentIntensity, closeTo(0.005, 1e-12));
+    expect(skySource.sunDirection.y, lessThan(0));
+    await capture('linux-solar-night');
+    expect(
+      await viewportBrightness(tester, captureKey),
+      lessThan(dayBrightness * 0.5),
+    );
+    expect(
+      tester
+          .widgetList<Text>(find.byType(Text))
+          .map((text) => text.data)
+          .where((text) => text?.endsWith('downloaded') ?? false)
+          .toList(),
+      counters,
+    );
+    for (var i = 0; i < meshes.length; i++) {
+      expect(
+        texturedMeshes[i].mesh!.primitives.single.geometry,
+        same(meshes[i]),
+      );
+    }
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(camera().copyWith(timestamp: original.timestamp));
+    await tester.pump(const Duration(seconds: 1));
+    expect(world.directionalLight!.intensity, greaterThan(0));
+    await tester.drag(find.byType(scene.SceneView), const Offset(100, -20));
+    await tester.pump();
+    final rotated = camera();
+    expect(rotated.azimuth, isNot(aimed.azimuth));
+    expect(rotated.latitude, placed.latitude);
+    await tester.tap(find.text('Full-frame'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('APS-C').last);
+    await tester.pump(const Duration(milliseconds: 300));
+    final updatedView = tester.widget<scene.SceneView>(
+      find.byType(scene.SceneView),
+    );
+    expect(updatedView.scene, same(world));
+    expect(
+      (updatedView.camera! as scene.PerspectiveCamera).fovRadiansY,
+      camera().verticalFov,
+    );
+    expect(camera().sensor, Sensor.apsC);
+    await tester.tap(find.byTooltip('Later by one hour'));
+    await tester.pump();
+    expect(
+      tester.widget<scene.SceneView>(find.byType(scene.SceneView)).scene,
+      same(world),
+    );
+    expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+    await capture('linux-preview');
+    await tester.tap(find.text('Map'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(camera().azimuth, rotated.azimuth);
+    expect(camera().sensor, Sensor.apsC);
+    await tester.tap(find.byTooltip('Later by one hour'));
+    await tester.pump();
+    expect(
+      camera().timestamp,
+      original.timestamp.add(const Duration(hours: 2)),
+    );
+    await tester.tap(find.text('3D Preview'));
+    for (
+      var i = 0;
+      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    expect(find.text('9 cached · 0 downloaded'), findsOneWidget);
+    await waitForImagery();
+    expect(find.text('NAIP: 10 cached · 0 downloaded'), findsOneWidget);
+    expect(camera().relitImagery, isTrue);
+    expect(camera().groundElevation, isNotNull);
+    await tester.tap(find.text('Map'));
+    await tester.pump(const Duration(milliseconds: 500));
+    final beforeMove = camera();
+    await tester.tapAt(
+      tester.getCenter(find.byType(FlutterMap)) + const Offset(-200, 80),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(camera().latitude, isNot(beforeMove.latitude));
+    expect(camera().groundElevation, isNull);
+    await tester.tap(find.text('3D Preview'));
+    for (
+      var i = 0;
+      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+    expect(camera().groundElevation, isNotNull);
+    expect(camera().groundElevation, isNot(beforeMove.groundElevation));
+    await waitForImagery();
+    await capture('linux-terrain-moved');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+}
