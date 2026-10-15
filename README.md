@@ -26,7 +26,8 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Shared camera position, azimuth, pitch, height, focal length, and UTC timestamp.
 - Account-free Mapterhorn terrain: Copernicus GLO-30 plus finer open regional
   DEMs, with Mapzen fallback, rendered in a camera-relative WGS84 frame.
-- Terrain-derived camera height, progressive loading, simple distance LOD, and tile skirts.
+- Terrain-derived camera height, progressive loading, distance/FOV quadtree LOD, and tile skirts.
+- **Terrain range** button: surrounding radius, FOV-aware forward fetching, and render distance.
 - Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
   a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile.
 - Natural imagery and opt-in approximate relighting, without rebuilding terrain.
@@ -93,8 +94,14 @@ relighting is approximate and may double those shadows. Imagery dates do not
 follow simulation time; source acquisition dates are not queried yet. See
 [imagery data notes](docs/data-sources/imagery.md).
 
-Terrain loading covers a fixed 3×3 region at zoom 13, with a 256 MiB LRU disk
-budget split between Mapterhorn and Mapzen. Where regional tiles are absent, the
+Terrain defaults to the original 3×3 zoom-13 region. **Terrain range** adjusts
+surrounding coverage (1–3 tile rings), forward reach (0–40 km, off by default),
+and terrain rendering (2–40 km, whole-tile cutoff plus view-frustum culling).
+Forward coverage follows sensor/focal length, pitch and azimuth after a 400 ms
+pause; long lenses prefer finer tiles, subject to a 256-tile budget. Overlapping
+meshes/textures stay resident. Settings persist in saved plans.
+
+The 256 MiB elevation LRU disk budget remains split between Mapterhorn and Mapzen. Where regional tiles are absent, the
 loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,
 but current mesh density does not display their finest native detail. Cached terrain works without network access, but this is not a complete
 offline-region feature. Source vertical datums are uncorrected; do not use the

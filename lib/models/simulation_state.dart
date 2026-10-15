@@ -44,6 +44,9 @@ class SimulationState {
     this.groundElevation,
     this.relitImagery = false,
     this.showConstellations = false,
+    this.terrainRings = 1,
+    this.terrainForwardKm = 0,
+    this.terrainRenderKm = 40,
     this.target = CelestialTarget.none,
     DateTime? timestamp,
   }) : timestamp = (timestamp ?? DateTime.utc(2026, 6, 21, 19)).toUtc() {
@@ -64,6 +67,14 @@ class SimulationState {
         !focalLength.isFinite ||
         focalLength < minFocalLength ||
         focalLength > maxFocalLength ||
+        terrainRings < 1 ||
+        terrainRings > 3 ||
+        !terrainForwardKm.isFinite ||
+        terrainForwardKm < 0 ||
+        terrainForwardKm > 40 ||
+        !terrainRenderKm.isFinite ||
+        terrainRenderKm < 2 ||
+        terrainRenderKm > 40 ||
         (groundElevation != null &&
             (!groundElevation!.isFinite ||
                 groundElevation! < -12000 ||
@@ -75,6 +86,8 @@ class SimulationState {
   final double latitude, longitude, azimuth, pitch, height, focalLength;
   final double? groundElevation;
   final bool relitImagery, showConstellations;
+  final int terrainRings;
+  final double terrainForwardKm, terrainRenderKm;
   final Sensor sensor;
   final DateTime timestamp;
   final CelestialTarget target;
@@ -131,6 +144,9 @@ class SimulationState {
     double? groundElevation,
     bool? relitImagery,
     bool? showConstellations,
+    int? terrainRings,
+    double? terrainForwardKm,
+    double? terrainRenderKm,
     CelestialTarget? target,
     DateTime? timestamp,
   }) {
@@ -152,6 +168,9 @@ class SimulationState {
           : groundElevation ?? this.groundElevation,
       relitImagery: relitImagery ?? this.relitImagery,
       showConstellations: showConstellations ?? this.showConstellations,
+      terrainRings: terrainRings ?? this.terrainRings,
+      terrainForwardKm: terrainForwardKm ?? this.terrainForwardKm,
+      terrainRenderKm: terrainRenderKm ?? this.terrainRenderKm,
       target: target ?? this.target,
       timestamp: timestamp ?? this.timestamp,
     );

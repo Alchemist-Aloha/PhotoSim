@@ -464,6 +464,22 @@ LOD selection must consider:
 
 High focal lengths may require additional detail in distant terrain, even when the visible geographic area is narrow.
 
+### Current range controls (Linux vertical slice)
+
+The 3D **Terrain range** button controls surrounding fetch radius (1–3 zoom-13
+tile rings), forward fetch distance (0–40 km, off by default), and terrain render
+radius (2–40 km, default 40). Forward coverage uses the horizontal projection of
+the sensor/focal-length FOV and camera pitch/azimuth, with a 400 ms adjustment
+debounce. Retain overlapping terrain meshes/textures and cancel obsolete jobs.
+Use non-overlapping distance/FOV quadtree leaves with at most 256 patches; long
+lenses prefer finer tiles within that budget. Whole-tile distance rejection and
+Flutter Scene's actual 3D frustum culling govern rendering without clipping sky
+layers. Persist settings; legacy plans keep the original 3×3 region.
+
+This is not yet viewport/screen-error LOD, terrain-aware vertical fetch culling,
+exact per-pixel distance clipping, or precise horizon prediction. See
+[terrain source limits](data-sources/terrain.md).
+
 ## 6.3 Terrain continuity
 
 Avoid visible gaps between terrain patches with different LODs.

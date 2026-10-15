@@ -40,19 +40,20 @@ class TerrainSources {
     int resolution, {
     required Future<void> abort,
   }) async {
-    if (id.z != 13) {
-      throw ArgumentError('Terrain regions currently use zoom 13');
+    if (id.z > 13) {
+      throw ArgumentError('Terrain zoom must not exceed 13');
     }
     var cancelled = false;
     abort.then((_) => cancelled = true);
     final primary = sources.first;
-    final parent = TileId(12, id.x ~/ 2, id.y ~/ 2);
+    final parent = id.z == 13 ? TileId(12, id.x ~/ 2, id.y ~/ 2) : null;
     final preferParent =
+        parent != null &&
         await primary.cache.read(id) == null &&
         await primary.cache.read(parent) != null;
     final candidates = [
       (primary, preferParent ? parent : id),
-      (primary, preferParent ? id : parent),
+      if (parent != null) (primary, preferParent ? id : parent),
       (sources.last, id),
     ];
     Exception? failure;

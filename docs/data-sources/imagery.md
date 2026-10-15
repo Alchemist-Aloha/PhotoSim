@@ -45,7 +45,9 @@ Easting/Northing. Endpoints: `https://wms.geo.admin.ch/`,
 
 Every export uses the exact existing terrain XYZ tile's Web Mercator bounds.
 Row zero maps to north; existing normalized UVs and clamped texture edges are
-reused. Nine 256×256 previews load progressively, with at most three jobs active.
+reused. Each selected terrain patch receives a 256×256 preview (nine by default),
+with at most three jobs active. Forward-range coverage can add coarser patches;
+preview ground spacing doubles for each lower terrain zoom.
 The camera tile then upgrades to 1024×1024 without rebuilding geometry. Remaining
 tiles retain previews. Source selection is automatic; there is no source picker
 or new saved-plan setting.
@@ -72,8 +74,11 @@ recover physical reflectance. See [astronomy notes](../astronomy.md).
 
 Source acquisition dates vary within mosaics. Exact dates remain unknown/null and
 are not queried, even though the global mosaic's 2016 epoch is known from its
-source label. Photography does not follow simulation time. Time, optics, sky-layer
-and relighting changes neither download imagery nor rebuild geographic geometry.
+source label. Photography does not follow simulation time. Time, sky-layer and
+relighting changes neither download imagery nor rebuild geographic geometry.
+Optics/aim edits also preserve geography with forward fetching off (the default).
+When enabled, they replan FOV-dependent coverage; retained patches keep their images
+and only missing previews/details load. Render-radius changes do not fetch imagery.
 
 ## Cache and validation
 

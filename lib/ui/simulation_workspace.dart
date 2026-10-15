@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_scene/gpu.dart' as gpu;
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -16,6 +17,8 @@ import '../core/constellations.dart';
 import '../render/constellations.dart';
 import '../core/night_sky.dart';
 import '../core/terrain_geo.dart';
+import '../core/terrain_coverage.dart';
+import 'terrain_range_dialog.dart';
 import '../data/imagery/imagery_provider.dart';
 import '../data/imagery/imagery_sources.dart';
 import '../data/terrain/terrain_provider.dart';
@@ -46,6 +49,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   final patches = <String, ({TileId id, scene.Node node})>{};
   final textures = <scene.Node, scene.Texture2D>{};
   final partialImagery = <String>{};
+  final detailedImagery = <String>{};
+  Set<String> wantedTiles = {};
+  LatLng? terrainOrigin;
+  Timer? coverageDebounce;
   final imageProviders = <String, List<ImageryProvider>>{};
   bool imageryLoading = false;
   int imageryFailures = 0;
@@ -138,57 +145,109 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   @override
   void didUpdateWidget(covariant SimulationWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.state.latitude != widget.state.latitude ||
-        oldWidget.state.longitude != widget.state.longitude) {
-      if (repository != null && world != null) loadTerrain();
+    final old = oldWidget.state, next = widget.state;
+    if (old.latitude != next.latitude ||
+        old.longitude != next.longitude ||
+        old.terrainRings != next.terrainRings ||
+        old.terrainForwardKm != next.terrainForwardKm) {
+      coverageDebounce?.cancel();
+      if (nightRenderer != null) loadTerrain();
+    } else if (next.terrainForwardKm > 0 &&
+        (old.azimuth != next.azimuth ||
+            old.pitch != next.pitch ||
+            old.sensor != next.sensor ||
+            old.focalLength != next.focalLength)) {
+      coverageDebounce?.cancel();
+      coverageDebounce = Timer(const Duration(milliseconds: 400), () {
+        if (mounted && nightRenderer != null) loadTerrain();
+      });
     }
-    if (oldWidget.state.relitImagery != widget.state.relitImagery) {
+    if (old.terrainRenderKm != next.terrainRenderKm) updateTerrainVisibility();
+    if (old.relitImagery != next.relitImagery) {
       for (final entry in textures.entries) {
         applyTexture(entry.key, entry.value);
       }
     }
   }
 
-  Future<void> loadTerrain() async {
+  void updateTerrainVisibility() {
+    for (final patch in patches.values) {
+      patch.node.visible =
+          terrainDistance(patch.id, widget.state.location) <=
+          widget.state.terrainRenderKm * 1000;
+    }
+  }
+
+  Future<void> showTerrainRange() async {
+    final range =
+        await showDialog<({int rings, double forwardKm, double renderKm})>(
+          context: context,
+          builder: (_) => TerrainRangeDialog(state: widget.state),
+        );
+    if (!mounted || range == null) return;
+    widget.onChanged(
+      widget.state.copyWith(
+        terrainRings: range.rings,
+        terrainForwardKm: range.forwardKm,
+        terrainRenderKm: range.renderKm,
+      ),
+    );
+  }
+
+  Future<void> loadTerrain({bool retry = false}) async {
+    final origin = widget.state.location;
+    final rebase = terrainOrigin != origin;
+    final tiles = terrainCoverage(widget.state);
+    final wanted = tiles.map((tile) => tile.key).toSet();
+    if (!rebase &&
+        !retry &&
+        wanted.length == wantedTiles.length &&
+        wanted.containsAll(wantedTiles)) {
+      return;
+    }
+    wantedTiles = wanted;
+    terrainOrigin = origin;
     if (cancellation != null && !cancellation!.isCompleted) {
       cancellation!.complete();
     }
     final token = ++generation;
     final stop = cancellation = Completer<void>();
-    final origin = widget.state.location;
     final center = TileId.at(origin);
-    final tiles = center.neighborhood();
-    for (final node in terrainNodes) {
+    for (final key in patches.keys.toList()) {
+      if (!rebase && wanted.contains(key)) continue;
+      final node = patches.remove(key)!.node;
       world!.remove(node);
+      terrainNodes.remove(node);
+      textures.remove(node);
+      terrainProviders.remove(key);
+      partialImagery.remove(key);
+      imageProviders.remove(key);
+      detailedImagery.remove(key);
     }
-    terrainNodes.clear();
-    patches.clear();
-    terrainProviders.clear();
-    textures.clear();
-    partialImagery.clear();
-    imageProviders.clear();
     setState(() {
       imageryLoading = false;
       imageryFailures = 0;
       imageryFailure = null;
-      loaded = 0;
+      loaded = patches.length;
       failed = 0;
       total = tiles.length;
-      ground = null;
+      if (rebase) ground = null;
       tileFailure = null;
       loading = true;
     });
-    // Center first; at most three fetch/decode/build jobs are active.
-    for (var start = 0; start < tiles.length; start += 3) {
+    final missing = tiles
+        .where((tile) => !patches.containsKey(tile.key))
+        .toList();
+    // Near-first jobs, bounded concurrency; overlapping resident patches keep their buffers/textures.
+    for (var start = 0; start < missing.length; start += 3) {
       if (!mounted || token != generation) return;
       await Future.wait(
-        tiles.skip(start).take(3).map((id) async {
+        missing.skip(start).take(3).map((id) async {
           try {
-            // shortcut: fixed 3×3 region with distance LOD, use screen-error quadtree for longer-range planning.
             final result = await repository!.load(
               id,
               origin,
-              id.key == center.key ? 128 : 64,
+              id.key == center.key ? 128 : (id.z == 13 ? 64 : 32),
               abort: stop.future,
             );
             if (!mounted || token != generation) return;
@@ -205,10 +264,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               ..baseColorFactor = vm.Vector4(0.32, 0.40, 0.25, 1)
               ..roughnessFactor = 1
               ..metallicFactor = 0;
-            final node = scene.Node(
-              name: id.key,
-              mesh: scene.Mesh(geometry, material),
-            );
+            final node =
+                scene.Node(name: id.key, mesh: scene.Mesh(geometry, material))
+                  ..visible =
+                      terrainDistance(id, origin) <=
+                      widget.state.terrainRenderKm * 1000;
             world!.add(node);
             terrainNodes.add(node);
             patches[id.key] = (id: id, node: node);
@@ -227,10 +287,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           }
         }),
       );
+      // Make the first nearby surfaces usable before waiting for the distant region.
+      if (start == 0 && missing.length > 3 && mounted && token == generation) {
+        await loadImagery(token, stop);
+      }
     }
     if (mounted && token == generation) {
       setState(() => loading = false);
-      await loadImagery(token, stop);
+      await loadImagery(token, stop, retry: retry);
     }
   }
 
@@ -248,7 +312,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   void setRelighting(bool value) =>
       widget.onChanged(widget.state.copyWith(relitImagery: value));
 
-  Future<void> loadImagery(int token, Completer<void> stop) async {
+  Future<void> loadImagery(
+    int token,
+    Completer<void> stop, {
+    bool retry = false,
+  }) async {
     if (!mounted || token != generation) return;
     setState(() {
       imageryLoading = true;
@@ -256,12 +324,21 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       imageryFailure = null;
     });
     final centerKey = TileId.at(widget.state.location).key;
-    final entries = patches.values.toList()
-      ..sort(
-        (a, b) => (b.id.key == centerKey ? 1 : 0).compareTo(
-          a.id.key == centerKey ? 1 : 0,
-        ),
-      );
+    final entries =
+        patches.values
+            .where(
+              (patch) =>
+                  !textures.containsKey(patch.node) ||
+                  (retry &&
+                      partialImagery.contains(patch.id.key) &&
+                      !detailedImagery.contains(patch.id.key)),
+            )
+            .toList()
+          ..sort(
+            (a, b) => (b.id.key == centerKey ? 1 : 0).compareTo(
+              a.id.key == centerKey ? 1 : 0,
+            ),
+          );
     Future<void> update(({TileId id, scene.Node node}) patch, int size) async {
       try {
         final result = await imagery!.load(patch.id, size, abort: stop.future);
@@ -279,6 +356,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         applyTexture(patch.node, texture);
         setState(() {
           imageProviders[patch.id.key] = result.providers;
+          if (size == 1024) detailedImagery.add(patch.id.key);
           if (raster.partial) {
             partialImagery.add(patch.id.key);
           } else {
@@ -305,7 +383,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     if (mounted &&
         token == generation &&
         center != null &&
-        textures.containsKey(center.node)) {
+        textures.containsKey(center.node) &&
+        (retry || !detailedImagery.contains(centerKey))) {
       await update(center, 1024);
     }
     if (mounted && token == generation) setState(() => imageryLoading = false);
@@ -313,6 +392,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
 
   @override
   void dispose() {
+    coverageDebounce?.cancel();
     generation++;
     if (cancellation != null && !cancellation!.isCompleted) {
       cancellation!.complete();
@@ -354,7 +434,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'United Kingdom: © Environment Agency copyright and/or database right 2015. All rights reserved.\n'
             'US 3DEP and global GMTED2010/SRTM: courtesy of the US Geological Survey.\n\n'
             'Elevation source datum is uncorrected. Ground height follows the downloaded raster, not a surveyed site. '
-            'The fixed local region and coarse mesh are not suitable for precise distant-horizon predictions. '
+            'Bounded distance/FOV coverage and coarse meshes are not suitable for precise distant-horizon predictions. '
             'Imagery automatically prefers regional aerial sources over the global mosaic.\n'
             'USGS, USDA, The National Map: Orthoimagery (NAIP, public domain).\n'
             'France: © IGN · BD ORTHO · Licence Ouverte 2.0.\n'
@@ -471,6 +551,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 ),
                 if (textures.length < loaded || partialImagery.isNotEmpty)
                   const Text('Fallback surface where imagery is missing'),
+                OutlinedButton.icon(
+                  onPressed: showTerrainRange,
+                  icon: const Icon(Icons.terrain),
+                  label: const Text('Terrain range'),
+                ),
                 FilterChip(
                   label: const Text('Constellations'),
                   tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
@@ -506,7 +591,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                   ),
                 ),
                 TextButton(
-                  onPressed: loading || imageryLoading ? null : loadTerrain,
+                  onPressed: loading || imageryLoading
+                      ? null
+                      : () => loadTerrain(retry: true),
                   child: const Text('Retry terrain'),
                 ),
               ],
@@ -527,7 +614,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 TextButton(
                   onPressed: loading || imageryLoading
                       ? null
-                      : () => loadImagery(generation, cancellation!),
+                      : () =>
+                            loadImagery(generation, cancellation!, retry: true),
                   child: const Text('Retry imagery'),
                 ),
               ],

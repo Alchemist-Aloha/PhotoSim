@@ -208,6 +208,29 @@ void main() {
     }
   });
 
+  test(
+    'distant coarse tiles use their own zoom and never probe a child/parent',
+    () async {
+      final requests = <Uri>[];
+      final client = MockClient((request) async {
+        requests.add(request.url);
+        return http.Response.bytes(terrainWebpFixture(), 200);
+      });
+      addTearDown(client.close);
+      final sources = TerrainSources(client: client, directory: directory);
+      final coarse = TileId(11, 1, 1);
+      final result = await sources.load(
+        coarse,
+        coarse.point(0.5, 0.5),
+        32,
+        abort: Completer<void>().future,
+      );
+      expect(result.patch.field.size, 512);
+      expect(result.rasterId.key, coarse.key);
+      expect(requests.single.path, '/11/1/1.webp');
+    },
+  );
+
   test('all services failing leaves caches empty', () async {
     final client = MockClient((_) async => http.Response('unavailable', 503));
     addTearDown(client.close);

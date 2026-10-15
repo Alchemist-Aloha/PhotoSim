@@ -20,14 +20,19 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
   from global zoom-12 parents where regional zoom-13 tiles are unavailable.
 - Terrarium decoding, pixel-center elevation interpolation, double-precision
   WGS84 ECEF/ENU, meter-scale camera-relative geometry and ellipsoid curvature.
-- Progressive 3×3 zoom-13 terrain, generated normals/UVs, camera ground vertex,
-  coarse distance LOD, skirts and native LRU elevation caching (128 MiB per service,
+- Default progressive 3×3 zoom-13 terrain, generated normals/UVs, camera ground vertex,
+  distance/FOV quadtree LOD, skirts and native LRU elevation caching (128 MiB per service,
   256 MiB total). Native 1–5 m source detail is not displayed by the existing mesh.
 - Automatic free imagery selection: NAIP, Swiss-only SWISSIMAGE, IGN BD ORTHO
   and the CC BY EOX Sentinel-2 2016 global mosaic. Exact EPSG:3857 bounds,
   natural-color processing, bounded/cancellable requests and visible source credits.
 - Regional errors/no-data fall through; transparent coverage composites over lower
   priority sources. No newer non-commercial EOX layers or paid accounts required.
+- **Terrain range** dialog: 1–3 surrounding tile rings, 0–40 km FOV-aware forward
+  fetching and 2–40 km whole-tile render cutoff plus actual 3D frustum culling.
+  Pitch/aim/optics changes debounce 400 ms; non-overlapping distant tiles coarsen
+  within a 256-patch budget, long lenses prefer finer tiles, retained patches reuse
+  meshes/textures, and settings persist in plans with legacy defaults.
 - Progressive 256×256 image previews and a 1024×1024 camera-tile replacement.
 - Texture swaps preserve existing geometry; switching natural/relit mode also
   preserves geometry and shared camera/time state.
@@ -89,7 +94,9 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
   imagery appearance preference.
 
 Decode and raster preparation use isolates. There are no network requests in the
-render loop, and camera optics/orientation/time changes do not reload source data.
+render loop. Time/appearance edits do not reload geography. Optics/orientation
+changes also preserve it with forward fetching off; when enabled they reconcile
+FOV-dependent coverage, retaining overlapping patches.
 Mesh reassignment registers material changes with Flutter Scene while reusing the
 same resident geometry; mutating a primitive's material alone did not update
 the rendered scene in the installed backend.
@@ -99,7 +106,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- Ninety-eight passing unit/widget tests: optics/state/geographic precision, elevations,
+- 108 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
@@ -117,7 +124,9 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 - A second native Linux test loads live Mapterhorn terrain and Swiss, French,
   Australian and Beijing imagery. It verifies source credits/the upstream licenses
   dialog, GPU pixel diversity and geography/cache reuse after optics/time edits,
-  and captures `linux-imagery-{swiss,ign,eox,beijing}.png`.
+  and captures `linux-imagery-{swiss,ign,eox,beijing}.png`. The Swiss case also
+  checks forward fetching, FOV/aim replanning, nearby mesh reuse, frustum rejection,
+  render-only changes without downloads, and UTC changes while the range dialog is open.
 - Native workflow loads nine real Yosemite terrain patches and nine NAIP textures;
   the camera patch receives an additional higher-resolution image.
 - Returning to 3D reports **9 cached / 0 downloaded** elevation patches and
@@ -161,7 +170,8 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
 
 ## Remaining limits
 
-- Fixed regional extent and distance LOD, not screen-error quadtree refinement.
+- Bounded distance/FOV quadtree coverage, not viewport/screen-error refinement or
+  terrain-aware vertical fetch culling. Render cutoff is whole-tile, not per-pixel.
   Mapterhorn's finer upstream grids still use the original coarse mesh. No standalone
   national GeoTIFF clients, NASA HMA or restricted terrain services are implemented.
 - Uncorrected source elevation datums and no precision terrain-horizon service.

@@ -59,6 +59,7 @@ Focus on **functional geographic and astronomical accuracy**, rather than photor
 - Camera-relative geographic coordinates.
 - Progressive terrain loading.
 - Basic terrain LOD.
+- Terrain-range controls for surrounding/forward fetching and rendering, using camera FOV.
 - Terrain shading and directional shadows.
 
 **Astronomy**

@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:photosim/core/terrain_coverage.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 
@@ -142,6 +143,126 @@ void main() {
           counters,
         );
         if (site.$4 == 'swiss') {
+          final nearby = {
+            for (final node in world.root.children.where(
+              (node) => RegExp(r'^\d+-\d+-\d+$').hasMatch(node.name),
+            ))
+              node.name: node.mesh!.primitives.single.geometry,
+          };
+          List<scene.Node> terrainNodes() => world.root.children
+              .where((node) => RegExp(r'^\d+-\d+-\d+$').hasMatch(node.name))
+              .toList();
+          List<String?> counts() => tester
+              .widgetList<Text>(find.byType(Text))
+              .map((text) => text.data)
+              .where((text) => text?.contains(' downloaded') ?? false)
+              .toList();
+          Future<void> waitForCoverage() async {
+            await tester.pump(const Duration(milliseconds: 500));
+            final expected = terrainCoverage(state).length;
+            for (var i = 0; i < 360; i++) {
+              if (find
+                      .text('Real terrain · $expected/$expected tiles')
+                      .evaluate()
+                      .isNotEmpty &&
+                  find
+                      .text('Imagery · $expected/$expected textures')
+                      .evaluate()
+                      .isNotEmpty) {
+                break;
+              }
+              await tester.pump(const Duration(milliseconds: 500));
+            }
+            expect(
+              find.text('Real terrain · $expected/$expected tiles'),
+              findsOneWidget,
+            );
+            expect(
+              find.text('Imagery · $expected/$expected textures'),
+              findsOneWidget,
+            );
+            expect(
+              terrainNodes().map((node) => node.name).toSet(),
+              terrainCoverage(state).map((tile) => tile.key).toSet(),
+            );
+            for (final entry in nearby.entries) {
+              expect(
+                terrainNodes()
+                    .singleWhere((node) => node.name == entry.key)
+                    .mesh!
+                    .primitives
+                    .single
+                    .geometry,
+                same(entry.value),
+              );
+            }
+          }
+
+          rebuild(() => state = state.copyWith(pitch: 0));
+          await tester.pump();
+          await tester.tap(find.text('Terrain range'));
+          await tester.pump(const Duration(milliseconds: 300));
+          tester
+              .widget<Slider>(find.byKey(const ValueKey('terrain-forward')))
+              .onChanged!(20);
+          await tester.pump();
+          await tester.tap(find.text('Apply'));
+          await waitForCoverage();
+          final narrowCount = terrainNodes().length;
+          expect(narrowCount, greaterThan(9));
+          final narrowView = tester.widget<scene.SceneView>(
+            find.byType(scene.SceneView),
+          );
+          expect(
+            terrainNodes().any(
+              (node) => !node.isVisibleTo(
+                narrowView.camera!,
+                tester.getSize(find.byType(scene.SceneView)),
+              ),
+            ),
+            isTrue,
+          );
+          final resident = {
+            for (final node in terrainNodes())
+              node.name: node.mesh!.primitives.single.geometry,
+          };
+          final beforeRender = counts();
+          await tester.tap(find.text('Terrain range'));
+          await tester.pump(const Duration(milliseconds: 300));
+          tester
+              .widget<Slider>(find.byKey(const ValueKey('terrain-render')))
+              .onChanged!(2);
+          // Applying range preferences must not rewind playback/other state changed behind the dialog.
+          rebuild(
+            () => state = state.copyWith(
+              timestamp: state.timestamp.add(const Duration(hours: 1)),
+            ),
+          );
+          await tester.pump();
+          final latestUtc = state.timestamp;
+          await tester.tap(find.text('Apply'));
+          await tester.pump(const Duration(seconds: 1));
+          expect(state.timestamp, latestUtc);
+          expect(counts(), beforeRender);
+          expect(
+            terrainNodes().where((node) => node.visible).length,
+            lessThan(resident.length),
+          );
+          for (final node in terrainNodes()) {
+            expect(
+              node.mesh!.primitives.single.geometry,
+              same(resident[node.name]),
+            );
+          }
+          rebuild(() => state = state.copyWith(focalLength: 8));
+          await waitForCoverage();
+          expect(
+            terrainNodes().map((node) => node.name).toSet(),
+            isNot(resident.keys.toSet()),
+          );
+          rebuild(() => state = state.copyWith(azimuth: 180));
+          await waitForCoverage();
+          expect(tester.takeException(), isNull);
           await tester.tap(find.text('© Terrain & imagery sources'));
           await tester.pump(const Duration(milliseconds: 300));
           final credits = tester

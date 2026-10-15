@@ -21,6 +21,9 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Selected target (`none`, `sun`, `moon`, `galacticCenter`).
 - Natural/approximate-relighting preference.
 - Optional `showConstellations` toggle; missing in older plans defaults to off.
+- Optional `terrainRings` (integer 1–3), `terrainForwardKm` (0–40) and
+  `terrainRenderKm` (2–40). Older plans default to 1 ring, forward off and a
+  40 km whole-tile render radius. Missing fields do not require a schema bump.
 
 Legacy version-1 files remain readable: their obsolete `lens` preset field is
 ignored, while focal length and sensor are preserved. New version-2 files omit

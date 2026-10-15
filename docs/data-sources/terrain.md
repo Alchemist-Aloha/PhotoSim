@@ -41,7 +41,31 @@ time, so PhotoSim does not invent per-tile source identity/accuracy metadata.
 
 ### Selection and bounded loading
 
-The existing terrain region remains nine zoom-13 XYZ patches. For each patch:
+Default coverage remains nine zoom-13 XYZ patches. The **Terrain range** dialog
+sets 1–3 surrounding tile rings (3×3 through 7×7), 0–40 km forward reach (default
+off), and a 2–40 km horizontal render radius (default 40). Ring distances vary
+with latitude and camera position within the tile; the dialog shows approximate km.
+
+Forward fetches use the horizontal envelope of the camera's optical frustum,
+including sensor, focal length, pitch and azimuth. If the frustum includes zenith
+or nadir, its envelope spans every heading; vertical terrain visibility is not
+predicted before downloading. A distance/FOV quadtree keeps nearby rings at zoom
+13 and uses coarser, non-overlapping tiles farther away. Long lenses prefer finer
+tiles; automatic coarsening enforces a 256-tile budget rather than truncating reach.
+This is an observer-scale Mercator approximation, not terrain-aware horizon or
+screen-error selection. Web Mercator's polar coverage limit still applies.
+
+Aim, pitch and optics changes debounce for 400 ms when forward fetching is enabled.
+Changes reconcile the desired tile set: retained patches preserve geometry/textures,
+new patches load near-first, obsolete jobs cancel and unused patches are removed.
+The first nearby image batch loads before waiting for the rest of the terrain.
+Render-distance changes only hide/reveal whole tiles intersecting the radius;
+coarse tiles can extend beyond it. Flutter Scene additionally culls against the
+actual 3D view frustum. Fetch and render limits are independent (prefetching is
+allowed); rendering cannot invent terrain beyond fetched coverage. Sky distances
+are unchanged. Settings persist in plans; old plans retain the original defaults.
+
+For each zoom-13 patch:
 
 1. Request a Mapterhorn zoom-13 tile where available.
 2. If unavailable/invalid, try its zoom-12 parent. The global mosaic stops at
@@ -49,6 +73,9 @@ The existing terrain region remains nine zoom-13 XYZ patches. For each patch:
    quadrant from its 512×512 raster, preserving pixel-center registration, north-up
    orientation and the requested patch's geographic bounds. Do not upscale it.
 3. If both fail, request the existing Mapzen zoom-13 tile.
+
+Coarser patches request their own zoom directly from Mapterhorn, then Mapzen;
+they do not request zoom-13 children or crop an unrelated zoom-12 raster.
 
 Cached detail is preferred; if only the parent is cached, use it without repeating
 failed detail probes. A cached coarse tile may consequently remain preferred until
@@ -100,11 +127,13 @@ clients and standalone ArcticDEM/REMA providers have not been added.
 
 At zoom 13, a 512-pixel tile has ground sample spacing of approximately
 `9.55 × cos(latitude)` m, versus `19.1 × cos(latitude)` m for 256 pixels. Those are
-sampling spacings, not source detail or accuracy guarantees. **Current mesh density
-is unchanged**: 128 subdivisions on the camera patch and 64 on surrounding patches.
-Thus native 1–5 m source detail is not displayed; adaptive geometry refinement
-remains open. Time, optics, relighting and sky-layer edits retain resident geography
-and do not download new terrain. Imagery keeps the same independent patch UVs.
+sampling spacings, not source detail or accuracy guarantees. Meshes use 128
+subdivisions on the camera patch, 64 on other zoom-13 patches, and 32 on coarser
+patches. Native 1–5 m source detail is not displayed; screen-error geometry
+refinement remains open. Time, relighting and sky-layer edits do not download or
+rebuild geography. With forward fetching off, optics/aim edits also preserve it;
+when enabled they can change coverage, retaining overlapping patches. Imagery
+keeps the same independent patch UVs; distant previews are correspondingly coarser.
 
 Both services blend products of different resolution, acquisition dates, DSM/DTM
 type and vertical reference systems. PhotoSim passes service elevations through and
@@ -143,8 +172,13 @@ rendering and usable read-only entries. No cache refresh UI is implemented.
 Unit tests cover WebP/PNG trust boundaries, fractional/negative heights, quadrant
 orientation/cropping, source selection, provenance, separate bounded caches,
 corruption, failures, deadline-vs-caller cancellation and bundled credits.
+Coverage tests check FOV/pitch/direction, pole/dateline wrapping, non-overlapping
+LOD leaves, the tile budget, range validation and legacy plan defaults. Dialog
+widget tests cover apply/cancel, semantics and a small viewport.
 The Linux native imagery workflow now also checks actual Mapterhorn rendering in
 Switzerland, France, Australia and Beijing, source credit display, and geometry/cache
-reuse on time/optics edits. Beijing exercises the global parent-tile route in the
+reuse on time/optics edits with forward fetching off. The Swiss case additionally
+checks live forward loading, FOV/aim replanning, retained nearby geometry, render-only
+reuse, frustum culling, and preserving UTC edits behind the dialog. Beijing exercises the global parent-tile route in the
 currently published coverage. The full Yosemite save/reopen/GPU workflow remains
 covered. These checks are not a worldwide coverage survey or accuracy benchmark.

@@ -17,6 +17,9 @@ void main() {
     target: CelestialTarget.galacticCenter,
     relitImagery: true,
     showConstellations: true,
+    terrainRings: 2,
+    terrainForwardKm: 25,
+    terrainRenderKm: 15,
     groundElevation: 90,
     timestamp: DateTime.parse('2026-01-01T20:00:00+08:00'),
   );
@@ -38,6 +41,9 @@ void main() {
       expect(plan.state.target, state.target);
       expect(plan.state.relitImagery, state.relitImagery);
       expect(plan.state.showConstellations, isTrue);
+      expect(plan.state.terrainRings, 2);
+      expect(plan.state.terrainForwardKm, 25);
+      expect(plan.state.terrainRenderKm, 15);
       expect(plan.state.timestamp, state.timestamp);
       expect(plan.state.timestamp.isUtc, isTrue);
       expect(plan.state.groundElevation, isNull);
@@ -65,6 +71,26 @@ void main() {
       );
     }
   });
+
+  test(
+    'legacy plans without terrain ranges keep the original 3×3 defaults',
+    () {
+      final json = jsonDecode(
+        SavedPlan('Old terrain', state).encode(),
+      ) as Map<String, dynamic>;
+      json.remove('terrainRings');
+      json.remove('terrainForwardKm');
+      json.remove('terrainRenderKm');
+      for (final version in [1, 2]) {
+        final restored = SavedPlan.decode(
+          jsonEncode({...json, 'version': version}),
+        ).state;
+        expect(restored.terrainRings, 1);
+        expect(restored.terrainForwardKm, 0);
+        expect(restored.terrainRenderKm, 40);
+      }
+    },
+  );
 
   test('legacy lens presets do not change saved focal length or sensor', () {
     final json =
@@ -99,6 +125,11 @@ void main() {
         ('focalLength', 1000),
         ('relitImagery', 1),
         ('showConstellations', 1),
+        ('terrainRings', 4),
+        ('terrainRings', 1.5),
+        ('terrainForwardKm', 41),
+        ('terrainForwardKm', '20'),
+        ('terrainRenderKm', -1),
         ('name', ''),
         ('name', 'x' * 81),
         ('timestamp', '2026-02-30T00:00:00.000Z'),
