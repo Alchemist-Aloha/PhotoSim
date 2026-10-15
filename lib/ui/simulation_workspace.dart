@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
 
@@ -15,9 +16,10 @@ import '../core/constellations.dart';
 import '../render/constellations.dart';
 import '../core/night_sky.dart';
 import '../core/terrain_geo.dart';
-import '../data/imagery/imagery_repository.dart';
-import '../data/terrain/terrain_repository.dart';
-import '../data/terrain/tile_cache.dart';
+import '../data/imagery/imagery_provider.dart';
+import '../data/imagery/imagery_sources.dart';
+import '../data/terrain/terrain_provider.dart';
+import '../data/terrain/terrain_sources.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
 import '../render/night_sky.dart';
@@ -37,11 +39,14 @@ class SimulationWorkspace extends StatefulWidget {
 
 class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   scene.Scene? world;
-  TerrainRepository? repository;
-  ImageryRepository? imagery;
+  TerrainSources? repository;
+  final terrainProviders = <String, TerrainProvider>{};
+  String terrainCredits = '';
+  ImagerySources? imagery;
   final patches = <String, ({TileId id, scene.Node node})>{};
   final textures = <scene.Node, scene.Texture2D>{};
   final partialImagery = <String>{};
+  final imageProviders = <String, List<ImageryProvider>>{};
   bool imageryLoading = false;
   int imageryFailures = 0;
   String? imageryFailure;
@@ -69,22 +74,27 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       await scene.Scene.initializeStaticResources();
       final directory = await getApplicationCacheDirectory();
       if (!mounted) return;
-      repository = TerrainRepository(
+      terrainCredits =
+          (jsonDecode(
+                await rootBundle.loadString(
+                  'assets/terrain/mapterhorn-attribution.json',
+                ),
+              ) as List)
+              .map(
+                (source) =>
+                    '${source['name']}\n${source['producer']}\n${source['license']}\n'
+                    '${source['website']}\n${source['license_pdf']}',
+              )
+              .toSet()
+              .join('\n\n');
+      if (!mounted) return;
+      repository = TerrainSources(
         client: client,
-        cache: TileCache(Directory('${directory.path}/photosim/terrain-v1')),
+        directory: Directory('${directory.path}/photosim'),
       );
-      imagery = ImageryRepository(
+      imagery = ImagerySources(
         client: client,
-        previewCache: TileCache(
-          Directory('${directory.path}/photosim/naip-natural-256-v1'),
-          maxBytes: 64 * 1024 * 1024,
-          maxEntryBytes: 8 * 1024 * 1024,
-        ),
-        detailCache: TileCache(
-          Directory('${directory.path}/photosim/naip-natural-1024-v1'),
-          maxBytes: 192 * 1024 * 1024,
-          maxEntryBytes: 8 * 1024 * 1024,
-        ),
+        directory: Directory('${directory.path}/photosim'),
       );
       skySource = scene.PhysicalSkySource(turbidity: 2);
       world = scene.Scene()..skybox = scene.Skybox(skySource!);
@@ -153,8 +163,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
     terrainNodes.clear();
     patches.clear();
+    terrainProviders.clear();
     textures.clear();
     partialImagery.clear();
+    imageProviders.clear();
     setState(() {
       imageryLoading = false;
       imageryFailures = 0;
@@ -173,13 +185,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         tiles.skip(start).take(3).map((id) async {
           try {
             // shortcut: fixed 3×3 region with distance LOD, use screen-error quadtree for longer-range planning.
-            final patch = await repository!.load(
+            final result = await repository!.load(
               id,
               origin,
               id.key == center.key ? 128 : 64,
               abort: stop.future,
             );
             if (!mounted || token != generation) return;
+            final patch = result.patch;
+            terrainProviders[id.key] = result.provider;
             final geometry = scene.MeshGeometry.fromArrays(
               positions: patch.positions,
               normals: patch.normals,
@@ -250,7 +264,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       );
     Future<void> update(({TileId id, scene.Node node}) patch, int size) async {
       try {
-        final raster = await imagery!.load(patch.id, size, abort: stop.future);
+        final result = await imagery!.load(patch.id, size, abort: stop.future);
+        final raster = result.raster;
         if (!mounted || token != generation) return;
         final texture = scene.Texture2D.fromPixels(
           raster.rgba,
@@ -263,6 +278,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         textures[patch.node] = texture;
         applyTexture(patch.node, texture);
         setState(() {
+          imageProviders[patch.id.key] = result.providers;
           if (raster.partial) {
             partialImagery.add(patch.id.key);
           } else {
@@ -314,10 +330,16 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('Terrain & imagery sources and limitations'),
-      content: const SizedBox(
+      content: SizedBox(
         width: 620,
         child: SingleChildScrollView(
           child: SelectableText(
+            'Preferred terrain: © Mapterhorn · https://mapterhorn.com/attribution\n'
+            'Account-free tiles combine Copernicus GLO-30 with open regional terrain. '
+            'Nominal source grids can be 1–10 m where available, but this preview still uses '
+            'a coarse mesh and does not display native lidar detail. '
+            'Global zoom-12 tiles are cropped where higher zooms are absent. '
+            'Mapzen remains the independent fallback.\n\n'
             'Mapzen Terrain Tiles · AWS Open Data\n'
             'Source credits: tilezen/joerd docs/attribution.md on GitHub.\n\n'
             'ArcticDEM: DEM(s) created from DigitalGlobe, Inc., imagery; funded under NSF awards 1043681, 1559691, 1542736.\n'
@@ -333,16 +355,28 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'US 3DEP and global GMTED2010/SRTM: courtesy of the US Geological Survey.\n\n'
             'Elevation source datum is uncorrected. Ground height follows the downloaded raster, not a surveyed site. '
             'The fixed local region and coarse mesh are not suitable for precise distant-horizon predictions. '
-            'Aerial imagery: USGS, USDA, The National Map: Orthoimagery (NAIP). '
+            'Imagery automatically prefers regional aerial sources over the global mosaic.\n'
+            'USGS, USDA, The National Map: Orthoimagery (NAIP, public domain).\n'
+            'France: © IGN · BD ORTHO · Licence Ouverte 2.0.\n'
+            'Switzerland: ©swisstopo · SWISSIMAGE (open government data).\n'
+            'Global: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH '
+            '(Contains modified Copernicus Sentinel data 2016) · CC BY 4.0 '
+            '(https://creativecommons.org/licenses/by/4.0/). '
+            'Only the freely reusable 2016 mosaic is used, not newer non-commercial layers. '
+            'Source orthophotos can reach 20 cm in France and 10–25 cm in Switzerland; '
+            'the global mosaic is about 10 m. Service limits and the current terrain textures '
+            'downsample these sources; native aerial detail is not displayed. '
             'The mosaic acquisition dates vary and are not yet queried; they do not follow simulation time. '
             'Natural imagery preserves original colors and baked-in lighting. Relighting is approximate and can double existing shadows. '
-            'Where NAIP is missing, the green surface remains a labeled fallback material. '
+            'Missing regional pixels fall back to the global mosaic. If all sources fail, '
+            'the green surface remains a labeled fallback material. '
             'Solar direction is calculated locally with Astronomia (Meeus, MIT); brightness and sky appearance are approximate. '
             'Sun/Moon readouts omit atmospheric refraction. The Moon is an untextured phase-lit sphere; '
             'moonlight brightness is an artistic approximation, not calibrated exposure. '
             'Stars: XHIP (Anderson & Francis, 2012); Milky Way outlines: Jose R. Vieira, '
             'via D3-Celestial (Olaf Frohn, BSD-3-Clause). Constellation names and illustrative connecting figures '
-            'also come from D3-Celestial; figures are not official IAU boundaries. Night-sky brightness and star sizes are artistic.',
+            'also come from D3-Celestial; figures are not official IAU boundaries. Night-sky brightness and star sizes are artistic.\n\n'
+            'Mapterhorn upstream source credits and license references:\n\n$terrainCredits',
           ),
         ),
       ),
@@ -433,7 +467,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                   'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
                 ),
                 Text(
-                  'USGS NAIP · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
+                  'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
                 ),
                 if (textures.length < loaded || partialImagery.isNotEmpty)
                   const Text('Fallback surface where imagery is missing'),
@@ -459,7 +493,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             ),
           ),
         ),
-        if (failed > 0 || repository!.cache.warning != null)
+        if (failed > 0 || repository!.cacheWarning != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -468,7 +502,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                   child: Text(
                     failed > 0
                         ? '$failed terrain tiles unavailable. ${tileFailure ?? ''}'
-                        : repository!.cache.warning!,
+                        : repository!.cacheWarning!,
                   ),
                 ),
                 TextButton(
@@ -478,9 +512,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               ],
             ),
           ),
-        if (imageryFailures > 0 ||
-            imagery!.previewCache.warning != null ||
-            imagery!.detailCache.warning != null)
+        if (imageryFailures > 0 || imagery!.cacheWarning != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -489,8 +521,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                   child: Text(
                     imageryFailures > 0
                         ? 'Imagery unavailable or incomplete: $imageryFailure. Terrain remains usable.'
-                        : imagery!.previewCache.warning ??
-                              imagery!.detailCache.warning!,
+                        : imagery!.cacheWarning!,
                   ),
                 ),
                 TextButton(
@@ -573,6 +604,23 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text('Drag to aim · Change UTC time to move the Sun'),
+              if (terrainProviders.isNotEmpty)
+                Text(
+                  terrainProviders.values
+                      .map((provider) => provider.attribution)
+                      .toSet()
+                      .join(' · '),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if (imageProviders.isNotEmpty)
+                Text(
+                  imageProviders.values
+                      .expand((providers) => providers)
+                      .map((provider) => provider.attribution)
+                      .toSet()
+                      .join(' · '),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               TextButton(
                 onPressed: showSources,
                 child: const Text('© Terrain & imagery sources'),
@@ -581,7 +629,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
               ),
               Text(
-                'NAIP: ${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
+                'Imagery: ${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
               ),
             ],
           ),

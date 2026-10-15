@@ -53,7 +53,7 @@ Focus on **functional geographic and astronomical accuracy**, rather than photor
 
 **3D terrain**
 
-- Actual elevation data loaded from Mapzen Terrain Tiles.
+- Actual elevation data from anonymous Mapterhorn tiles, with Mapzen fallback.
 - Real terrain geometry reconstructed locally.
 - Satellite/aerial imagery mapped onto terrain.
 - Camera-relative geographic coordinates.
@@ -118,8 +118,10 @@ Avoid adding unrelated features before the two-workspace photography workflow is
 | GPU acceleration | Flutter GPU / Impeller |
 | Web rendering | Flutter Scene WebGL2 backend |
 | Terrain rendering reference | Dashmap |
-| Elevation data | Mapzen Terrain Tiles |
+| Elevation data | Mapterhorn (global + regional open DEMs), Mapzen fallback |
 | US imagery for prototype | USGS NAIP |
+| Free global imagery fallback | EOX Sentinel-2 cloudless 2016 (CC BY 4.0) |
+| Free regional aerial imagery | IGN BD ORTHO; swisstopo SWISSIMAGE |
 | Optional global satellite imagery | MapTiler with configured key |
 | Astronomy calculations | `astronomia` |
 | Star data | Small local star catalog |
@@ -139,6 +141,11 @@ Do not implement custom GPU shaders unless an existing Flutter Scene material or
 The MVP must not require a paid imagery subscription.
 
 Use a small US geographic region with USGS NAIP imagery as the reproducible integration-test location.
+
+Use the freely reusable EOX Sentinel-2 2016 mosaic as a global fallback, with
+higher-resolution open regional aerial sources (IGN France, swisstopo Switzerland)
+where available. Keep attribution visible and distinguish source resolution from
+the downsampled terrain textures. Newer non-commercial EOX mosaics are not the default.
 
 Support MapTiler as an optional source for global high-quality imagery within its permitted free-use conditions.
 
@@ -280,9 +287,14 @@ Replace procedural terrain with actual geographic terrain and imagery.
 
 ### Step 1 — Terrain acquisition
 
-Implement Mapzen elevation tile requests.
+Prefer account-free Mapterhorn Terrarium WebP tiles (512 px), combining a
+Copernicus GLO-30 baseline with finer open regional sources. Crop zoom-12 parents
+where high-zoom regional tiles are absent. Keep service attribution/licenses and
+provider-separated caches; do not equate source grid spacing with mesh detail.
 
-Example endpoint:
+Retain Mapzen elevation tile requests as an independent fallback.
+
+Fallback endpoint:
 
 `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png`
 
@@ -330,7 +342,9 @@ Use Dashmap's existing terrain implementation as a reference.
 
 Implement an imagery provider interface.
 
-Support USGS NAIP in a US demonstration area.
+Support USGS NAIP in a US demonstration area, IGN BD ORTHO in France and
+SWISSIMAGE in Switzerland, falling back to the CC BY EOX Sentinel-2 2016 mosaic.
+Composite partial coverage without fabricating imagery; keep source caches separate.
 
 Support optional MapTiler satellite tiles through a configured key.
 

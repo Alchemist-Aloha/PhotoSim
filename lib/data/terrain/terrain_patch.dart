@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 import '../../core/terrain_geo.dart';
+import 'terrain_provider.dart';
 
 double terrariumHeight(int red, int green, int blue) =>
     red * 256 + green + blue / 256 - 32768;
@@ -57,24 +58,63 @@ HeightField decodeTerrarium(Uint8List bytes) {
   if (decoded == null) {
     throw const FormatException('Could not decode Terrarium PNG');
   }
-  final heights = Float32List(256 * 256);
-  for (var y = 0; y < 256; y++) {
-    for (var x = 0; x < 256; x++) {
+  return _heightField(decoded, 256);
+}
+
+HeightField decodeMapterhorn(Uint8List bytes) {
+  if (bytes.length < 25 || bytes.length > 1024 * 1024) {
+    throw const FormatException('Invalid terrain WebP');
+  }
+  final header = ByteData.sublistView(bytes);
+  if (header.getUint32(0) != 0x52494646 ||
+      header.getUint32(4, Endian.little) + 8 != bytes.length ||
+      header.getUint32(8) != 0x57454250 ||
+      header.getUint32(12) != 0x5650384c ||
+      bytes[20] != 0x2f) {
+    throw const FormatException('Expected lossless VP8L terrain WebP');
+  }
+  final dimensions = header.getUint32(21, Endian.little);
+  if ((dimensions & 0x3fff) + 1 != 512 ||
+      ((dimensions >> 14) & 0x3fff) + 1 != 512 ||
+      dimensions >> 29 != 0) {
+    throw const FormatException('Expected a 512×512 terrain WebP');
+  }
+  image.Image? decoded;
+  try {
+    final decoder = image.WebPDecoder()..maxPixels = 512 * 512;
+    final info = decoder.startDecode(bytes);
+    if (info == null || info.width != 512 || info.height != 512) {
+      throw const FormatException('Invalid terrain WebP dimensions');
+    }
+    decoded = decoder.decodeFrame(0);
+  } catch (error) {
+    throw FormatException('Malformed terrain WebP: $error');
+  }
+  if (decoded == null) {
+    throw const FormatException('Could not decode terrain WebP');
+  }
+  return _heightField(decoded, 512);
+}
+
+HeightField _heightField(image.Image decoded, int size) {
+  final heights = Float32List(size * size);
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
       final pixel = decoded.getPixel(x, y);
       final height = terrariumHeight(
         pixel.r.toInt(),
         pixel.g.toInt(),
         pixel.b.toInt(),
       );
-      if (height < -12000 || height > 10000) {
+      if (pixel.a != 255 || height < -12000 || height > 10000) {
         throw const FormatException(
           'Terrain contains void or out-of-range elevations',
         );
       }
-      heights[y * 256 + x] = height;
+      heights[y * size + x] = height;
     }
   }
-  return HeightField(heights, 256);
+  return HeightField(heights, size);
 }
 
 class TerrainPatch {
@@ -97,20 +137,46 @@ class TerrainPatch {
 }
 
 class TerrainBuildRequest {
-  TerrainBuildRequest(this.bytes, this.id, this.origin, this.resolution);
+  TerrainBuildRequest(
+    this.bytes,
+    this.id,
+    this.origin,
+    this.resolution, {
+    this.provider = TerrainProvider.mapzen,
+    TileId? rasterId,
+  }) : rasterId = rasterId ?? id;
   final Uint8List bytes;
-  final TileId id;
+  final TileId id, rasterId;
+  final TerrainProvider provider;
   final LatLng origin;
   final int resolution;
 }
 
-TerrainPatch decodeAndBuildTerrain(TerrainBuildRequest request) =>
-    buildTerrainPatch(
-      decodeTerrarium(request.bytes),
-      request.id,
-      request.origin,
-      request.resolution,
-    );
+TerrainPatch decodeAndBuildTerrain(TerrainBuildRequest request) {
+  var field = request.provider == TerrainProvider.mapterhorn
+      ? decodeMapterhorn(request.bytes)
+      : decodeTerrarium(request.bytes);
+  final id = request.id, rasterId = request.rasterId;
+  if (rasterId.key != id.key) {
+    if (request.provider != TerrainProvider.mapterhorn ||
+        rasterId.z != id.z - 1 ||
+        rasterId.x != id.x ~/ 2 ||
+        rasterId.y != id.y ~/ 2) {
+      throw const FormatException(
+        'Terrain raster does not cover requested tile',
+      );
+    }
+    // The global mosaic stops at z12; crop its exact child quadrant, without inventing detail.
+    final heights = Float32List(256 * 256);
+    final left = id.x % 2 * 256, top = id.y % 2 * 256;
+    for (var row = 0; row < 256; row++) {
+      final start = (top + row) * 512 + left;
+      heights.setRange(row * 256, (row + 1) * 256, field.heights, start);
+    }
+    field = HeightField(heights, 256);
+  }
+  return buildTerrainPatch(field, id, request.origin, request.resolution);
+}
 
 TerrainPatch buildTerrainPatch(
   HeightField field,

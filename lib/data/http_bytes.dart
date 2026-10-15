@@ -9,12 +9,13 @@ Future<Uint8List> downloadBytes(
   Uri uri, {
   required Future<void> abort,
   required int maxBytes,
+  Duration timeout = const Duration(seconds: 20),
 }) async {
   final stop = Completer<void>();
   abort.then((_) {
     if (!stop.isCompleted) stop.complete();
   });
-  final timer = Timer(const Duration(seconds: 20), () {
+  final timer = Timer(timeout, () {
     if (!stop.isCompleted) stop.complete();
   });
   try {

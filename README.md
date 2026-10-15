@@ -24,9 +24,11 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Geographic field-of-view wedge calculated from physical sensor and focal length.
 - Full-frame / APS-C sensor pills and a single 8–600 mm focal-length slider.
 - Shared camera position, azimuth, pitch, height, focal length, and UTC timestamp.
-- Real Mapzen elevation terrain rendered in a camera-relative WGS84 frame.
+- Account-free Mapterhorn terrain: Copernicus GLO-30 plus finer open regional
+  DEMs, with Mapzen fallback, rendered in a camera-relative WGS84 frame.
 - Terrain-derived camera height, progressive loading, simple distance LOD, and tile skirts.
-- USGS NAIP aerial imagery, progressively refined on the camera tile.
+- Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
+  a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile.
 - Natural imagery and opt-in approximate relighting, without rebuilding terrain.
 - Independent bounded terrain/imagery caches with corruption recovery and source metadata.
 - Drag the 3D preview to look around; change focal length to zoom optically.
@@ -52,6 +54,7 @@ agree. Camera controls never translate the 3D camera implicitly.
 flutter analyze
 flutter test
 flutter test integration_test/linux_workflow_test.dart -d linux
+flutter test integration_test/linux_imagery_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```
@@ -66,9 +69,12 @@ evidence, rendering limitations, and the next roadmap milestone.
 
 ## Important limitations
 
-The 3D surface uses **real elevation and USGS NAIP aerial imagery** where
-available in the conterminous US. Other regions and missing image pixels use a
-labeled green fallback material. Sun/Moon calculations and solar lighting now
+The 3D surface uses **real elevation and automatically selected free imagery**:
+NAIP in the conterminous US, IGN in France, swisstopo in Switzerland, and the
+approximately 10 m EOX Sentinel-2 **2016** global mosaic elsewhere or as fallback.
+Regional aerial sources can be sub-meter, but current terrain textures downsample
+them; native aerial detail is not displayed. Pixels missing from every source use
+a labeled green fallback material. Sun/Moon calculations and solar lighting now
 work locally, including a phase-lit lunar sphere and approximate moonlight.
 Lunar surface detail and photographic exports remain unimplemented. Night-sky
 brightness and stellar point sizes are artistic, not calibrated exposure;
@@ -88,7 +94,9 @@ follow simulation time; source acquisition dates are not queried yet. See
 [imagery data notes](docs/data-sources/imagery.md).
 
 Terrain loading covers a fixed 3×3 region at zoom 13, with a 256 MiB LRU disk
-cache. Cached terrain works without network access, but this is not a complete
+budget split between Mapterhorn and Mapzen. Where regional tiles are absent, the
+loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,
+but current mesh density does not display their finest native detail. Cached terrain works without network access, but this is not a complete
 offline-region feature. Source vertical datums are uncorrected; do not use the
 coarse preview for precise distant-horizon predictions. See
 [terrain data notes](docs/data-sources/terrain.md).

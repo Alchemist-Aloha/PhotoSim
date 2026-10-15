@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:image/image.dart' as image;
 import 'package:photosim/core/terrain_geo.dart';
 import 'package:photosim/data/imagery/imagery_provider.dart';
 import 'package:photosim/data/imagery/imagery_repository.dart';
@@ -57,6 +58,41 @@ void main() {
     expect(raster.rgba.sublist(0, 4), [255, 0, 0, 255]);
     expect(raster.rgba.sublist(raster.rgba.length - 4), [0, 0, 255, 255]);
     expect(raster.partial, isFalse);
+  });
+  test('indexed PNG preserves palette colors and transparent no-data for compositing', () {
+    final png = image.Image(
+      width: 256,
+      height: 256,
+      withPalette: true,
+      numChannels: 4,
+    );
+    png.palette!.setRgba(0, 80, 120, 160, 255);
+    png.palette!.setRgba(1, 0, 0, 0, 0);
+    png.setPixelIndex(1, 0, 1);
+    final raster = decodeImagery(
+      ImageryDecodeRequest(image.encodePng(png), 256, retainTransparency: true),
+    );
+    expect(raster.rgba.sublist(0, 8), [80, 120, 160, 255, 0, 0, 0, 0]);
+    expect(raster.partial, isTrue);
+  });
+  test('cached JPEG responses are bounded and decode as opaque RGB', () {
+    final jpeg = image.Image(width: 256, height: 256, numChannels: 3);
+    image.fill(jpeg, color: image.ColorRgb8(80, 120, 160));
+    final bytes = image.encodeJpg(jpeg);
+    final raster = decodeImagery(ImageryDecodeRequest(bytes, 256));
+    expect(raster.rgba[0], closeTo(80, 2));
+    expect(raster.rgba[1], closeTo(120, 2));
+    expect(raster.rgba[2], closeTo(160, 2));
+    expect(raster.rgba[3], 255);
+    expect(raster.partial, isFalse);
+    expect(
+      () => decodeImagery(ImageryDecodeRequest(bytes, 1024)),
+      throwsFormatException,
+    );
+    expect(
+      () => decodeImagery(ImageryDecodeRequest(bytes.sublist(0, 40), 256)),
+      throwsFormatException,
+    );
   });
   test(
     'partial no-data becomes fallback material; empty coverage is unavailable',

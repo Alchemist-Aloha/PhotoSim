@@ -358,15 +358,28 @@ Support pluggable terrain providers.
 
 | Provider | Approximate resolution | Role |
 |---|---|---|
-| Mapzen Terrain Tiles | Variable by zoom | Primary fast terrain loading |
-| Copernicus DEM GLO-30 | 30 m | Global high-resolution terrain |
+| Mapterhorn | 30 m global; finer regional sources | Primary anonymous tiled terrain service |
+| Mapzen Terrain Tiles | Variable by zoom | Independent tiled fallback |
+| Copernicus DEM GLO-30 | 30 m | Global baseline through Mapterhorn |
 | Copernicus DEM GLO-90 | 90 m | Global fallback |
-| USGS 3DEP | 1–10 m | High-resolution US terrain |
+| USGS 3DEP and open national DEMs | Regionally 0.5–10 m | Available through Mapterhorn where covered |
 | User-provided DEM | Arbitrary | Optional custom terrain |
 
 Actual resolution, availability, usage rights, and data coverage must be determined separately for each source.
 
-## 5.3 Mapzen terrain interface
+## 5.3 Tiled terrain interfaces
+
+Prefer Mapterhorn's anonymous `https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`
+service: 512×512 lossless WebP with Terrarium-encoded heights. It combines
+Copernicus GLO-30 with open national terrain without requiring application users
+to register at the original download portals. Retain upstream attribution and
+license references; the tile-generation code's license does not license all data.
+
+For the current zoom-13 region, try regional tiles first, then crop the exact
+child quadrant of a global zoom-12 parent where needed. On failure, use Mapzen.
+Source sampling, native source detail and rendered mesh resolution are distinct;
+the current mesh does not expose native 1–5 m detail. Keep service caches separate
+within the existing 256 MiB budget. See [terrain sources](data-sources/terrain.md).
 
 Support Mapzen Terrarium tiles through the published tile format:
 
@@ -522,9 +535,29 @@ Default open global imagery option.
 
 - 10 m visible-band resolution.
 - Geographic coverage across most global land.
-- RGB image generation.
-- Historical image selection.
-- Cloud-cover filtering.
+- The current Linux implementation uses EOX's pre-rendered **2016** cloudless
+  mosaic (`s2cloudless_3857`, CC BY 4.0), without an account or API key.
+- Newer EOX mosaics with non-commercial restrictions are not used by default.
+- Custom RGB generation, historical image selection and cloud-cover filtering
+  remain future work; imagery acquisition time does not follow simulation UTC.
+
+### IGN BD ORTHO and swisstopo SWISSIMAGE
+
+Free regional aerial imagery is preferred over the global mosaic where covered:
+
+- IGN BD ORTHO for metropolitan France/Corsica and selected overseas territories;
+  approximately 20 cm source orthophotos in much of France, Licence Ouverte 2.0.
+- swisstopo SWISSIMAGE for Switzerland; original orthophotos 10–25 cm, with
+  coarser service products, freely reusable with mandatory swisstopo attribution.
+- Use only the Swiss imagery layer, not background groups with third-party imagery.
+- Select automatically by approximate coverage bounds, fall through on errors or
+  no-data, and fill transparent regional pixels from lower-priority sources.
+- Keep contributing source credits visible and caches provider/resolution-specific.
+
+Source resolution is not displayed resolution. The current zoom-13 terrain uses
+256-pixel previews and a 1024-pixel camera texture, downsampling aerial imagery.
+Native sub-meter display requires future near-camera imagery subdivision.
+See [imagery sources and licensing](data-sources/imagery.md).
 
 ### MapTiler Satellite
 
@@ -1596,8 +1629,8 @@ Procedural terrain may still be used at this stage.
 
 Features:
 
-- Mapzen terrain tile downloads.
-- Terrain raster decoding.
+- Anonymous Mapterhorn terrain with Mapzen fallback.
+- Lossless WebP/PNG Terrarium decoding and exact parent-tile cropping.
 - ECEF/ENU conversion.
 - Mesh generation.
 - Quadtree LOD.
@@ -1885,6 +1918,8 @@ These extensions must build on the existing camera, terrain, astronomy, and rend
 
 ## Elevation data
 
+- Mapterhorn access: https://mapterhorn.com/data-access/
+- Mapterhorn upstream credits/licenses: https://mapterhorn.com/attribution/
 - Mapzen Terrain Tiles: https://registry.opendata.aws/terrain-tiles/
 - Copernicus DEM: https://registry.opendata.aws/copernicus-dem/
 - USGS National Map: https://apps.nationalmap.gov/downloader/
@@ -1893,6 +1928,9 @@ These extensions must build on the existing camera, terrain, astronomy, and rend
 ## Geographic imagery
 
 - USGS NAIP: https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer
+- EOX 2016 mosaic / licensing: https://cloudless.eox.at/pricing
+- IGN BD ORTHO: https://geoservices.ign.fr/bdortho
+- swisstopo SWISSIMAGE: https://www.swisstopo.admin.ch/en/orthoimage-swissimage-10
 - Copernicus Data Space: https://dataspace.copernicus.eu/
 - Element 84 Earth Search: https://earth-search.aws.element84.com/v1
 - MapTiler: https://docs.maptiler.com/

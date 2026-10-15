@@ -1,0 +1,8 @@
+{
+  "attributionUrl": "https://download.mapterhorn.com/attribution.json",
+  "attributionSha256": "09f9a9db46bd55a38b4612f0f76a771bd321ed5a75f6e9f3e1170f73eec312c2",
+  "sourceCount": 151,
+  "tileJsonUrl": "https://tiles.mapterhorn.com/tilejson.json",
+  "documentationUrl": "https://mapterhorn.com/data-access/",
+  "note": "Only source credits are bundled, not downloaded elevation tiles. Tile content and source coverage can change independently of this attribution snapshot."
+}

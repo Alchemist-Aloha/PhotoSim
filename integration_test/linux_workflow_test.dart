@@ -87,12 +87,12 @@ void main() {
     Future<void> waitForImagery() async {
       for (
         var i = 0;
-        i < 240 && find.text('USGS NAIP · 9/9 textures').evaluate().isEmpty;
+        i < 240 && find.text('Imagery · 9/9 textures').evaluate().isEmpty;
         i++
       ) {
         await tester.pump(const Duration(milliseconds: 500));
       }
-      expect(find.text('USGS NAIP · 9/9 textures'), findsOneWidget);
+      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
     }
 
     Future<void> capture(String name) async {
@@ -698,7 +698,7 @@ void main() {
     }
     expect(find.text('9 cached · 0 downloaded'), findsOneWidget);
     await waitForImagery();
-    expect(find.text('NAIP: 10 cached · 0 downloaded'), findsOneWidget);
+    expect(find.text('Imagery: 10 cached · 0 downloaded'), findsOneWidget);
     expect(camera().relitImagery, isTrue);
     expect(camera().groundElevation, isNotNull);
     await tester.tap(find.text('Map'));
@@ -795,7 +795,7 @@ void main() {
     }
     await waitForImagery();
     expect(find.text('9 cached · 0 downloaded'), findsOneWidget);
-    expect(find.text('NAIP: 10 cached · 0 downloaded'), findsOneWidget);
+    expect(find.text('Imagery: 10 cached · 0 downloaded'), findsOneWidget);
     expect(
       SavedPlan('Compare', camera()).encode(),
       SavedPlan('Compare', composition).encode(),

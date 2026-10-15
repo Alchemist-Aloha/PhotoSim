@@ -3,8 +3,8 @@
 ## Current milestone
 
 The Linux workflow now includes **offline stars/Milky Way planning and saved
-compositions**, in addition to real Mapzen/NAIP terrain, Sun/Moon lighting,
-estimated local time and playback. This advances Phase 4 and saved-plan integration.
+compositions**, in addition to account-free Mapterhorn/Mapzen terrain and regional/global
+imagery, Sun/Moon lighting, estimated local time and playback. This advances Phase 4 and saved-plan integration.
 The public MVP and cross-platform Phase 0/release gates remain incomplete.
 
 ## Available
@@ -13,20 +13,31 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
   physical sensor/focal-length fields of view, height and UTC timeline controls.
 - APS-C/full-frame sensor pills and one 8–600 mm focal-length slider; no lens presets.
   Existing saved-plan focal lengths and sensor selections remain readable.
+- Preferred anonymous Mapterhorn tiles combine Copernicus GLO-30 with finer open
+  national datasets; Mapzen is the independent fallback. Source credits are visible,
+  with 151 upstream catalog entries bundled in the sources dialog.
+- Strict 512px lossless WebP and 256px PNG Terrarium decoding; exact child cropping
+  from global zoom-12 parents where regional zoom-13 tiles are unavailable.
 - Terrarium decoding, pixel-center elevation interpolation, double-precision
   WGS84 ECEF/ENU, meter-scale camera-relative geometry and ellipsoid curvature.
 - Progressive 3×3 zoom-13 terrain, generated normals/UVs, camera ground vertex,
-  coarse distance LOD, skirts and native LRU elevation caching.
-- NAIP provider interface and exact EPSG:3857 raster export bounds, explicit
-  natural-color processing, bounded/cancellable requests and source attribution.
+  coarse distance LOD, skirts and native LRU elevation caching (128 MiB per service,
+  256 MiB total). Native 1–5 m source detail is not displayed by the existing mesh.
+- Automatic free imagery selection: NAIP, Swiss-only SWISSIMAGE, IGN BD ORTHO
+  and the CC BY EOX Sentinel-2 2016 global mosaic. Exact EPSG:3857 bounds,
+  natural-color processing, bounded/cancellable requests and visible source credits.
+- Regional errors/no-data fall through; transparent coverage composites over lower
+  priority sources. No newer non-commercial EOX layers or paid accounts required.
 - Progressive 256×256 image previews and a 1024×1024 camera-tile replacement.
 - Texture swaps preserve existing geometry; switching natural/relit mode also
   preserves geometry and shared camera/time state.
 - Natural, display-referred imagery by default; opt-in approximate relighting.
-- Transparent/missing imagery stays a labeled fallback surface; unavailable
+- Pixels unavailable from every source stay a labeled fallback surface; unavailable
   high-resolution imagery retains a successful preview.
 - Independent 256 MiB imagery cache (64 MiB previews, 192 MiB detail), in addition
-  to the existing 256 MiB elevation cache. Corruption recovery and source metadata.
+  to the existing 256 MiB elevation cache. Four provider namespaces share those
+  configured budgets equally; existing NAIP paths remain readable. Corruption recovery,
+  source metadata, dimension-checked PNG/indexed PNG/JPEG and isolate compositing.
 - Pinned Astronomia 1.1.1 behind an application-level calculation interface.
 - Topocentric solar/lunar positions and angular sizes, observer-dependent Moon
   illumination and waxing/waning readouts shared by both workspaces.
@@ -65,8 +76,10 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
 - `lib/app/app.dart`: authoritative shared state, playback timer and lifecycle cleanup.
 - `lib/render/moon.dart`: lunar geometry, phase shading and approximate moonlight.
 - `lib/core/terrain_geo.dart`: XYZ/Web Mercator bounds, WGS84 and local frames.
-- `lib/data/terrain/`: raster elevations, CPU meshes, elevation repository.
-- `lib/data/imagery/`: provider interface, NAIP requests, validation/decode/cache.
+- `lib/data/terrain/`: PNG/WebP elevations, parent cropping, CPU meshes,
+  account-free service selection/fallback and provider-separated elevation repositories.
+- `lib/data/imagery/`: regional/global providers, automatic selection/compositing,
+  exact raster requests, validation/decode/cache.
 - `lib/data/http_bytes.dart`: shared bounded, cancellable HTTP download.
 - `lib/data/terrain/tile_cache.dart`: reused provider/resolution-scoped native cache.
 - `lib/ui/simulation_workspace.dart`: progressive orchestration and GPU upload.
@@ -86,10 +99,12 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- Seventy-seven passing unit/widget tests: optics/state/geographic precision, elevations,
-  normals/edges/ground vertex, cache behavior, bounded responses and cancellation,
+- Ninety-eight passing unit/widget tests: optics/state/geographic precision, elevations,
+  normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
+  terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
-  resolutions/metadata/cache, missing detail, corruption and out-of-coverage behavior.
+  resolutions/metadata/cache, regional/global routing, PNG/JPEG validation, alpha
+  compositing, service timeouts, missing detail, corruption and out-of-coverage behavior.
 - Six independent NASA/JPL Horizons fixtures pass Sun <0.1° and Moon <0.2°
   angular separation checks. Phase, observer height, UTC normalization, date
   boundaries and shared readout changes are tested offline.
@@ -99,6 +114,10 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   southern-hemisphere DST, rollover, instant preservation and unavailable years.
 - Widget tests check playback, stopping on edits/backgrounding/disposal, the upper
   date boundary, and the estimated local readout.
+- A second native Linux test loads live Mapterhorn terrain and Swiss, French,
+  Australian and Beijing imagery. It verifies source credits/the upstream licenses
+  dialog, GPU pixel diversity and geography/cache reuse after optics/time edits,
+  and captures `linux-imagery-{swiss,ign,eox,beijing}.png`.
 - Native workflow loads nine real Yosemite terrain patches and nine NAIP textures;
   the camera patch receives an additional higher-resolution image.
 - Returning to 3D reports **9 cached / 0 downloaded** elevation patches and
@@ -143,11 +162,15 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
 ## Remaining limits
 
 - Fixed regional extent and distance LOD, not screen-error quadtree refinement.
+  Mapterhorn's finer upstream grids still use the original coarse mesh. No standalone
+  national GeoTIFF clients, NASA HMA or restricted terrain services are implemented.
 - Uncorrected source elevation datums and no precision terrain-horizon service.
 - Coarse/unequal tile-edge samples, skirts, blurry distant imagery and stretched
   cliff/foreground textures remain visible.
 - Imagery source acquisition dates are unknown; no date filtering or cache refresh UI.
-- Optional MapTiler/global imagery providers are not implemented.
+- Global fallback is the old, approximately 10 m 2016 mosaic, not current imagery.
+  Native sub-meter regional imagery is downsampled by existing texture footprints;
+  adaptive near-camera imagery subdivision and optional paid providers remain open.
 - Native-only cache; other platform builds and browser storage remain open.
 - Scene warns about depth precision inside ground patches. Shadow accuracy, frame
   time targets, release-mode interaction and long-run GPU-memory stability are unmeasured.
