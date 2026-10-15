@@ -25,7 +25,7 @@ void main() {
     expect(restored.focusDistance, 3);
     final json = jsonDecode(
       SavedPlan('Legacy', original).encode(),
-    ) as Map<String, dynamic>;
+    ) as Map<String, Object?>;
     for (final key in [
       'weather',
       'renderQuality',

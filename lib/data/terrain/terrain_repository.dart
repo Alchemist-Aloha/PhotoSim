@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -29,7 +31,7 @@ class TerrainRepository {
     rasterId ??= id;
     final uri = provider.request(rasterId);
     var cancelled = false;
-    abort.then((_) => cancelled = true);
+    unawaited(abort.then((_) => cancelled = true));
     final stored = await cache.read(rasterId);
     if (stored != null) {
       try {

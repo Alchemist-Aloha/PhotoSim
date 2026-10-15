@@ -1,4 +1,5 @@
 # PhotoSim
+
 ## Unified Software Requirements and Technical Architecture
 
 **Specification version:** 1.0 (long-term specification)
@@ -231,7 +232,7 @@ Photography mode must be the default.
 The 3D renderer must respond to:
 
 | User change | Required rendering update |
-|---|---|
+| --- | --- |
 | Camera azimuth | Rotate virtual camera |
 | Camera pitch | Tilt virtual camera |
 | Camera position | Update viewpoint and visible terrain |
@@ -268,6 +269,7 @@ boundaries. Names and highlights must depth-test against terrain, remain usable
 as planning guides in daylight, and not intercept camera aiming gestures. Preserve
 the toggle across workspace changes and saved plans; missing preferences in
 older plans default to off.
+
 - Terrain-distance information.
 - Current time and date.
 
@@ -284,7 +286,7 @@ A clean fullscreen photographic preview must always be available.
 Provide one single-selection pill control with two options:
 
 | Format | Sensor width | Sensor height |
-|---|---|---|
+| --- | --- | --- |
 | APS-C | 23.5 mm | 15.6 mm |
 | Full-frame | 36 mm | 24 mm |
 
@@ -379,7 +381,7 @@ The local rendering origin should be rebased as the camera moves over large geog
 Support pluggable terrain providers.
 
 | Provider | Approximate resolution | Role |
-|---|---|---|
+| --- | --- | --- |
 | Mapterhorn | 30 m global; finer regional sources | Primary anonymous tiled terrain service |
 | Mapzen Terrain Tiles | Variable by zoom | Independent tiled fallback |
 | Copernicus DEM GLO-30 | 30 m | Global baseline through Mapterhorn |
@@ -405,7 +407,7 @@ within the existing 256 MiB budget. See [terrain sources](data-sources/terrain.m
 
 Support Mapzen Terrarium tiles through the published tile format:
 
-https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png
+<https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png>
 
 Decode elevation from RGB values:
 
@@ -993,9 +995,9 @@ Investigate Dashmap as the reference implementation for streaming geographic ter
 
 Relevant projects:
 
-- https://github.com/bdero/flutter_scene
-- https://github.com/bdero/dashmap
-- https://docs.flutter.dev/perf/impeller
+- <https://github.com/bdero/flutter_scene>
+- <https://github.com/bdero/dashmap>
+- <https://docs.flutter.dev/perf/impeller>
 
 ### Cross-platform constraint
 
@@ -1091,7 +1093,7 @@ Support explicit disposal of unused resources and recovery from lost device or b
 Target performance:
 
 | Platform | Preferred frame rate |
-|---|---|
+| --- | --- |
 | Android | 30 FPS minimum target; 60 FPS preferred |
 | Linux | 60 FPS |
 | Windows | 60 FPS |
@@ -1874,7 +1876,7 @@ For release planning, verify quotas, provider access policies, and terms of use 
 # 24. Engineering Risks
 
 | Risk | Mitigation |
-|---|---|
+| --- | --- |
 | Flutter GPU compatibility differs by platform | Renderer abstraction and mandatory Phase 0 feasibility testing |
 | Flutter Scene API changes | Version pinning and isolated backend adapter |
 | Large terrain datasets | Quadtree LOD and on-demand downloads |
@@ -1950,39 +1952,39 @@ These extensions must build on the existing camera, terrain, astronomy, and rend
 
 ## GPU rendering
 
-- Flutter Scene: https://github.com/bdero/flutter_scene
-- Dashmap geographic 3D renderer: https://github.com/bdero/dashmap
-- Flutter Impeller: https://docs.flutter.dev/perf/impeller
+- Flutter Scene: <https://github.com/bdero/flutter_scene>
+- Dashmap geographic 3D renderer: <https://github.com/bdero/dashmap>
+- Flutter Impeller: <https://docs.flutter.dev/perf/impeller>
 
 ## Elevation data
 
-- Mapterhorn access: https://mapterhorn.com/data-access/
-- Mapterhorn upstream credits/licenses: https://mapterhorn.com/attribution/
-- Mapzen Terrain Tiles: https://registry.opendata.aws/terrain-tiles/
-- Copernicus DEM: https://registry.opendata.aws/copernicus-dem/
-- USGS National Map: https://apps.nationalmap.gov/downloader/
-- OpenTopography: https://portal.opentopography.org/apidocs/
+- Mapterhorn access: <https://mapterhorn.com/data-access/>
+- Mapterhorn upstream credits/licenses: <https://mapterhorn.com/attribution/>
+- Mapzen Terrain Tiles: <https://registry.opendata.aws/terrain-tiles/>
+- Copernicus DEM: <https://registry.opendata.aws/copernicus-dem/>
+- USGS National Map: <https://apps.nationalmap.gov/downloader/>
+- OpenTopography: <https://portal.opentopography.org/apidocs/>
 
 ## Geographic imagery
 
-- USGS NAIP: https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer
-- EOX 2016 mosaic / licensing: https://cloudless.eox.at/pricing
-- IGN BD ORTHO: https://geoservices.ign.fr/bdortho
-- swisstopo SWISSIMAGE: https://www.swisstopo.admin.ch/en/orthoimage-swissimage-10
-- Copernicus Data Space: https://dataspace.copernicus.eu/
-- Element 84 Earth Search: https://earth-search.aws.element84.com/v1
-- MapTiler: https://docs.maptiler.com/
+- USGS NAIP: <https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer>
+- EOX 2016 mosaic / licensing: <https://cloudless.eox.at/pricing>
+- IGN BD ORTHO: <https://geoservices.ign.fr/bdortho>
+- swisstopo SWISSIMAGE: <https://www.swisstopo.admin.ch/en/orthoimage-swissimage-10>
+- Copernicus Data Space: <https://dataspace.copernicus.eu/>
+- Element 84 Earth Search: <https://earth-search.aws.element84.com/v1>
+- MapTiler: <https://docs.maptiler.com/>
 
 ## Astronomy
 
-- Astronomia: https://github.com/dmvvilela/astronomia
-- Astronomy Engine: https://github.com/cosinekitty/astronomy
-- D3-Celestial: https://github.com/ofrohn/d3-celestial
-- Stellarium: https://github.com/Stellarium/stellarium
+- Astronomia: <https://github.com/dmvvilela/astronomia>
+- Astronomy Engine: <https://github.com/cosinekitty/astronomy>
+- D3-Celestial: <https://github.com/ofrohn/d3-celestial>
+- Stellarium: <https://github.com/Stellarium/stellarium>
 
 ## Weather
 
-- Open-Meteo: https://open-meteo.com/en/docs
+- Open-Meteo: <https://open-meteo.com/en/docs>
 
 ---
 

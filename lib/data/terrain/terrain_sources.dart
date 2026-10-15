@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -44,7 +45,7 @@ class TerrainSources {
       throw ArgumentError('Terrain zoom must not exceed 13');
     }
     var cancelled = false;
-    abort.then((_) => cancelled = true);
+    unawaited(abort.then((_) => cancelled = true));
     final primary = sources.first;
     final parent = id.z == 13 ? TileId(12, id.x ~/ 2, id.y ~/ 2) : null;
     final preferParent =

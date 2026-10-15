@@ -50,7 +50,7 @@ void main() {
       expect(await cache.read(id), bytes);
       final metadata = jsonDecode(
         await File('${directory.path}/${id.key}.png.json').readAsString(),
-      ) as Map<String, dynamic>;
+      ) as Map<String, Object?>;
       expect(metadata['tile'], [id.z, id.x, id.y]);
       expect(metadata['provider'], 'Mapzen Terrarium');
       expect(DateTime.parse(metadata['downloadedAt'] as String).isUtc, isTrue);

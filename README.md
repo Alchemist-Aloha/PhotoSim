@@ -67,7 +67,8 @@ agree. Camera controls never translate the 3D camera implicitly.
 ## Build and verify
 
 ```sh
-flutter analyze
+dart format --output=none --set-exit-if-changed lib test integration_test
+flutter analyze --fatal-infos --fatal-warnings
 flutter test
 flutter test integration_test/linux_workflow_test.dart -d linux
 flutter test integration_test/linux_imagery_test.dart -d linux
@@ -77,6 +78,11 @@ flutter test integration_test/linux_spec_photography_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```
+
+`analysis_options.yaml` enables strict casts, inference and raw-type checking,
+plus correctness/async lints (including dynamic-call and discarded-future checks).
+Warnings and lint infos are fatal in the analysis command above; tests and native
+integration tests are analyzed too. No extra lint dependency is required.
 
 Ship the **entire bundle directory**, not just its executable. The integration
 test requires a live Linux graphical session and internet access on its first

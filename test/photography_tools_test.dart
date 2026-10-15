@@ -127,7 +127,7 @@ void main() {
       expect(restored.whiteBalance, 4000);
       final json = jsonDecode(
         SavedPlan('Legacy', state).encode(),
-      ) as Map<String, dynamic>;
+      ) as Map<String, Object?>;
       for (final key in [
         'roll',
         'portrait',

@@ -12,9 +12,11 @@ Future<Uint8List> downloadBytes(
   Duration timeout = const Duration(seconds: 20),
 }) async {
   final stop = Completer<void>();
-  abort.then((_) {
-    if (!stop.isCompleted) stop.complete();
-  });
+  unawaited(
+    abort.then((_) {
+      if (!stop.isCompleted) stop.complete();
+    }),
+  );
   final timer = Timer(timeout, () {
     if (!stop.isCompleted) stop.complete();
   });

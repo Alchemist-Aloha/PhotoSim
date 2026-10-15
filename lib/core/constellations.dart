@@ -16,19 +16,24 @@ class Constellation {
 }
 
 List<Constellation> parseConstellations(String source) {
-  final rows = jsonDecode(source);
-  if (rows is! List || rows.isEmpty || rows.length > 100) {
+  final Object? rows = jsonDecode(source);
+  if (rows is! List<Object?> || rows.isEmpty || rows.length > 100) {
     throw const FormatException('Invalid constellation catalog');
   }
-  Vector3 point(dynamic p) {
-    if (p is! List ||
-        p.length != 2 ||
-        p.any((n) => n is! num || !n.isFinite) ||
-        p[0].abs() > 180 ||
-        p[1].abs() > 90) {
+  Vector3 point(Object? p) {
+    if (p is! List<Object?> || p.length != 2) {
       throw const FormatException('Invalid constellation coordinate');
     }
-    final ra = p[0] * radians, dec = p[1] * radians;
+    final longitude = p[0], latitude = p[1];
+    if (longitude is! num ||
+        latitude is! num ||
+        !longitude.isFinite ||
+        !latitude.isFinite ||
+        longitude.abs() > 180 ||
+        latitude.abs() > 90) {
+      throw const FormatException('Invalid constellation coordinate');
+    }
+    final ra = longitude * radians, dec = latitude * radians;
     return Vector3(
       math.cos(dec) * math.cos(ra),
       math.cos(dec) * math.sin(ra),
@@ -38,24 +43,28 @@ List<Constellation> parseConstellations(String source) {
 
   return rows
       .map((row) {
-        if (row is! List ||
-            row.length != 4 ||
-            row[0] is! String ||
-            row[0].trim().isEmpty ||
-            row[0].length > 80 ||
-            row[3] is! List ||
-            row[3].isEmpty) {
+        if (row is! List<Object?> || row.length != 4) {
           throw const FormatException('Invalid constellation row');
         }
-        final lines = (row[3] as List)
+        final name = row[0], encodedLines = row[3];
+        if (name is! String ||
+            name.trim().isEmpty ||
+            name.length > 80 ||
+            encodedLines is! List<Object?> ||
+            encodedLines.isEmpty) {
+          throw const FormatException('Invalid constellation row');
+        }
+        final lines = encodedLines
             .map((line) {
-              if (line is! List || line.length < 2 || line.length > 100) {
+              if (line is! List<Object?> ||
+                  line.length < 2 ||
+                  line.length > 100) {
                 throw const FormatException('Invalid constellation line');
               }
               return line.map(point).toList(growable: false);
             })
             .toList(growable: false);
-        return Constellation(row[0], point([row[1], row[2]]), lines);
+        return Constellation(name, point([row[1], row[2]]), lines);
       })
       .toList(growable: false);
 }

@@ -36,7 +36,8 @@ void main() {
     expect(query['format'], 'png32');
     expect(query['adjustAspectRatio'], 'false');
     expect(
-      jsonDecode(query['renderingRule']!)['rasterFunction'],
+      (jsonDecode(query['renderingRule']!)
+          as Map<String, Object?>)['rasterFunction'],
       'NaturalColor',
     );
     final bounds = query['bbox']!.split(',').map(double.parse).toList();
@@ -173,7 +174,7 @@ void main() {
       final metadata = jsonDecode(
         await File('${detail.directory.path}/${tile.key}.png.json')
             .readAsString(),
-      );
+      ) as Map<String, Object?>;
       expect(metadata['provider'], 'USGS NAIP');
       expect(metadata['pixels'], 1024);
       expect(metadata['url'], provider.request(tile, 1024).toString());

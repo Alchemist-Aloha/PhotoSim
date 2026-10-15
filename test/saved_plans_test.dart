@@ -77,7 +77,7 @@ void main() {
     () {
       final json = jsonDecode(
         SavedPlan('Old terrain', state).encode(),
-      ) as Map<String, dynamic>;
+      ) as Map<String, Object?>;
       json.remove('terrainRings');
       json.remove('terrainForwardKm');
       json.remove('terrainRenderKm');
@@ -101,8 +101,9 @@ void main() {
       );
       expect(restored.state.focalLength, state.focalLength);
       expect(restored.state.sensor, state.sensor);
-      expect(jsonDecode(restored.encode()).containsKey('lens'), isFalse);
-      expect(jsonDecode(restored.encode())['version'], 2);
+      final encoded = jsonDecode(restored.encode()) as Map<String, Object?>;
+      expect(encoded.containsKey('lens'), isFalse);
+      expect(encoded['version'], 2);
     }
   });
 
@@ -111,7 +112,7 @@ void main() {
     () {
       final source = jsonDecode(
         SavedPlan('Valid', state).encode(),
-      ) as Map<String, dynamic>;
+      ) as Map<String, Object?>;
       for (final entry in [
         ('version', 3),
         ('version', 1.0),

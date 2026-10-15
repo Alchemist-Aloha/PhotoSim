@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as image;
@@ -127,7 +129,7 @@ class ImageryRepository {
       throw ImageryUnavailable('Outside ${provider.name} service extent');
     }
     var cancelled = false;
-    abort.then((_) => cancelled = true);
+    unawaited(abort.then((_) => cancelled = true));
     final cache = pixels == 256 ? previewCache : detailCache;
     final stored = await cache.read(tile);
     if (stored != null) {

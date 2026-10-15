@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -50,7 +51,7 @@ class ImagerySources {
       throw ArgumentError('Unsupported imagery resolution');
     }
     var cancelled = false;
-    abort.then((_) => cancelled = true);
+    unawaited(abort.then((_) => cancelled = true));
     final layers = <ImageryRaster>[];
     final providers = <ImageryProvider>[];
     Exception? failure;

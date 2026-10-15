@@ -499,7 +499,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (cleanPreview) setCleanPreview(false);
+          if (cleanPreview) unawaited(setCleanPreview(false));
         },
       },
       child: Focus(autofocus: true, child: scaffold),

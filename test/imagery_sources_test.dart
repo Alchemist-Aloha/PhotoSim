@@ -88,7 +88,7 @@ void main() {
           final metadata = jsonDecode(
             await File('${cache.directory.path}/${tile.key}.png.json')
                 .readAsString(),
-          );
+          ) as Map<String, Object?>;
           expect(metadata['provider'], entry.$2);
           expect(metadata['attribution'], result.providers.single.attribution);
           expect(

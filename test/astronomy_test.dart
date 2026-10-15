@@ -23,8 +23,9 @@ double separation(Vector3 a, Vector3 b) =>
 void main() {
   final fixtures = jsonDecode(
     File('test/fixtures/horizons.json').readAsStringSync(),
-  ) as Map<String, dynamic>;
-  for (final c in fixtures['cases'] as List) {
+  ) as Map<String, Object?>;
+  for (final c
+      in (fixtures['cases'] as List<Object?>).cast<Map<String, Object?>>()) {
     test(
       'airless topocentric Horizons reference ${c['utc']} ${c['latitude']}',
       () {
@@ -35,7 +36,7 @@ void main() {
           elevation: (c['elevation'] as num).toDouble(),
         );
         for (final entry in [('sun', sky.sun, 0.1), ('moon', sky.moon, 0.2)]) {
-          final reference = c[entry.$1] as Map<String, dynamic>;
+          final reference = c[entry.$1] as Map<String, Object?>;
           final direction = horizontalDirection(
             (reference['azimuth'] as num).toDouble(),
             (reference['altitude'] as num).toDouble(),
@@ -58,7 +59,11 @@ void main() {
         }
         expect(
           sky.moonIllumination,
-          closeTo((c['moon']['illumination'] as num).toDouble(), 0.001),
+          closeTo(
+            ((c['moon'] as Map<String, Object?>)['illumination'] as num)
+                .toDouble(),
+            0.001,
+          ),
         );
         expect(sky.sun.angularRadius / radians, inInclusiveRange(0.25, 0.28));
         expect(sky.moon.angularRadius / radians, inInclusiveRange(0.23, 0.30));

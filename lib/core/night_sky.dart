@@ -25,29 +25,31 @@ class Star {
 }
 
 List<Star> parseStarCatalog(String source) {
-  final rows = jsonDecode(source);
-  if (rows is! List || rows.isEmpty || rows.length > 10000) {
+  final Object? rows = jsonDecode(source);
+  if (rows is! List<Object?> || rows.isEmpty || rows.length > 10000) {
     throw const FormatException('Invalid star catalog');
   }
   return rows
       .map((row) {
-        if (row is! List ||
-            row.length != 4 ||
-            row[0] is! int ||
-            row[0] <= 0 ||
-            row.skip(1).any((v) => v is! num || !v.isFinite) ||
-            (row[1] as num).abs() > 180 ||
-            (row[2] as num).abs() > 90 ||
-            row[3] < -2 ||
-            row[3] > 6) {
+        if (row is! List<Object?> || row.length != 4) {
           throw const FormatException('Invalid star row');
         }
-        return Star(
-          row[0],
-          row[1] * radians,
-          row[2] * radians,
-          row[3].toDouble(),
-        );
+        final id = row[0], ra = row[1], dec = row[2], magnitude = row[3];
+        if (id is! int ||
+            id <= 0 ||
+            ra is! num ||
+            !ra.isFinite ||
+            ra.abs() > 180 ||
+            dec is! num ||
+            !dec.isFinite ||
+            dec.abs() > 90 ||
+            magnitude is! num ||
+            !magnitude.isFinite ||
+            magnitude < -2 ||
+            magnitude > 6) {
+          throw const FormatException('Invalid star row');
+        }
+        return Star(id, ra * radians, dec * radians, magnitude.toDouble());
       })
       .toList(growable: false);
 }

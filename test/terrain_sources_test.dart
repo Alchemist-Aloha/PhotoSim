@@ -121,7 +121,7 @@ void main() {
     final metadata = jsonDecode(
       await File('${directory.path}/mapterhorn-v1/${id.key}.png.json')
           .readAsString(),
-    );
+    ) as Map<String, Object?>;
     expect(metadata['provider'], 'Mapterhorn');
     expect(metadata['pixels'], 512);
     expect(metadata['encoding'], 'Terrarium lossless WebP');
@@ -168,7 +168,7 @@ void main() {
     final metadata = jsonDecode(
       await File('${directory.path}/mapterhorn-v1/12-1-1.png.json')
           .readAsString(),
-    );
+    ) as Map<String, Object?>;
     expect(metadata['tile'], [12, 1, 1]);
     expect(
       metadata['url'],
@@ -274,7 +274,8 @@ void main() {
     () async {
       final sources = jsonDecode(
         await File('assets/terrain/mapterhorn-attribution.json').readAsString(),
-      ) as List;
+      ) as List<Object?>;
+      final credits = sources.cast<Map<String, Object?>>();
       for (final code in [
         'glo30',
         'usgs3dep13',
@@ -287,7 +288,7 @@ void main() {
         'nz',
         'jpdem10a',
       ]) {
-        final source = sources.singleWhere((s) => s['source'] == code);
+        final source = credits.singleWhere((s) => s['source'] == code);
         expect(source['producer'], isNotEmpty);
         expect(source['license'], isNotEmpty);
         expect(Uri.parse(source['license_pdf'] as String).scheme, 'https');

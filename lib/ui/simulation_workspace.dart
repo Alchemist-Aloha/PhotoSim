@@ -85,7 +85,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   @override
   void initState() {
     super.initState();
-    initialize();
+    unawaited(initialize());
   }
 
   Future<void> initialize() async {
@@ -98,7 +98,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 await rootBundle.loadString(
                   'assets/terrain/mapterhorn-attribution.json',
                 ),
-              ) as List)
+              ) as List<Object?>)
+              .cast<Map<String, Object?>>()
               .map(
                 (source) =>
                     '${source['name']}\n${source['producer']}\n${source['license']}\n'
@@ -174,7 +175,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.terrainRings != next.terrainRings ||
         old.terrainForwardKm != next.terrainForwardKm) {
       coverageDebounce?.cancel();
-      if (nightRenderer != null) loadTerrain();
+      if (nightRenderer != null) unawaited(loadTerrain());
     } else if (next.terrainForwardKm > 0 &&
         (old.azimuth != next.azimuth ||
             old.pitch != next.pitch ||
@@ -184,7 +185,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             old.focalLength != next.focalLength)) {
       coverageDebounce?.cancel();
       coverageDebounce = Timer(const Duration(milliseconds: 400), () {
-        if (mounted && nightRenderer != null) loadTerrain();
+        if (mounted && nightRenderer != null) unawaited(loadTerrain());
       });
     }
     if (old.terrainRenderKm != next.terrainRenderKm) updateTerrainVisibility();

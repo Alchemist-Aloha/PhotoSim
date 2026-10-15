@@ -40,6 +40,12 @@ void main() {
     for (final source in [
       '{}',
       '[]',
+      'null',
+      '[{}]',
+      '[[true,0,0,1]]',
+      '[[1.5,0,0,1]]',
+      '[[1,0,false,1]]',
+      '[[1,0,0,null]]',
       '[[1,0,0]]',
       '[[1,181,0,1]]',
       '[[1,0,91,1]]',
@@ -53,19 +59,20 @@ void main() {
 
   final fixtures = jsonDecode(
     File('test/fixtures/sky_rotation.json').readAsStringSync(),
-  );
-  for (final row in fixtures['cases']) {
+  ) as Map<String, Object?>;
+  for (final row
+      in (fixtures['cases'] as List<Object?>).cast<Map<String, Object?>>()) {
     test('independent ERFA rotation: ${row['name']}', () {
       final frame = ObserverSkyFrame(
-        timestamp: DateTime.parse(row['timestamp']),
+        timestamp: DateTime.parse(row['timestamp'] as String),
         latitude: (row['latitude'] as num).toDouble(),
         longitude: (row['longitude'] as num).toDouble(),
       );
       final direction = frame.direction(
-        row['ra'] * radians,
-        row['dec'] * radians,
+        (row['ra'] as num) * radians,
+        (row['dec'] as num) * radians,
       );
-      final values = (row['direction'] as List)
+      final values = (row['direction'] as List<Object?>)
           .map((n) => (n as num).toDouble())
           .toList();
       final expected = Vector3(values[0], values[1], values[2]);
@@ -74,10 +81,10 @@ void main() {
       expect(separation, lessThan(0.01));
       expect(direction.length, closeTo(1, 1e-12));
       final position = frame.position(
-        row['ra'] * radians,
-        row['dec'] * radians,
+        (row['ra'] as num) * radians,
+        (row['dec'] as num) * radians,
       );
-      expect(position.altitude, closeTo(row['altitude'], 0.01));
+      expect(position.altitude, closeTo(row['altitude'] as num, 0.01));
     });
   }
 

@@ -54,8 +54,8 @@ class SavedPlan {
     if (utf8.encode(source).length > 32768) {
       throw const FormatException('Plan exceeds 32 KiB');
     }
-    final json = jsonDecode(source);
-    if (json is! Map ||
+    final Object? json = jsonDecode(source);
+    if (json is! Map<String, Object?> ||
         json['version'] is! int ||
         ![1, 2].contains(json['version'])) {
       throw const FormatException('Unsupported plan format/version');

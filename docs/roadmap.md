@@ -125,7 +125,7 @@ Avoid adding unrelated features before the two-workspace photography workflow is
 ## 3. Technology Decisions
 
 | Component | Selected technology |
-|---|---|
+| --- | --- |
 | Application framework | Flutter |
 | 2D map | `flutter_map` |
 | 3D rendering | `flutter_scene` |
@@ -615,7 +615,7 @@ Platform builds must be tested on their actual operating systems or suitable CI 
 ### Performance targets
 
 | Metric | MVP target |
-|---|---|
+| --- | --- |
 | Desktop interaction | 30–60 FPS |
 | Android interaction | 30 FPS |
 | Browser interaction | 30 FPS |
