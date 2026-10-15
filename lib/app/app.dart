@@ -339,7 +339,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   state: state,
                   onChanged: update,
                 )
-              : SimulationWorkspace(state: state, onChanged: update);
+              : SimulationWorkspace(
+                  state: state,
+                  onChanged: update,
+                  onPausePlayback: () => setState(stopPlayback),
+                );
           return Column(
             children: [
               Expanded(

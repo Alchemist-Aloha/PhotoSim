@@ -155,8 +155,9 @@ class NightSkyRenderer {
       ..setRotation(_rotation)
       ..setTranslation(eye);
     final sky = state.sky;
-    final stars = nightVisibility(sky),
-        band = nightVisibility(sky, milkyWay: true);
+    final clear = state.weather == Weather.clear;
+    final stars = clear ? nightVisibility(sky) : 0.0,
+        band = clear ? nightVisibility(sky, milkyWay: true) : 0.0;
     starNode.visible = stars > 0;
     bandNode.visible = band > 0.001;
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);

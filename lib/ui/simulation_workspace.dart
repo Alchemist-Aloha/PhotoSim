@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_scene/gpu.dart' as gpu;
@@ -25,6 +26,9 @@ import '../data/terrain/terrain_provider.dart';
 import '../data/terrain/terrain_sources.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
+import '../render/photography.dart';
+import '../data/image_export.dart';
+import 'rain_overlay.dart';
 import '../render/night_sky.dart';
 
 class SimulationWorkspace extends StatefulWidget {
@@ -32,7 +36,9 @@ class SimulationWorkspace extends StatefulWidget {
     super.key,
     required this.state,
     required this.onChanged,
+    this.onPausePlayback,
   });
+  final VoidCallback? onPausePlayback;
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
 
@@ -41,7 +47,10 @@ class SimulationWorkspace extends StatefulWidget {
 }
 
 class _SimulationWorkspaceState extends State<SimulationWorkspace> {
+  final photoKey = GlobalKey();
+  bool exporting = false;
   scene.Scene? world;
+  scene.GradientSkySource? overcastSky;
   TerrainSources? repository;
   final terrainProviders = <String, TerrainProvider>{};
   String terrainCredits = '';
@@ -104,6 +113,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         directory: Directory('${directory.path}/photosim'),
       );
       skySource = scene.PhysicalSkySource(turbidity: 2);
+      overcastSky = scene.GradientSkySource();
       world = scene.Scene()..skybox = scene.Skybox(skySource!);
       world!.directionalLight = scene.DirectionalLight(
         castsShadow: true,
@@ -163,7 +173,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       });
     }
     if (old.terrainRenderKm != next.terrainRenderKm) updateTerrainVisibility();
-    if (old.relitImagery != next.relitImagery) {
+    if (old.relitImagery != next.relitImagery ||
+        old.weather != next.weather ||
+        old.depthOfField != next.depthOfField) {
       for (final entry in textures.entries) {
         applyTexture(entry.key, entry.value);
       }
@@ -304,7 +316,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         ? (scene.PhysicallyBasedMaterial(baseColorTexture: texture)
             ..roughnessFactor = 1
             ..metallicFactor = 0)
-        : (scene.UnlitMaterial(colorTexture: texture)..displayReferred = true);
+        : (scene.UnlitMaterial(colorTexture: texture)
+            // Display-referred surfaces bypass the backend's fog and depth-of-field passes.
+            ..displayReferred =
+                widget.state.weather == Weather.clear &&
+                !widget.state.depthOfField
+            ..baseColorFactor = vm.Vector4.all(
+              weatherTransmission(widget.state.weather),
+            )
+            ..baseColorFactor.a = 1);
     // Reassign the mesh to notify Scene of the material change; geometry stays resident.
     node.mesh = scene.Mesh(geometry, material);
   }
@@ -388,6 +408,102 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       await update(center, 1024);
     }
     if (mounted && token == generation) setState(() => imageryLoading = false);
+  }
+
+  Future<void> exportImage() async {
+    if (exporting) return;
+    widget.onPausePlayback?.call();
+    setState(() => exporting = true);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final snapshot = widget.state;
+      final boundary =
+          photoKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      if (boundary.size.shortestSide < 32) {
+        throw StateError('Preview is too small to export');
+      }
+      final ratio = math.min(
+        MediaQuery.devicePixelRatioOf(context),
+        math.min(
+          4096 / boundary.size.longestSide,
+          math.sqrt(12000000 / (boundary.size.width * boundary.size.height)),
+        ),
+      );
+      final image = await boundary.toImage(pixelRatio: ratio);
+      late final Uint8List bytes;
+      try {
+        final credits = {
+          ...terrainProviders.values.map((provider) => provider.attribution),
+          ...imageProviders.values
+              .expand((providers) => providers)
+              .map((provider) => provider.attribution),
+          'Sky catalog: D3-Celestial / XHIP · BSD-3-Clause',
+        }.join(' · ');
+        bytes = await encodePreview(
+          image,
+          '$credits\n'
+          '${snapshot.timestamp.toIso8601String()} · ${snapshot.sensor.label} · ${snapshot.focalLength.toStringAsFixed(1)} mm · '
+          'f/${snapshot.aperture.toStringAsFixed(1)} · ${snapshot.weather.label} (illustrative)',
+        );
+      } finally {
+        image.dispose();
+      }
+      final directory =
+          await getDownloadsDirectory() ??
+          await getApplicationDocumentsDirectory();
+      if (!mounted) return;
+      var path =
+          '${directory.path}/photosim-${DateTime.now().toUtc().microsecondsSinceEpoch}.png';
+      final destination = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Export PNG'),
+          content: SizedBox(
+            width: 560,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Exports the current preview with weather, depth of field and source credits; no crosshair or application controls. Maximum 4096 px / 12 MP. Existing files are never overwritten.',
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  initialValue: path,
+                  onChanged: (value) => path = value,
+                  decoration: const InputDecoration(
+                    labelText: 'Absolute PNG path',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, path.trim()),
+              child: const Text('Save PNG'),
+            ),
+          ],
+        ),
+      );
+      if (destination == null) return;
+      final file = await savePreview(destination, bytes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: SelectableText('Exported PNG · ${file.path}')),
+      );
+    } catch (failure) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $failure')));
+      }
+    } finally {
+      if (mounted) setState(() => exporting = false);
+    }
   }
 
   @override
@@ -507,6 +623,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       -math.cos(yaw) * math.cos(pitch),
     );
     final sky = state.sky;
+    configurePhotography(active, state);
     final sun = sky.sun;
     moonRenderer!.update(sky, eye);
     nightRenderer?.update(state, eye);
@@ -523,13 +640,32 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     // shortcut: clear-sky color/brightness ramps, use calibrated radiometry for exposure simulation.
     // Keep night terrain distinguishable from the sky without adding directional shadows.
     active.environmentIntensity = 0.04 + 0.21 * twilight;
+    final transmission = weatherTransmission(state.weather);
+    moonRenderer!.node.visible = state.weather == Weather.clear;
+    if (state.weather == Weather.clear) {
+      if (active.skybox?.source != skySource) {
+        active.skybox = scene.Skybox(skySource!);
+      }
+    } else {
+      final brightness = ((sun.altitude + 18) / 33).clamp(0.02, 1.0);
+      overcastSky!
+        ..sunColor = vm.Vector3.zero()
+        ..zenithColor = vm.Vector3(0.22, 0.25, 0.29) * brightness
+        ..horizonColor = active.fog.color
+        ..groundColor = active.fog.color;
+      if (active.skybox?.source != overcastSky) {
+        active.skybox = scene.Skybox(overcastSky!);
+      }
+    }
     final moon = sky.moon.direction;
     // The one shadow-casting light follows the Moon once the Sun is below horizontal.
     active.directionalLight!
       ..direction = sun.altitude > 0
           ? -sunDirection
           : -vm.Vector3(moon.x, moon.y, moon.z)
-      ..intensity = sun.altitude > 0 ? 3 * daylight : moonlightIntensity(sky)
+      ..intensity =
+          (sun.altitude > 0 ? 3 * daylight : moonlightIntensity(sky)) *
+          transmission
       ..color = sun.altitude > 0
           ? vm.Vector3(1, 0.45 + 0.53 * daylight, 0.15 + 0.80 * daylight)
           : vm.Vector3(0.85, 0.90, 1);
@@ -543,6 +679,53 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               spacing: 12,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                DropdownButton<RenderQuality>(
+                  value: state.renderQuality,
+                  items: [
+                    for (final quality in RenderQuality.values)
+                      DropdownMenuItem(
+                        value: quality,
+                        child: Text('Quality: ${quality.label}'),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      widget.onChanged(
+                        widget.state.copyWith(renderQuality: value),
+                      );
+                    }
+                  },
+                ),
+                DropdownButton<Weather>(
+                  value: state.weather,
+                  items: [
+                    for (final weather in Weather.values)
+                      DropdownMenuItem(
+                        value: weather,
+                        child: Text('Weather: ${weather.label}'),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      widget.onChanged(widget.state.copyWith(weather: value));
+                    }
+                  },
+                ),
+                const Tooltip(
+                  message: 'Manual illustrative weather, not observed conditions or a forecast.',
+                  child: Icon(
+                    Icons.info_outline,
+                    semanticLabel: 'Weather presets are illustrative',
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed:
+                      ground == null || loading || imageryLoading || exporting
+                      ? null
+                      : exportImage,
+                  icon: const Icon(Icons.image_outlined),
+                  label: Text(exporting ? 'Exporting…' : 'Export PNG'),
+                ),
                 Text(
                   'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
                 ),
@@ -571,7 +754,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 ),
                 Text(
                   state.relitImagery
-                      ? 'UTC-driven Sun/Moon light · approximate clear sky'
+                      ? 'UTC-driven Sun/Moon light · approximate atmosphere'
+                      : state.weather != Weather.clear || state.depthOfField
+                      ? 'Illustrative weather/DOF · captured shadows remain'
                       : 'Natural imagery retains captured lighting',
                 ),
               ],
@@ -650,22 +835,32 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                             fit: StackFit.expand,
                             children: [
                               // Scene's +Z-forward camera reverses east/west in our ENU axes.
-                              Semantics(
-                                label: state.showConstellations
-                                    ? 'Constellation guides. Labels in the field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
-                                    : '3D photography preview',
-                                child: Transform.flip(
-                                  flipX: true,
-                                  child: scene.SceneView(
-                                    active,
-                                    camera: scene.PerspectiveCamera(
-                                      position: eye,
-                                      target: eye + direction,
-                                      fovRadiansY: state.verticalFov,
-                                      fovNear: 0.5,
-                                      fovFar: 50000,
+                              RepaintBoundary(
+                                key: photoKey,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Semantics(
+                                      label: state.showConstellations
+                                          ? 'Constellation guides. Labels in the field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
+                                          : '3D photography preview',
+                                      child: Transform.flip(
+                                        flipX: true,
+                                        child: scene.SceneView(
+                                          active,
+                                          camera: scene.PerspectiveCamera(
+                                            position: eye,
+                                            target: eye + direction,
+                                            fovRadiansY: state.verticalFov,
+                                            fovNear: 0.5,
+                                            fovFar: 50000,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    if (state.weather == Weather.rain)
+                                      const RainOverlay(),
+                                  ],
                                 ),
                               ),
                               const IgnorePointer(

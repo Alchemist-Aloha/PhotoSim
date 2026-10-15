@@ -29,6 +29,25 @@ enum Sensor {
   final double height;
 }
 
+enum RenderQuality {
+  performance('Performance'),
+  balanced('Balanced'),
+  high('High');
+
+  const RenderQuality(this.label);
+  final String label;
+}
+
+enum Weather {
+  clear('Clear'),
+  cloudy('Cloudy'),
+  fog('Fog'),
+  rain('Rain');
+
+  const Weather(this.label);
+  final String label;
+}
+
 @immutable
 class SimulationState {
   static const minFocalLength = 8.0, maxFocalLength = 600.0;
@@ -48,6 +67,11 @@ class SimulationState {
     this.terrainForwardKm = 0,
     this.terrainRenderKm = 40,
     this.target = CelestialTarget.none,
+    this.renderQuality = RenderQuality.balanced,
+    this.weather = Weather.clear,
+    this.depthOfField = false,
+    this.aperture = 8,
+    this.focusDistance = 1000,
     DateTime? timestamp,
   }) : timestamp = (timestamp ?? DateTime.utc(2026, 6, 21, 19)).toUtc() {
     if (this.timestamp.year < 1900 ||
@@ -67,6 +91,12 @@ class SimulationState {
         !focalLength.isFinite ||
         focalLength < minFocalLength ||
         focalLength > maxFocalLength ||
+        !aperture.isFinite ||
+        aperture < 1.4 ||
+        aperture > 22 ||
+        !focusDistance.isFinite ||
+        focusDistance < 1 ||
+        focusDistance > 1000000 ||
         terrainRings < 1 ||
         terrainRings > 3 ||
         !terrainForwardKm.isFinite ||
@@ -91,6 +121,10 @@ class SimulationState {
   final Sensor sensor;
   final DateTime timestamp;
   final CelestialTarget target;
+  final RenderQuality renderQuality;
+  final Weather weather;
+  final bool depthOfField;
+  final double aperture, focusDistance;
 
   CelestialPosition get galacticCenter => ObserverSkyFrame(
     timestamp: timestamp,
@@ -148,6 +182,11 @@ class SimulationState {
     double? terrainForwardKm,
     double? terrainRenderKm,
     CelestialTarget? target,
+    RenderQuality? renderQuality,
+    Weather? weather,
+    bool? depthOfField,
+    double? aperture,
+    double? focusDistance,
     DateTime? timestamp,
   }) {
     return SimulationState(
@@ -172,6 +211,11 @@ class SimulationState {
       terrainForwardKm: terrainForwardKm ?? this.terrainForwardKm,
       terrainRenderKm: terrainRenderKm ?? this.terrainRenderKm,
       target: target ?? this.target,
+      renderQuality: renderQuality ?? this.renderQuality,
+      weather: weather ?? this.weather,
+      depthOfField: depthOfField ?? this.depthOfField,
+      aperture: aperture ?? this.aperture,
+      focusDistance: focusDistance ?? this.focusDistance,
       timestamp: timestamp ?? this.timestamp,
     );
   }

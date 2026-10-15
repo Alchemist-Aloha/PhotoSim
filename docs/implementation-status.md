@@ -1,11 +1,12 @@
-# Linux-first implementation status
+# Linux MVP implementation status
 
 ## Current milestone
 
-The Linux workflow now includes **offline stars/Milky Way planning and saved
-compositions**, in addition to account-free Mapterhorn/Mapzen terrain and regional/global
-imagery, Sun/Moon lighting, estimated local time and playback. This advances Phase 4 and saved-plan integration.
-The public MVP and cross-platform Phase 0/release gates remain incomplete.
+**The revised Linux desktop MVP is complete.** It includes attributed PNG export,
+quality presets, manual weather and aperture-linked depth of field, in addition
+to the existing terrain/imagery, astronomy, timeline and save/reopen workflow.
+See [authoritative Linux 0.1 scope](linux-mvp.md). Other platforms are future work;
+this does not mark every requirement of the long-term specification complete.
 
 ## Available
 
@@ -69,7 +70,15 @@ The public MVP and cross-platform Phase 0/release gates remain incomplete.
   sky rotation, two GPU batches, terrain depth tests and saved layer preference.
 - Named version-2 JSON photography snapshots (legacy version-1 files remain readable): camera, optics, UTC, selected target
   and imagery preference; local save/open, fresh-app restoration and corruption warnings.
-- No paid service, secrets, custom shaders or fabricated imagery.
+- Attributed, same-aspect-ratio PNG export of the current viewport, capped to
+  4096 px / 12 MP, with no application controls and no overwriting existing files.
+- Performance/Balanced/High backend rendering budgets; unnecessary shadows skipped
+  for natural imagery/overcast weather. Mesh/texture resources remain resident.
+- Manual illustrative Clear/Cloudy/Fog/Rain, with overcast sky, fog, attenuation
+  and clipped animated rain; no forecasts or weather network requests.
+- Physical depth-buffer DOF linked to aperture, focus distance, focal length and
+  sensor, with settings persisted in plans and backward-compatible defaults.
+- No paid service, secrets, custom shaders or fabricated geographic imagery.
 
 ## Responsibility boundaries
 
@@ -106,7 +115,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 108 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 113 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
@@ -162,6 +171,10 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   `linux-terrain-moved.png`, plus the terrain-isolated `linux-moon-phase.png`,
   `linux-night-sky-terrain.png`, `linux-night-sky-isolated.png`,
   `linux-star-isolated.png`, `linux-constellations.png` and `linux-reopened-plan.png`.
+- Linux photography native test exercises all weather/quality presets, DOF and
+  aperture-dependent GPU pixels, geography/download invariants, and actual UI PNG
+  export with sensor aspect ratio. Screenshots include `linux-weather-*.png`,
+  `linux-dof-{open,stopped}.png` and `linux-export.png`.
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live
@@ -199,25 +212,21 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
   No local-wall-time input or timezone override. Civil-time rules can change.
 - Plans are unencrypted native local snapshots; no file-picker import/export,
   cloud storage, editing/deletion UI or power-loss durability guarantee.
-- Photographic exports remain post-MVP.
+- PNG export is viewport-sized; independent-resolution export remains future work.
+- Manual weather is illustrative, not live forecasting. Rain is screen-space;
+  DOF is a bounded post-process approximation, not a calibrated exposure model.
 
 See [astronomy notes](astronomy.md) for the calculation contract, reference
 sources and accuracy limits, [night-sky notes](data-sources/night-sky.md) for
 catalog/brightness limits, and [saved plans](saved-plans.md) for persistence.
-Next: responsive-layout/performance validation and the platform/release gates.
+Next: optional improvements and future-platform feasibility, not Linux MVP blockers.
 
-## Remaining roadmap gates
+## Future roadmap
 
-The roadmap is **not complete**. Remaining MVP work includes:
-
-1. Responsive-layout validation, adaptive quality, frustum/LOD improvements,
-   defined-device FPS/latency profiling and long-running GPU-resource checks.
-2. Android, Web/WebGL2, Windows and macOS scaffolding and actual-platform
-   build/render validation. Linux success does not close the Phase 0 gate.
-3. The documented Shenandoah save/close/reopen demonstration and complete
-   workflow regression tests on all five target platforms.
-
-Post-MVP priorities in the roadmap, including advanced weather and photographic
-exports, are not part of the MVP completion claim. Windows/macOS verification
-requires those operating systems or suitable CI runners; none has been verified
-in this Linux session.
+The original cross-platform roadmap remains a future-product plan, not the
+acceptance contract for Linux 0.1. Deferred work includes responsive mobile UI,
+viewport/screen-error LOD, measured FPS and GPU-memory stability, richer exposure
+and atmosphere, forecasts, and independent-resolution export. Android, Web/WebGL2,
+Windows and macOS need scaffolding and actual-platform validation; none is claimed
+supported. The current release is the verified Linux planning/save/reopen/export
+workflow documented in [Linux MVP scope](linux-mvp.md).

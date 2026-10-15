@@ -24,6 +24,10 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Optional `terrainRings` (integer 1–3), `terrainForwardKm` (0–40) and
   `terrainRenderKm` (2–40). Older plans default to 1 ring, forward off and a
   40 km whole-tile render radius. Missing fields do not require a schema bump.
+- Optional `renderQuality` (`performance`, `balanced`, `high`), `weather`
+  (`clear`, `cloudy`, `fog`, `rain`), `depthOfField`, `aperture` (1.4–22) and
+  `focusDistance` (1–1,000,000 meters). Legacy defaults: Balanced, Clear, off,
+  f/8 and 1 km focus. All fields are validated and preserve UTC/camera state.
 
 Legacy version-1 files remain readable: their obsolete `lens` preset field is
 ignored, while focal length and sensor are preserved. New version-2 files omit

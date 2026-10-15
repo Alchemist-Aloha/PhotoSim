@@ -70,7 +70,10 @@ remain labeled partial coverage rather than silently claiming complete imagery.
 
 Natural mode preserves display-referred colors and baked-in lighting. Optional
 UTC-driven relighting is approximate and can double captured shadows; it cannot
-recover physical reflectance. See [astronomy notes](../astronomy.md).
+recover physical reflectance. Clear natural imagery with DOF off stays display-referred.
+Weather/DOF switch natural imagery to the scene-linear effects pipeline so fog and
+physical depth blur apply; tone mapping can shift colors and baked-in shadows remain.
+Changing weather, aperture, focus or backend quality does not reload geography. See [astronomy notes](../astronomy.md).
 
 Source acquisition dates vary within mosaics. Exact dates remain unknown/null and
 are not queried, even though the global mosaic's 2016 epoch is known from its

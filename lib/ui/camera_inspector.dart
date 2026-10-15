@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/geo.dart';
@@ -102,8 +104,41 @@ class CameraInspector extends StatelessWidget {
         ' m',
       ),
       const Divider(height: 32),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Depth of field'),
+        value: state.depthOfField,
+        onChanged: (value) => onChanged(state.copyWith(depthOfField: value)),
+      ),
+      control(
+        'Aperture (f-number)',
+        state.aperture,
+        1.4,
+        22,
+        (value) => onChanged(state.copyWith(aperture: value)),
+        '',
+      ),
+      Text(
+        'Focus distance: ${state.focusDistance >= 1000000 ? '∞ (1,000 km)' : '${state.focusDistance.toStringAsFixed(1)} m'}',
+      ),
+      Slider(
+        key: const ValueKey('focus-distance'),
+        label: 'Focus distance',
+        semanticFormatterCallback: (value) =>
+            '${math.pow(10, value).toStringAsFixed(1)} meters',
+        min: 0,
+        max: 6,
+        value: math.log(state.focusDistance) / math.ln10,
+        onChanged: (value) => onChanged(
+          state.copyWith(focusDistance: math.pow(10, value).toDouble()),
+        ),
+      ),
       const Text(
-        'Early development build\nSun/Moon readouts are airless topocentric centers; no refraction or terrain-horizon prediction. Sun/Moon lighting is approximate. Natural imagery retains its original lighting.',
+        'Smaller f-numbers increase out-of-focus blur. Aperture controls depth of field only; exposure is visibility-enhanced, not calibrated.',
+      ),
+      const Divider(height: 32),
+      const Text(
+        'Linux MVP\nSun/Moon readouts are airless topocentric centers; no refraction or terrain-horizon prediction. Sun/Moon lighting is approximate. Natural imagery retains its original lighting.',
       ),
     ],
   );

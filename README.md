@@ -1,8 +1,8 @@
 # PhotoSim
 
-Linux-first landscape photography simulator built with Flutter. This is the
-night-sky and saved-composition milestone of [the MVP roadmap](docs/roadmap.md),
-**not the complete cross-platform MVP**.
+Linux landscape photography simulator built with Flutter. **The Linux MVP is complete**
+under the revised [Linux release scope](docs/linux-mvp.md). Other platforms are future
+work; the full long-term specification is not a claim of implemented features.
 
 ## Run on Linux
 
@@ -45,6 +45,12 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Sun/Moon/Galactic-center targeting, aim action and rectangular lens-FOV readout.
 - Toggleable constellation names and blue connecting figures in 3D, depth-tested against terrain.
 - Named versioned JSON snapshots, with local save/open and restoration after app restart.
+- **Export PNG**: current photographic viewport with source credits, weather and DOF; no application controls.
+- **Performance / Balanced / High** render-quality presets (render scale, AA, shadows and DOF quality).
+- Manual **Clear / Cloudy / Fog / Rain** presets, explicitly illustrative rather than forecast weather.
+- Depth-buffer **depth of field** linked to aperture (f/1.4–f/22), focal length, sensor and focus distance.
+
+See [Linux MVP photography controls and export](docs/linux-mvp.md) for usage, limits and validation.
 
 The preview maintains the sensor's aspect ratio so map and 3D fields of view
 agree. Camera controls never translate the 3D camera implicitly.
@@ -56,6 +62,7 @@ flutter analyze
 flutter test
 flutter test integration_test/linux_workflow_test.dart -d linux
 flutter test integration_test/linux_imagery_test.dart -d linux
+flutter test integration_test/linux_photography_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```
@@ -66,7 +73,7 @@ terrain/imagery visit. Subsequent visits reuse the independent disk caches. It w
 `build/validation/`.
 
 See [implementation status](docs/implementation-status.md) for validation
-evidence, rendering limitations, and the next roadmap milestone.
+evidence, rendering limitations, and future work.
 
 ## Important limitations
 
@@ -77,7 +84,8 @@ Regional aerial sources can be sub-meter, but current terrain textures downsampl
 them; native aerial detail is not displayed. Pixels missing from every source use
 a labeled green fallback material. Sun/Moon calculations and solar lighting now
 work locally, including a phase-lit lunar sphere and approximate moonlight.
-Lunar surface detail and photographic exports remain unimplemented. Night-sky
+Lunar surface detail remains unimplemented. PNG export captures the current viewport,
+not an independent high-resolution render. Night-sky
 brightness and stellar point sizes are artistic, not calibrated exposure;
 proper motion, aberration and atmospheric extinction are omitted. See
 [night-sky data notes](docs/data-sources/night-sky.md). Saved plans are local,
@@ -113,5 +121,5 @@ tile service with attribution and an identifying user agent; it does not bulk
 download or prefetch regions. Review [OSM's usage policy](https://operations.osmfoundation.org/policies/tiles/)
 before distribution or scaling. No paid API or credentials are required.
 
-Only Linux is scaffolded and tested at this stage. Other platforms and the
-full Phase 0 cross-platform exit criteria remain open.
+Linux is the completed MVP target. Android, Web, Windows and macOS are deferred
+future releases, with no current support or build/render claim.

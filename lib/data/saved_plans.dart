@@ -29,6 +29,11 @@ class SavedPlan {
     'terrainRings': state.terrainRings,
     'terrainForwardKm': state.terrainForwardKm,
     'terrainRenderKm': state.terrainRenderKm,
+    'renderQuality': state.renderQuality.name,
+    'weather': state.weather.name,
+    'depthOfField': state.depthOfField,
+    'aperture': state.aperture,
+    'focusDistance': state.focusDistance,
   });
 
   static SavedPlan decode(String source) {
@@ -65,6 +70,13 @@ class SavedPlan {
           terrainRings: json['terrainRings'] as int? ?? 1,
           terrainForwardKm: (json['terrainForwardKm'] as num?)?.toDouble() ?? 0,
           terrainRenderKm: (json['terrainRenderKm'] as num?)?.toDouble() ?? 40,
+          renderQuality: RenderQuality.values.byName(
+            json['renderQuality'] as String? ?? 'balanced',
+          ),
+          weather: Weather.values.byName(json['weather'] as String? ?? 'clear'),
+          depthOfField: json['depthOfField'] as bool? ?? false,
+          aperture: (json['aperture'] as num?)?.toDouble() ?? 8,
+          focusDistance: (json['focusDistance'] as num?)?.toDouble() ?? 1000,
         ),
       );
     } on Object {

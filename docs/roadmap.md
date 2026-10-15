@@ -1,12 +1,26 @@
 # Landscape Photography Simulator — MVP Implementation Plan
 
 **Version:** 1.0  
-**Target:** Functional cross-platform Flutter MVP  
-**Platforms:** Android, Web, Linux, macOS, Windows  
+**Current target:** Linux desktop MVP complete
+
+**Future platforms:** Android, Web, macOS, Windows
+
 **Duration estimate:** 6–8 weeks  
 **Development approach:** Vertical slices, automated tests, working application at every milestone
 
 ---
+
+## 0. Revised release scope
+
+The product decision is now **Linux first, Linux MVP done**. See
+[Linux MVP acceptance and verification](linux-mvp.md). PNG export, backend quality
+selection, manual Clear/Cloudy/Fog/Rain and aperture-linked depth of field are in
+this release. The historical multi-platform gates and post-MVP sequencing below
+are superseded for Linux 0.1; they remain future-product planning, not claims that
+all long-term requirements are finished. Live forecasts, independent-resolution
+export, full exposure simulation and measured performance optimization remain
+future work. The validated Linux workflow uses Yosemite and the regional/global
+source fixtures rather than requiring a five-platform Shenandoah demonstration.
 
 ## 1. MVP Objective
 
@@ -45,8 +59,7 @@ Focus on **functional geographic and astronomical accuracy**, rather than photor
 **Virtual camera**
 
 - Full-frame and APS-C sensor presets.
-- Generic zoom lens presets.
-- Custom focal length.
+- One continuous 8–600 mm focal-length slider; no lens presets.
 - Adjustable yaw, pitch, and camera height.
 - Correct perspective projection.
 - Synchronized controls across both workspaces.
@@ -90,7 +103,7 @@ Focus on **functional geographic and astronomical accuracy**, rather than photor
 
 Do not implement the following until after the first functional release:
 
-- Weather API and cloud simulation.
+- Live weather API and volumetric cloud simulation (manual illustrative weather is included).
 - Full volumetric clouds.
 - Detailed atmospheric scattering from first principles.
 - High-resolution USGS LiDAR integration.
@@ -780,7 +793,7 @@ Suggested location: Shenandoah National Park, Virginia, where terrain is well su
 3. Place the virtual camera.
 4. Set camera height to 1.7 m.
 5. Select a full-frame sensor.
-6. Select a 24–70mm zoom lens.
+6. Use the single focal-length slider (no lens presets).
 7. Set focal length to 35mm.
 8. Rotate camera toward a mountain ridge.
 9. Switch to Simulation View.

@@ -1,14 +1,30 @@
 # PhotoSim
 ## Unified Software Requirements and Technical Architecture
 
-**Specification version:** 1.0  
-**Target platforms:** Android, Web, Linux, macOS, Windows  
+**Specification version:** 1.0 (long-term specification)
+
+**Current release:** Linux MVP complete — see [authoritative release scope](linux-mvp.md).
+
+**Future platforms:** Android, Web, macOS, Windows
+
 **Application framework:** Flutter / Dart  
 **Rendering:** Flutter GPU / Impeller with a cross-platform 3D rendering abstraction  
 **Primary rendering candidate:** Flutter Scene  
 **Project model:** Open-source, offline-capable, cross-platform application
 
 ---
+
+# 0. Revised Linux MVP acceptance scope
+
+By product decision, PhotoSim 0.1 closes the **Linux desktop MVP**, not the original
+five-platform MVP. Other platforms and the broader requirements below are future
+work. [Linux MVP scope](linux-mvp.md) is authoritative for this release: export the
+current photographic viewport as an attributed PNG; provide backend quality
+presets, illustrative Clear/Cloudy/Fog/Rain selection and thin-lens depth of field
+linked to aperture, focus distance, sensor and focal length. No live weather API
+or calibrated exposure is claimed. The original cross-platform phase gates and
+broader definition of done below describe the future product, not remaining
+Linux 0.1 release blockers.
 
 # 1. Project Overview
 
