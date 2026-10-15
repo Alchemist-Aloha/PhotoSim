@@ -96,6 +96,7 @@ class SimulationState {
     this.sensor = Sensor.fullFrame,
     this.focalLength = 24,
     this.groundElevation,
+    this.fixedElevation,
     this.relitImagery = true,
     this.showConstellations = false,
     this.terrainRings = 1,
@@ -170,6 +171,10 @@ class SimulationState {
         !terrainRenderKm.isFinite ||
         terrainRenderKm < 2 ||
         terrainRenderKm > 40 ||
+        (fixedElevation != null &&
+            (!fixedElevation!.isFinite ||
+                fixedElevation! < -12000 ||
+                fixedElevation! > 10100)) ||
         (groundElevation != null &&
             (!groundElevation!.isFinite ||
                 groundElevation! < -12000 ||
@@ -192,6 +197,12 @@ class SimulationState {
       ? '1/${(1 / shutterSeconds).round()} s'
       : '${shutterSeconds.toStringAsFixed(1)} s';
   final double? groundElevation;
+
+  /// Absolute source-datum elevation captured by horizontal WASD navigation.
+  final double? fixedElevation;
+  double? get cameraElevation =>
+      fixedElevation ??
+      (groundElevation == null ? null : groundElevation! + height);
   final bool relitImagery, showConstellations;
   final int terrainRings;
   final double terrainForwardKm, terrainRenderKm;
@@ -264,7 +275,7 @@ class SimulationState {
     timestamp: timestamp,
     latitude: latitude,
     longitude: longitude,
-    elevation: (groundElevation ?? 0) + height,
+    elevation: cameraElevation ?? height,
   );
 
   LatLng get location => LatLng(latitude, longitude);
@@ -297,6 +308,8 @@ class SimulationState {
     Sensor? sensor,
     double? focalLength,
     double? groundElevation,
+    double? fixedElevation,
+    bool clearFixedElevation = false,
     bool? relitImagery,
     bool? showConstellations,
     int? terrainRings,
@@ -330,6 +343,13 @@ class SimulationState {
       exposureCompensation: exposureCompensation ?? this.exposureCompensation,
       whiteBalance: whiteBalance ?? this.whiteBalance,
       height: height ?? this.height,
+      fixedElevation: clearFixedElevation || height != null
+          ? null
+          : fixedElevation ??
+                ((latitude != null && latitude != this.latitude) ||
+                        (longitude != null && longitude != this.longitude)
+                    ? null
+                    : this.fixedElevation),
       sensor: sensor ?? this.sensor,
       focalLength: (focalLength ?? this.focalLength).clamp(
         minFocalLength,

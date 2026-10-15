@@ -30,6 +30,9 @@ import '../core/sunlight.dart';
 import '../data/image_export.dart';
 import 'rain_overlay.dart';
 import 'photography_overlays.dart';
+import 'wasd_navigation.dart';
+import '../core/camera_movement.dart';
+import '../data/terrain/terrain_patch.dart';
 import '../render/night_sky.dart';
 
 class SimulationWorkspace extends StatefulWidget {
@@ -75,6 +78,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   int generation = 0;
   int loaded = 0, failed = 0, total = 0;
   double? ground;
+  HeightField? cameraGroundField;
+  TileId? cameraGroundTile;
   String? tileFailure;
   Object? error;
   bool loading = true;
@@ -174,8 +179,22 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.longitude != next.longitude ||
         old.terrainRings != next.terrainRings ||
         old.terrainForwardKm != next.terrainForwardKm) {
-      coverageDebounce?.cancel();
-      if (nightRenderer != null) unawaited(loadTerrain());
+      final nearbyNavigation =
+          next.fixedElevation != null &&
+          terrainOrigin != null &&
+          TileId.at(next.location).key == TileId.at(terrainOrigin!).key &&
+          old.terrainRings == next.terrainRings &&
+          old.terrainForwardKm == next.terrainForwardKm;
+      if (nearbyNavigation) {
+        if (coverageDebounce?.isActive != true) {
+          coverageDebounce = Timer(const Duration(milliseconds: 400), () {
+            if (mounted && nightRenderer != null) unawaited(loadTerrain());
+          });
+        }
+      } else {
+        coverageDebounce?.cancel();
+        if (nightRenderer != null) unawaited(loadTerrain());
+      }
     } else if (next.terrainForwardKm > 0 &&
         (old.azimuth != next.azimuth ||
             old.pitch != next.pitch ||
@@ -188,7 +207,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         if (mounted && nightRenderer != null) unawaited(loadTerrain());
       });
     }
-    if (old.terrainRenderKm != next.terrainRenderKm) updateTerrainVisibility();
+    if (old.terrainRenderKm != next.terrainRenderKm ||
+        old.location != next.location) {
+      updateTerrainVisibility();
+    }
     if (old.relitImagery != next.relitImagery ||
         old.weather != next.weather ||
         old.atmosphericEffects != next.atmosphericEffects ||
@@ -198,6 +220,20 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       for (final entry in textures.entries) {
         applyTexture(entry.key, entry.value);
       }
+    }
+  }
+
+  void navigate(double forward, double right) {
+    final next = moveCamera(widget.state, forward, right);
+    if (identical(next, widget.state)) return;
+    final field = cameraGroundField;
+    if (field != null &&
+        TileId.at(next.location).key == cameraGroundTile?.key) {
+      final uv = cameraGroundTile!.uv(next.location);
+      ground = field.sample(uv.x, uv.y);
+      widget.onChanged(next.copyWith(groundElevation: ground));
+    } else {
+      widget.onChanged(next);
     }
   }
 
@@ -226,7 +262,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   }
 
   Future<void> loadTerrain({bool retry = false}) async {
-    final origin = widget.state.location;
+    final location = widget.state.location;
+    // shortcut: rebase on camera-tile exit; retain more height fields for uninterrupted long-range flight.
+    final retainFrame =
+        widget.state.fixedElevation != null &&
+        terrainOrigin != null &&
+        TileId.at(location).key == TileId.at(terrainOrigin!).key;
+    final origin = retainFrame ? terrainOrigin! : location;
     final rebase = terrainOrigin != origin;
     final tiles = terrainCoverage(widget.state);
     final wanted = tiles.map((tile) => tile.key).toSet();
@@ -262,7 +304,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       loaded = patches.length;
       failed = 0;
       total = tiles.length;
-      if (rebase) ground = null;
+      if (rebase) {
+        ground = null;
+        cameraGroundField = null;
+        cameraGroundTile = null;
+      }
       tileFailure = null;
       loading = true;
     });
@@ -298,13 +344,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             final node =
                 scene.Node(name: id.key, mesh: scene.Mesh(geometry, material))
                   ..visible =
-                      terrainDistance(id, origin) <=
+                      terrainDistance(id, widget.state.location) <=
                       widget.state.terrainRenderKm * 1000;
             world!.add(node);
             terrainNodes.add(node);
             patches[id.key] = (id: id, node: node);
             if (id.key == center.key) {
-              final uv = id.uv(origin);
+              cameraGroundField = patch.field;
+              cameraGroundTile = id;
+              final uv = id.uv(widget.state.location);
               ground = patch.field.sample(uv.x, uv.y);
               widget.onChanged(widget.state.copyWith(groundElevation: ground));
             }
@@ -636,7 +684,22 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     if (active == null) return const Center(child: CircularProgressIndicator());
     final state = widget.state;
     final frame = state.cameraFrame;
-    final eye = vm.Vector3(0, (ground ?? 0) + state.height, 0);
+    final eye = vm.Vector3(
+      0,
+      state.cameraElevation ?? (ground ?? 0) + state.height,
+      0,
+    );
+    final anchor = terrainOrigin;
+    final transform = anchor == null || anchor == state.location
+        ? vm.Matrix4.identity()
+        : vm.Matrix4.fromList(
+            LocalFrame(state.location)
+                .transformFrom(LocalFrame(anchor))
+                .storage,
+          );
+    for (final node in terrainNodes) {
+      node.localTransform = transform;
+    }
     final direction = vm.Vector3(
       frame.forward.x,
       frame.forward.y,
@@ -848,60 +911,68 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               : Center(
                   child: AspectRatio(
                     aspectRatio: state.sensorWidth / state.sensorHeight,
-                    child: GestureDetector(
-                      onPanUpdate: (details) => widget.onChanged(
-                        state.copyWith(
-                          azimuth: state.azimuth + details.delta.dx * 0.2,
-                          pitch: state.pitch - details.delta.dy * 0.2,
+                    child: WasdNavigation(
+                      enabled:
+                          !exporting &&
+                          cameraGroundField != null &&
+                          cameraGroundTile?.key ==
+                              TileId.at(state.location).key,
+                      onMove: navigate,
+                      child: GestureDetector(
+                        onPanUpdate: (details) => widget.onChanged(
+                          state.copyWith(
+                            azimuth: state.azimuth + details.delta.dx * 0.2,
+                            pitch: state.pitch - details.delta.dy * 0.2,
+                          ),
                         ),
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          nightRenderer?.updateLabels(
-                            skyLayerState,
-                            constraints.biggest,
-                          );
-                          return Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              // Scene's +Z-forward camera reverses east/west in our ENU axes.
-                              RepaintBoundary(
-                                key: photoKey,
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Semantics(
-                                      label: state.showConstellations
-                                          ? 'Constellation guides. Labels in the field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
-                                          : '3D photography preview',
-                                      child: Transform.flip(
-                                        flipX: true,
-                                        child: scene.SceneView(
-                                          active,
-                                          camera: scene.PerspectiveCamera(
-                                            position: eye,
-                                            target: eye + direction,
-                                            up: cameraUp,
-                                            fovRadiansY: state.verticalFov,
-                                            fovNear: 0.5,
-                                            fovFar: 50000,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            nightRenderer?.updateLabels(
+                              skyLayerState,
+                              constraints.biggest,
+                            );
+                            return Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                // Scene's +Z-forward camera reverses east/west in our ENU axes.
+                                RepaintBoundary(
+                                  key: photoKey,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Semantics(
+                                        label: state.showConstellations
+                                            ? 'Constellation guides. Labels in the field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
+                                            : '3D photography preview',
+                                        child: Transform.flip(
+                                          flipX: true,
+                                          child: scene.SceneView(
+                                            active,
+                                            camera: scene.PerspectiveCamera(
+                                              position: eye,
+                                              target: eye + direction,
+                                              up: cameraUp,
+                                              fovRadiansY: state.verticalFov,
+                                              fovNear: 0.5,
+                                              fovFar: 50000,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    if (state.weather == Weather.rain &&
-                                        state.rainIntensity > 0)
-                                      RainOverlay(
-                                        intensity: state.rainIntensity,
-                                      ),
-                                  ],
+                                      if (state.weather == Weather.rain &&
+                                          state.rainIntensity > 0)
+                                        RainOverlay(
+                                          intensity: state.rainIntensity,
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              if (!widget.cleanPreview)
-                                PhotographyOverlays(state: state),
-                            ],
-                          );
-                        },
+                                if (!widget.cleanPreview)
+                                  PhotographyOverlays(state: state),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -914,7 +985,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               spacing: 16,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text('Drag to aim · Change UTC time to move the Sun'),
+                const Text(
+                  'Click preview · Drag to aim · WASD: horizontal 30 m/s, fixed elevation',
+                ),
                 if (terrainProviders.isNotEmpty)
                   Text(
                     terrainProviders.values

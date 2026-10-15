@@ -38,6 +38,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
 - Independent bounded terrain/imagery caches with corruption recovery and source metadata.
 - Drag the 3D preview to look around; change focal length to zoom optically.
+- Click the 3D preview and hold WASD to move horizontally at 30 m/s; absolute camera elevation stays fixed.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
 - Phase-lit Moon at its calculated position and angular size, with terrain occlusion.
 - UTC-driven Sun/Moon lighting, cascaded terrain shadows and approximate clear sky.
@@ -76,6 +77,7 @@ flutter test integration_test/linux_imagery_test.dart -d linux
 flutter test integration_test/linux_photography_test.dart -d linux
 flutter test integration_test/linux_sunlight_test.dart -d linux
 flutter test integration_test/linux_spec_photography_test.dart -d linux
+flutter test integration_test/linux_wasd_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```

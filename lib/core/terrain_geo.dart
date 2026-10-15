@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:latlong2/latlong.dart';
-import 'package:vector_math/vector_math_64.dart' show Vector2, Vector3;
+import 'package:vector_math/vector_math_64.dart'
+    show Matrix3, Matrix4, Vector2, Vector3;
 
 import 'geo.dart';
 
@@ -90,7 +91,34 @@ class LocalFrame {
   final Vector3 center;
 
   Vector3 project(LatLng point, double height) {
-    final delta = ecef(point, height) - center;
+    return _rotate(ecef(point, height) - center);
+  }
+
+  /// Rigid ENU transform preserving resident meshes as the camera moves nearby.
+  Matrix4 transformFrom(LocalFrame source) {
+    final lat = source.origin.latitude * radians,
+        lon = source.origin.longitude * radians;
+    final east = _rotate(Vector3(-math.sin(lon), math.cos(lon), 0));
+    final up = _rotate(
+      Vector3(
+        math.cos(lat) * math.cos(lon),
+        math.cos(lat) * math.sin(lon),
+        math.sin(lat),
+      ),
+    );
+    final south = _rotate(
+      Vector3(
+        math.sin(lat) * math.cos(lon),
+        math.sin(lat) * math.sin(lon),
+        -math.cos(lat),
+      ),
+    );
+    return Matrix4.identity()
+      ..setRotation(Matrix3.columns(east, up, south))
+      ..setTranslation(_rotate(source.center - center));
+  }
+
+  Vector3 _rotate(Vector3 delta) {
     final lat = origin.latitude * radians;
     final lon = origin.longitude * radians;
     final east = -math.sin(lon) * delta.x + math.cos(lon) * delta.y;

@@ -105,6 +105,20 @@ class CameraInspector extends StatelessWidget {
           'Place or drag the camera on the map.\nGround elevation: '
           '${state.groundElevation == null ? 'not loaded' : '${state.groundElevation!.toStringAsFixed(1)} m (source datum)'}',
         ),
+        if (state.cameraElevation != null)
+          Text(
+            'Camera elevation: ${state.cameraElevation!.toStringAsFixed(1)} m${state.fixedElevation == null ? '' : ' (fixed for WASD)'}',
+          ),
+        if (state.fixedElevation != null) ...[
+          const Text(
+            'WASD holds absolute elevation, not ground clearance. The height offset below is inactive until changed; movement can enter terrain.',
+          ),
+          TextButton(
+            onPressed: () =>
+                onChanged(state.copyWith(clearFixedElevation: true)),
+            child: const Text('Resume ground-relative height'),
+          ),
+        ],
         const SizedBox(height: 16),
         control(
           'Azimuth',
@@ -131,7 +145,9 @@ class CameraInspector extends StatelessWidget {
           '°',
         ),
         control(
-          'Height above ground',
+          state.fixedElevation == null
+              ? 'Height above ground'
+              : 'Ground-relative height offset',
           state.height,
           0.1,
           100,

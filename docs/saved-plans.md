@@ -15,7 +15,13 @@ Native storage is currently **verified only on Linux**.
 Each snapshot is a standalone UTF-8 JSON file containing:
 
 - `version: 2` and a user-provided name (1–80 UTF-16 code units).
-- Latitude, longitude, azimuth, pitch and camera height above ground.
+- Latitude, longitude, azimuth, pitch and ground-relative camera-height offset.
+- Optional `fixedElevation` in meters (-12,000–10,100, source datum). WASD captures
+  terrain elevation + camera-height offset and preserves this absolute elevation
+  while moving horizontally, even after reopening a plan or terrain reloading.
+  Missing/null values retain ground-relative behavior. Editing the height offset,
+  placing the camera elsewhere on the map, or selecting **Resume ground-relative
+  height** clears the lock.
 - Optional `roll` (±180°), `portrait`, `showCrosshair`, `showGrid` and `showLevel`.
   Legacy defaults: zero roll, landscape, crosshair on, grid/level off.
 - Optional `exposureMode` (`enhanced`, `automatic`, `manual`), `iso` (50–25,600),

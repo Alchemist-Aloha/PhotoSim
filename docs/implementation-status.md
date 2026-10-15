@@ -126,7 +126,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 123 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 128 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
@@ -194,6 +194,10 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   white balance, roll/portrait projection, fullscreen/Esc resource reuse and
   portrait PNG export. Numerical/widget tests cover exposure stop ratios,
   persistence/defaults, composition guides and adjustable playback speed.
+- A sixth Linux native test covers held WASD navigation, unchanged absolute
+  camera elevation, terrain/texture reuse, dialog/map focus isolation, map sync
+  and terrain-tile rebasing. Nearby motion transforms retained meshes between
+  double-precision WGS84 frames; no ground-following or collision is implied.
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live
