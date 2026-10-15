@@ -73,6 +73,16 @@ class CameraInspector extends StatelessWidget {
               onChanged(state.copyWith(sensor: value.single)),
         ),
         const SizedBox(height: 16),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(value: false, label: Text('Landscape')),
+            ButtonSegment(value: true, label: Text('Portrait')),
+          ],
+          selected: {state.portrait},
+          onSelectionChanged: (value) =>
+              onChanged(state.copyWith(portrait: value.single)),
+        ),
+        const SizedBox(height: 16),
         control(
           'Focal length',
           state.focalLength,
@@ -113,12 +123,92 @@ class CameraInspector extends StatelessWidget {
           '°',
         ),
         control(
+          'Roll',
+          state.roll,
+          -180,
+          180,
+          (value) => onChanged(state.copyWith(roll: value)),
+          '°',
+        ),
+        control(
           'Height above ground',
           state.height,
           0.1,
           100,
           (value) => onChanged(state.copyWith(height: value)),
           ' m',
+        ),
+      ]),
+      section('Exposure', Icons.exposure, [
+        DropdownButtonFormField<ExposureMode>(
+          key: ValueKey(state.exposureMode),
+          initialValue: state.exposureMode,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Exposure mode'),
+          items: [
+            for (final mode in ExposureMode.values)
+              DropdownMenuItem(value: mode, child: Text(mode.label)),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(state.copyWith(exposureMode: value));
+          },
+        ),
+        const SizedBox(height: 16),
+        control(
+          'Exposure aperture',
+          state.aperture,
+          1.4,
+          22,
+          (value) => onChanged(state.copyWith(aperture: value)),
+          ' f-number',
+        ),
+        if (state.exposureMode == ExposureMode.manual) ...[
+          Text('ISO ${state.iso.round()}'),
+          Slider(
+            key: const ValueKey('iso'),
+            min: 0,
+            max: 9,
+            value: (math.log(state.iso / 50) / math.ln2).clamp(0, 9),
+            semanticFormatterCallback: (value) =>
+                'ISO ${(50 * math.pow(2, value)).round()}',
+            onChanged: (value) => onChanged(
+              state.copyWith(iso: (50 * math.pow(2, value)).toDouble()),
+            ),
+          ),
+          Text('Shutter ${state.shutterLabel}'),
+          Slider(
+            key: const ValueKey('shutter'),
+            min: -math.log(8000) / math.ln2,
+            max: math.log(30) / math.ln2,
+            value: (math.log(state.shutterSeconds) / math.ln2).clamp(
+              -math.log(8000) / math.ln2,
+              math.log(30) / math.ln2,
+            ),
+            semanticFormatterCallback: (value) =>
+                '${math.pow(2, value).toStringAsFixed(5)} seconds',
+            onChanged: (value) => onChanged(
+              state.copyWith(shutterSeconds: math.pow(2, value).toDouble()),
+            ),
+          ),
+        ],
+        control(
+          'Exposure compensation',
+          state.exposureCompensation,
+          -5,
+          5,
+          (value) => onChanged(state.copyWith(exposureCompensation: value)),
+          ' EV',
+        ),
+        control(
+          'White balance',
+          state.whiteBalance,
+          2000,
+          12000,
+          (value) => onChanged(state.copyWith(whiteBalance: value)),
+          ' K',
+        ),
+        const Text(
+          'Manual exposure uses photographic stop ratios relative to f/8, 1/125 s, ISO 100. Auto meters scene luminance. Enhanced visibility ignores ISO/shutter. Brightness and white balance are approximate, not calibrated; no noise or motion blur.',
         ),
       ]),
       section('Depth of field', Icons.blur_on, [
@@ -152,7 +242,7 @@ class CameraInspector extends StatelessWidget {
           ),
         ),
         const Text(
-          'Smaller f-numbers increase out-of-focus blur. Aperture controls depth of field only; exposure is not calibrated.',
+          'Smaller f-numbers increase out-of-focus blur and brighten Manual exposure. ISO/shutter controls are in Exposure.',
         ),
       ]),
       section('Weather', Icons.cloud_outlined, [
@@ -252,6 +342,29 @@ class CameraInspector extends StatelessWidget {
           value: state.showConstellations,
           onChanged: (value) =>
               onChanged(state.copyWith(showConstellations: value)),
+        ),
+      ]),
+      section('Composition guides', Icons.grid_3x3, [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Crosshair'),
+          value: state.showCrosshair,
+          onChanged: (value) => onChanged(state.copyWith(showCrosshair: value)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Rule of thirds'),
+          value: state.showGrid,
+          onChanged: (value) => onChanged(state.copyWith(showGrid: value)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Horizon level'),
+          value: state.showLevel,
+          onChanged: (value) => onChanged(state.copyWith(showLevel: value)),
+        ),
+        const Text(
+          'Composition guides are omitted from PNG exports. The level is the geometric horizontal plane, not a terrain-horizon prediction.',
         ),
       ]),
       section('About this preview', Icons.info_outline, [

@@ -16,6 +16,12 @@
 
 # 0. Revised Linux MVP acceptance scope
 
+**Current development target:** implement the remaining required Linux features
+of this specification, excluding other-platform support. This is in progress,
+not complete; [Linux spec progress](linux-spec-progress.md) records delivered
+slices and open Linux requirements. The completed MVP described below is the
+baseline, not a claim that these additional requirements have been fulfilled.
+
 By product decision, PhotoSim 0.1 closes the **Linux desktop MVP**, not the original
 five-platform MVP. Other platforms and the broader requirements below are future
 work. [Linux MVP scope](linux-mvp.md) is authoritative for this release: export the

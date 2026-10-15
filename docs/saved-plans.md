@@ -16,6 +16,12 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 
 - `version: 2` and a user-provided name (1–80 UTF-16 code units).
 - Latitude, longitude, azimuth, pitch and camera height above ground.
+- Optional `roll` (±180°), `portrait`, `showCrosshair`, `showGrid` and `showLevel`.
+  Legacy defaults: zero roll, landscape, crosshair on, grid/level off.
+- Optional `exposureMode` (`enhanced`, `automatic`, `manual`), `iso` (50–25,600),
+  `shutterSeconds` (1/8000–30), `exposureCompensation` (±5 EV), `whiteBalance`
+  (2,000–12,000 K). Legacy defaults: enhanced, ISO 100, 1/125 s, 0 EV, 6,500 K.
+  These are relative exposure/approximate grading, not calibrated radiometry.
 - Sensor enum identifier and focal length in millimeters (8–600 mm).
 - Canonical UTC ISO-8601 simulation timestamp.
 - Selected target (`none`, `sun`, `moon`, `galacticCenter`).

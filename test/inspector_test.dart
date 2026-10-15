@@ -145,7 +145,8 @@ void main() {
           ),
         ),
       );
-      expect(find.byType(ExpansionTile), findsNWidgets(6));
+      expect(find.byType(ExpansionTile), findsAtLeastNWidgets(6));
+      expect(find.text('Exposure'), findsOneWidget);
       expect(find.byKey(const ValueKey('Focal length')), findsOneWidget);
       await tester.tap(find.text('Optics'));
       await tester.pumpAndSettle();

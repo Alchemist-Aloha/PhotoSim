@@ -88,7 +88,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                   points: fovWedge(
                     state.location,
                     state.azimuth,
-                    state.horizontalFov,
+                    state.mapFov,
                     1000,
                   ),
                   color: const Color(0x4434D9B0),

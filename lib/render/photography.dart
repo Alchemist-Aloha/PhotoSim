@@ -2,9 +2,19 @@ import 'package:flutter_scene/scene.dart' as scene;
 import 'package:vector_math/vector_math.dart' as vm;
 
 import '../models/simulation_state.dart';
+import '../core/exposure.dart';
 
 /// Existing backend effects; no geographic resources change with these settings.
 void configurePhotography(scene.Scene world, SimulationState state) {
+  world.exposure = exposureMultiplier(state);
+  world.autoExposure
+    ..enabled = state.exposureMode == ExposureMode.automatic
+    ..strength = 1
+    ..compensation = 0;
+  world.postProcess.colorGrading
+    ..enabled = state.whiteBalance != 6500
+    // shortcut: approximate color-temperature correction, use calibrated chromatic adaptation for colorimetry.
+    ..temperature = ((state.whiteBalance - 6500) / 6500).clamp(-1.0, 1.0);
   final quality = state.renderQuality;
   world.renderScale = quality == RenderQuality.performance ? 0.7 : 1;
   final aa = switch (state.antialiasing) {
@@ -33,7 +43,7 @@ void configurePhotography(scene.Scene world, SimulationState state) {
     ..fStop = state.aperture
     ..focusDistance = state.focusDistance
     ..focalLength = state.focalLength / 1000
-    ..sensorHeight = state.sensor.height / 1000
+    ..sensorHeight = state.sensorHeight / 1000
     ..blurScale = 1
     ..quality = switch (quality) {
       RenderQuality.performance => scene.DepthOfFieldQuality.low,

@@ -6,7 +6,6 @@ import 'package:flutter_scene/scene.dart' as scene;
 import 'package:vector_math/vector_math.dart' as vm;
 
 import '../core/constellations.dart';
-import '../core/geo.dart';
 import '../models/simulation_state.dart';
 
 class ConstellationRenderer {
@@ -87,17 +86,14 @@ class ConstellationRenderer {
     root.visible = state.showConstellations;
     activeNames.clear();
     if (!root.visible || viewport.height <= 0) return;
-    final yaw = state.azimuth * radians, pitch = state.pitch * radians;
+    final frame = state.cameraFrame;
     final forward = vm.Vector3(
-      math.sin(yaw) * math.cos(pitch),
-      math.sin(pitch),
-      -math.cos(yaw) * math.cos(pitch),
+      frame.forward.x,
+      frame.forward.y,
+      frame.forward.z,
     );
-    final up = vm.Vector3(
-      -math.sin(yaw) * math.sin(pitch),
-      math.cos(pitch),
-      math.cos(yaw) * math.sin(pitch),
-    );
+    final up = vm.Vector3(frame.up.x, frame.up.y, frame.up.z);
+    final right = vm.Vector3(frame.right.x, frame.right.y, frame.right.z);
     labels.worldUp = up;
     var count = 0;
     for (var i = 0; i < catalog.length; i++) {
@@ -105,7 +101,6 @@ class ConstellationRenderer {
       final d = rotation.transformed(vm.Vector3(anchor.x, anchor.y, anchor.z));
       final depth = d.dot(forward);
       if (d.y <= 0 || depth <= 0) continue;
-      final right = vm.Vector3(math.cos(yaw), 0, math.sin(yaw));
       if (d.dot(right).abs() > depth * math.tan(state.horizontalFov / 2) ||
           d.dot(up).abs() > depth * math.tan(state.verticalFov / 2)) {
         continue;

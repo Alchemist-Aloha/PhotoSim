@@ -48,6 +48,15 @@ enum Antialiasing {
   final String label;
 }
 
+enum ExposureMode {
+  enhanced('Enhanced visibility'),
+  automatic('Auto exposure'),
+  manual('Manual exposure');
+
+  const ExposureMode(this.label);
+  final String label;
+}
+
 enum Weather {
   clear('Clear', 100, 1, 0),
   cloudy('Cloudy', 18, 0.35, 0),
@@ -73,6 +82,16 @@ class SimulationState {
     this.longitude = -119.59,
     this.azimuth = 0,
     this.pitch = 8,
+    this.roll = 0,
+    this.portrait = false,
+    this.showCrosshair = true,
+    this.showGrid = false,
+    this.showLevel = false,
+    this.exposureMode = ExposureMode.enhanced,
+    this.iso = 100,
+    this.shutterSeconds = 1 / 125,
+    this.exposureCompensation = 0,
+    this.whiteBalance = 6500,
     this.height = 1.7,
     this.sensor = Sensor.fullFrame,
     this.focalLength = 24,
@@ -109,6 +128,19 @@ class SimulationState {
         azimuth >= 360 ||
         !pitch.isFinite ||
         pitch.abs() > 85 ||
+        !roll.isFinite ||
+        roll.abs() > 180 ||
+        !iso.isFinite ||
+        iso < 50 ||
+        iso > 25600 ||
+        !shutterSeconds.isFinite ||
+        shutterSeconds < 1 / 8000 ||
+        shutterSeconds > 30 ||
+        !exposureCompensation.isFinite ||
+        exposureCompensation.abs() > 5 ||
+        !whiteBalance.isFinite ||
+        whiteBalance < 2000 ||
+        whiteBalance > 12000 ||
         !height.isFinite ||
         height < 0.1 ||
         height > 100 ||
@@ -147,6 +179,18 @@ class SimulationState {
   }
 
   final double latitude, longitude, azimuth, pitch, height, focalLength;
+  final double roll, iso, shutterSeconds, exposureCompensation, whiteBalance;
+  final bool portrait, showCrosshair, showGrid, showLevel;
+  final ExposureMode exposureMode;
+  bool get exposureProcessing =>
+      exposureMode != ExposureMode.enhanced ||
+      exposureCompensation != 0 ||
+      whiteBalance != 6500;
+  double get sensorWidth => portrait ? sensor.height : sensor.width;
+  double get sensorHeight => portrait ? sensor.width : sensor.height;
+  String get shutterLabel => shutterSeconds < 1
+      ? '1/${(1 / shutterSeconds).round()} s'
+      : '${shutterSeconds.toStringAsFixed(1)} s';
   final double? groundElevation;
   final bool relitImagery, showConstellations;
   final int terrainRings;
@@ -178,8 +222,18 @@ class SimulationState {
     CelestialTarget.galacticCenter => galacticCenter,
   };
 
-  /// Rectangular optical frustum, not a terrain visibility prediction.
-  bool containsDirection(Vector3 direction) {
+  double? get targetAngularOffset {
+    final position = targetPosition;
+    return position == null
+        ? null
+        : math.acos(
+                position.direction.dot(cameraFrame.forward).clamp(-1.0, 1.0),
+              ) /
+              radians;
+  }
+
+  /// ENU camera basis; positive roll rotates the camera clockwise looking forward.
+  ({Vector3 forward, Vector3 right, Vector3 up}) get cameraFrame {
     final yaw = azimuth * radians, tilt = pitch * radians;
     final forward = Vector3(
       math.sin(yaw) * math.cos(tilt),
@@ -188,6 +242,17 @@ class SimulationState {
     );
     final right = Vector3(math.cos(yaw), 0, math.sin(yaw));
     final up = right.cross(forward);
+    final angle = roll * radians;
+    return (
+      forward: forward,
+      right: right * math.cos(angle) - up * math.sin(angle),
+      up: up * math.cos(angle) + right * math.sin(angle),
+    );
+  }
+
+  bool containsDirection(Vector3 direction) {
+    final frame = cameraFrame;
+    final forward = frame.forward, right = frame.right, up = frame.up;
     final depth = direction.dot(forward);
     return depth > 0 &&
         direction.dot(right).abs() <=
@@ -203,14 +268,31 @@ class SimulationState {
   );
 
   LatLng get location => LatLng(latitude, longitude);
-  double get horizontalFov => 2 * math.atan(sensor.width / (2 * focalLength));
-  double get verticalFov => 2 * math.atan(sensor.height / (2 * focalLength));
+  double get horizontalFov => 2 * math.atan(sensorWidth / (2 * focalLength));
+  double get verticalFov => 2 * math.atan(sensorHeight / (2 * focalLength));
+  double get horizontalFrustumExtent =>
+      math.cos(roll * radians).abs() * math.tan(horizontalFov / 2) +
+      math.sin(roll * radians).abs() * math.tan(verticalFov / 2);
+  double get verticalFrustumExtent =>
+      math.sin(roll * radians).abs() * math.tan(horizontalFov / 2) +
+      math.cos(roll * radians).abs() * math.tan(verticalFov / 2);
+  double get mapFov => 2 * math.atan(horizontalFrustumExtent);
 
   SimulationState copyWith({
     double? latitude,
     double? longitude,
     double? azimuth,
     double? pitch,
+    double? roll,
+    bool? portrait,
+    bool? showCrosshair,
+    bool? showGrid,
+    bool? showLevel,
+    ExposureMode? exposureMode,
+    double? iso,
+    double? shutterSeconds,
+    double? exposureCompensation,
+    double? whiteBalance,
     double? height,
     Sensor? sensor,
     double? focalLength,
@@ -237,6 +319,16 @@ class SimulationState {
       longitude: longitude ?? this.longitude,
       azimuth: (azimuth ?? this.azimuth) % 360,
       pitch: (pitch ?? this.pitch).clamp(-85, 85),
+      roll: roll ?? this.roll,
+      portrait: portrait ?? this.portrait,
+      showCrosshair: showCrosshair ?? this.showCrosshair,
+      showGrid: showGrid ?? this.showGrid,
+      showLevel: showLevel ?? this.showLevel,
+      exposureMode: exposureMode ?? this.exposureMode,
+      iso: iso ?? this.iso,
+      shutterSeconds: shutterSeconds ?? this.shutterSeconds,
+      exposureCompensation: exposureCompensation ?? this.exposureCompensation,
+      whiteBalance: whiteBalance ?? this.whiteBalance,
       height: height ?? this.height,
       sensor: sensor ?? this.sensor,
       focalLength: (focalLength ?? this.focalLength).clamp(

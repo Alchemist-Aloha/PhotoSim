@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../data/saved_plans.dart';
@@ -49,8 +50,33 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   SimulationState state = SimulationState();
   Workspace workspace = Workspace.map;
   bool inspectorVisible = true;
+  bool cleanPreview = false;
+
+  Future<void> setCleanPreview(bool value) async {
+    setState(() {
+      if (value) stopPlayback();
+      cleanPreview = value;
+    });
+    try {
+      await const MethodChannel('photosim/window')
+          .invokeMethod<void>('fullscreen', value);
+    } on MissingPluginException {
+      // Unit-test/embedded hosts can still show the clean content viewport.
+    } on PlatformException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Window fullscreen unavailable: ${error.message}'),
+          ),
+        );
+      }
+    }
+  }
 
   Timer? playback;
+  int playbackSpeed = 5;
+  DateTime get nextPlaybackTime =>
+      state.timestamp.add(Duration(seconds: playbackSpeed * 12));
   PlanRepository? _plans;
   bool planBusy = false;
   int openedPlan = 0;
@@ -188,7 +214,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       stopPlayback();
     } else {
       playback = Timer.periodic(const Duration(milliseconds: 200), (_) {
-        final next = state.timestamp.add(const Duration(minutes: 1));
+        final next = nextPlaybackTime;
         if (next.year > 2100) {
           setState(stopPlayback);
         } else {
@@ -268,69 +294,85 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     );
     final local = clock.time;
     final inspector = CameraInspector(state: state, onChanged: update);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('PhotoSim'),
-        actions: [
-          SegmentedButton<Workspace>(
-            segments: const [
-              ButtonSegment(
-                value: Workspace.map,
-                label: Text('Map'),
-                icon: Icon(Icons.map_outlined),
-              ),
-              ButtonSegment(
-                value: Workspace.simulation,
-                label: Text('3D Preview'),
-                icon: Icon(Icons.landscape_outlined),
-              ),
-            ],
-            selected: {workspace},
-            onSelectionChanged: (value) =>
-                setState(() => workspace = value.single),
-          ),
-          const SizedBox(width: 16),
-          PopupMenuButton<bool>(
-            tooltip: 'Photography plans',
-            enabled: !planBusy,
-            icon: const Icon(Icons.folder_outlined),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: true, child: Text('Save plan')),
-              PopupMenuItem(value: false, child: Text('Open plan')),
-            ],
-            onSelected: managePlans,
-          ),
-          PopupMenuButton<CelestialTarget>(
-            tooltip: 'Select astronomical target',
-            icon: const Icon(Icons.track_changes),
-            initialValue: state.target,
-            itemBuilder: (_) => [
-              for (final target in CelestialTarget.values)
-                PopupMenuItem(value: target, child: Text(target.label)),
-            ],
-            onSelected: (value) => update(state.copyWith(target: value)),
-          ),
-          IconButton(
-            tooltip: 'Aim at selected target',
-            icon: const Icon(Icons.gps_fixed),
-            onPressed: target == null
-                ? null
-                : () => update(
-                    state.copyWith(
-                      azimuth: target.azimuth,
-                      pitch: target.altitude,
+    final scaffold = Scaffold(
+      floatingActionButton: cleanPreview
+          ? FloatingActionButton.small(
+              tooltip: 'Exit fullscreen preview (Esc)',
+              onPressed: () => setCleanPreview(false),
+              child: const Icon(Icons.fullscreen_exit),
+            )
+          : null,
+      appBar: cleanPreview
+          ? null
+          : AppBar(
+              title: const Text('PhotoSim'),
+              actions: [
+                SegmentedButton<Workspace>(
+                  segments: const [
+                    ButtonSegment(
+                      value: Workspace.map,
+                      label: Text('Map'),
+                      icon: Icon(Icons.map_outlined),
                     ),
-                  ),
-          ),
-          IconButton(
-            tooltip: 'Toggle camera inspector',
-            onPressed: () =>
-                setState(() => inspectorVisible = !inspectorVisible),
-            icon: const Icon(Icons.tune),
-          ),
-          const SizedBox(width: 12),
-        ],
-      ),
+                    ButtonSegment(
+                      value: Workspace.simulation,
+                      label: Text('3D Preview'),
+                      icon: Icon(Icons.landscape_outlined),
+                    ),
+                  ],
+                  selected: {workspace},
+                  onSelectionChanged: (value) =>
+                      setState(() => workspace = value.single),
+                ),
+                const SizedBox(width: 16),
+                PopupMenuButton<bool>(
+                  tooltip: 'Photography plans',
+                  enabled: !planBusy,
+                  icon: const Icon(Icons.folder_outlined),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: true, child: Text('Save plan')),
+                    PopupMenuItem(value: false, child: Text('Open plan')),
+                  ],
+                  onSelected: managePlans,
+                ),
+                PopupMenuButton<CelestialTarget>(
+                  tooltip: 'Select astronomical target',
+                  icon: const Icon(Icons.track_changes),
+                  initialValue: state.target,
+                  itemBuilder: (_) => [
+                    for (final target in CelestialTarget.values)
+                      PopupMenuItem(value: target, child: Text(target.label)),
+                  ],
+                  onSelected: (value) => update(state.copyWith(target: value)),
+                ),
+                IconButton(
+                  tooltip: 'Aim at selected target',
+                  icon: const Icon(Icons.gps_fixed),
+                  onPressed: target == null
+                      ? null
+                      : () => update(
+                          state.copyWith(
+                            azimuth: target.azimuth,
+                            pitch: target.altitude,
+                          ),
+                        ),
+                ),
+                IconButton(
+                  tooltip: 'Fullscreen preview',
+                  icon: const Icon(Icons.fullscreen),
+                  onPressed: workspace != Workspace.simulation
+                      ? null
+                      : () => setCleanPreview(true),
+                ),
+                IconButton(
+                  tooltip: 'Toggle camera inspector',
+                  onPressed: () =>
+                      setState(() => inspectorVisible = !inspectorVisible),
+                  icon: const Icon(Icons.tune),
+                ),
+                const SizedBox(width: 12),
+              ],
+            ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final viewport = workspace == Workspace.map
@@ -341,6 +383,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                 )
               : SimulationWorkspace(
                   state: state,
+                  cleanPreview: cleanPreview,
                   onChanged: update,
                   onPausePlayback: () => setState(stopPlayback),
                 );
@@ -350,92 +393,116 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                 child: Row(
                   children: [
                     Expanded(child: viewport),
-                    if (inspectorVisible && constraints.maxWidth >= 900) ...[
+                    if (!cleanPreview &&
+                        inspectorVisible &&
+                        constraints.maxWidth >= 900) ...[
                       const VerticalDivider(width: 1),
                       SizedBox(width: 310, child: inspector),
                     ],
                   ],
                 ),
               ),
-              if (inspectorVisible && constraints.maxWidth < 900)
+              if (!cleanPreview &&
+                  inspectorVisible &&
+                  constraints.maxWidth < 900)
                 SizedBox(height: 240, child: inspector),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                child: Tooltip(
-                  message:
-                      'Estimated timezone from bundled coordinate mapping. Verify near borders and offshore. '
-                      'Local rules are supported for 1970–2037; all controls and astronomy remain UTC.',
-                  child: Text(
-                    local == null
-                        ? clock.warning!
-                        : 'Estimated local: ${local.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
-                              '${local.timeZoneName} (${formatUtcOffset(local.timeZoneOffset)}) · ${clock.zoneId}',
+              if (!cleanPreview) ...[
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  child: Tooltip(
+                    message:
+                        'Estimated timezone from bundled coordinate mapping. Verify near borders and offshore. '
+                        'Local rules are supported for 1970–2037; all controls and astronomy remain UTC.',
+                    child: Text(
+                      local == null
+                          ? clock.warning!
+                          : 'Estimated local: ${local.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
+                                '${local.timeZoneName} (${formatUtcOffset(local.timeZoneOffset)}) · ${clock.zoneId}',
+                    ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TimeSlider(state: state, onChanged: update),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TimeSlider(state: state, onChanged: update),
                 ),
-                child: Wrap(
-                  spacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (target != null)
-                      Tooltip(
-                        message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Wrap(
+                    spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (target != null)
+                        Tooltip(
+                          message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
+                          child: Text(
+                            '${state.target.label}: ${state.containsDirection(target.direction) ? 'inside' : 'outside'} FOV · alt ${target.altitude.toStringAsFixed(1)}° · offset ${state.targetAngularOffset!.toStringAsFixed(1)}°',
+                          ),
+                        ),
+                      const Icon(Icons.schedule, size: 20),
+                      TextButton(
+                        onPressed: chooseTime,
                         child: Text(
-                          '${state.target.label}: ${state.containsDirection(target.direction) ? 'inside' : 'outside'} FOV · alt ${target.altitude.toStringAsFixed(1)}°',
+                          '${state.timestamp.toIso8601String().substring(0, 16).replaceAll('T', ' ')} UTC',
                         ),
                       ),
-                    const Icon(Icons.schedule, size: 20),
-                    TextButton(
-                      onPressed: chooseTime,
-                      child: Text(
-                        '${state.timestamp.toIso8601String().substring(0, 16).replaceAll('T', ' ')} UTC',
+                      timeStep(-1),
+                      timeStep(1),
+                      IconButton(
+                        tooltip: playback == null
+                            ? 'Play time ($playbackSpeed simulated minutes per second)'
+                            : 'Pause time',
+                        icon: Icon(
+                          playback == null ? Icons.play_arrow : Icons.pause,
+                        ),
+                        onPressed:
+                            playback == null && nextPlaybackTime.year > 2100
+                            ? null
+                            : togglePlayback,
                       ),
-                    ),
-                    timeStep(-1),
-                    timeStep(1),
-                    IconButton(
-                      tooltip: playback == null
-                          ? 'Play time (5 simulated minutes per second)'
-                          : 'Pause time',
-                      icon: Icon(
-                        playback == null ? Icons.play_arrow : Icons.pause,
+                      PopupMenuButton<int>(
+                        tooltip: 'Playback speed',
+                        icon: const Icon(Icons.speed),
+                        initialValue: playbackSpeed,
+                        itemBuilder: (_) => [
+                          for (final speed in [1, 5, 30, 60])
+                            PopupMenuItem(
+                              value: speed,
+                              child: Text('$speed min/s'),
+                            ),
+                        ],
+                        onSelected: (value) =>
+                            setState(() => playbackSpeed = value),
                       ),
-                      onPressed:
-                          playback == null &&
-                              state.timestamp
-                                      .add(const Duration(minutes: 1))
-                                      .year >
-                                  2100
-                          ? null
-                          : togglePlayback,
-                    ),
-                    Text(
-                      'Sun az ${sky.sun.azimuth.toStringAsFixed(1)}° · alt ${sky.sun.altitude.toStringAsFixed(1)}°',
-                    ),
-                    Text(
-                      'Moon az ${sky.moon.azimuth.toStringAsFixed(1)}° · alt ${sky.moon.altitude.toStringAsFixed(1)}° · '
-                      '${(sky.moonIllumination * 100).toStringAsFixed(0)}% ${sky.moonWaxing ? 'waxing' : 'waning'}',
-                    ),
-                  ],
+                      Text(
+                        'Sun az ${sky.sun.azimuth.toStringAsFixed(1)}° · alt ${sky.sun.altitude.toStringAsFixed(1)}°',
+                      ),
+                      Text(
+                        'Moon az ${sky.moon.azimuth.toStringAsFixed(1)}° · alt ${sky.moon.altitude.toStringAsFixed(1)}° · '
+                        '${(sky.moonIllumination * 100).toStringAsFixed(0)}% ${sky.moonWaxing ? 'waxing' : 'waning'}',
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ],
           );
         },
       ),
+    );
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (cleanPreview) setCleanPreview(false);
+        },
+      },
+      child: Focus(autofocus: true, child: scaffold),
     );
   }
 }

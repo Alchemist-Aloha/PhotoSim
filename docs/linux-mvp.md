@@ -1,5 +1,9 @@
 # PhotoSim 0.1 — Linux MVP complete
 
+The completed baseline below is historical Linux 0.1 scope. Further full-spec
+implementation is tracked in [Linux spec progress](linux-spec-progress.md);
+this document does not mean that the full Linux specification is complete.
+
 ## Release scope
 
 The MVP is now **Linux desktop only**, by explicit product decision. Android,
@@ -70,8 +74,9 @@ and select focus distance on a logarithmic **1 m–1,000 km** slider. The far en
 approximates infinity. The backend uses depth-buffer thin-lens bokeh, the actual
 8–600 mm focal length and selected sensor height. Smaller f-numbers increase blur
 away from the focus plane; this is not uniform whole-image blur. DOF quality
-follows the selected quality preset. Aperture controls blur only, not calibrated
-exposure; diffraction, ISO, shutter-speed exposure and automatic focus are future work.
+follows the selected quality preset. The original MVP aperture controlled blur only. The subsequent
+[photography-tools slice](linux-spec-progress.md) adds Manual/Auto exposure, ISO,
+shutter and white balance; diffraction and automatic focus remain open.
 
 Natural imagery is display-referred in clear weather with DOF off. Weather/DOF
 switch it into the scene-linear effects pipeline; colors can change with tone
@@ -106,7 +111,8 @@ leave an empty destination that must be removed or renamed before retrying.
 
 ## Verification
 
-- Clean Flutter analysis; 118 unit/widget tests.
+- Baseline validation was clean Flutter analysis with 118 unit/widget tests.
+  The subsequent full-spec photography slice has 123; see the progress ledger.
 - Linux workflow: map/camera/time/sky/lighting, save, recreate, reopen and cached geography.
 - Linux imagery workflow: live Switzerland, France, Australia and Beijing sources,
   terrain range/FOV replanning and resident-resource invariants.

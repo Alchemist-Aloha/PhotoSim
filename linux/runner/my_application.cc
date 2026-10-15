@@ -19,6 +19,34 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+static void window_method_cb(FlMethodChannel*, FlMethodCall* call,
+                             gpointer user_data) {
+  g_autoptr(GObject) object =
+      G_OBJECT(g_weak_ref_get(static_cast<GWeakRef*>(user_data)));
+  if (g_strcmp0(fl_method_call_get_name(call), "fullscreen") != 0) {
+    fl_method_call_respond_not_implemented(call, nullptr);
+    return;
+  }
+  FlValue* args = fl_method_call_get_args(call);
+  if (object == nullptr || args == nullptr ||
+      fl_value_get_type(args) != FL_VALUE_TYPE_BOOL) {
+    fl_method_call_respond_error(call, "window", "Window unavailable or invalid arguments",
+                                 nullptr, nullptr);
+    return;
+  }
+  if (fl_value_get_bool(args)) {
+    gtk_window_fullscreen(GTK_WINDOW(object));
+  } else {
+    gtk_window_unfullscreen(GTK_WINDOW(object));
+  }
+  fl_method_call_respond_success(call, nullptr, nullptr);
+}
+
+static void window_ref_free(gpointer data) {
+  g_weak_ref_clear(static_cast<GWeakRef*>(data));
+  g_free(data);
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -75,6 +103,14 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "photosim/window", FL_METHOD_CODEC(codec));
+  auto* window_ref = g_new0(GWeakRef, 1);
+  g_weak_ref_init(window_ref, G_OBJECT(window));
+  fl_method_channel_set_method_call_handler(channel, window_method_cb,
+                                            window_ref, window_ref_free);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

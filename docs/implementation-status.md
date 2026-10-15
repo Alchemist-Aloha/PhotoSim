@@ -8,6 +8,10 @@ to the existing terrain/imagery, astronomy, timeline and save/reopen workflow.
 See [authoritative Linux 0.1 scope](linux-mvp.md). Other platforms are future work;
 this does not mark every requirement of the long-term specification complete.
 
+Full non-platform spec implementation is now underway. See the authoritative
+[Linux spec progress ledger](linux-spec-progress.md), which lists remaining Linux
+requirements separately from excluded platform work.
+
 ## Available
 
 - Two synchronized map/3D workspaces with camera placement, draggable aim,
@@ -122,7 +126,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 118 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 123 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
@@ -186,6 +190,10 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   blue clear-sky pixels, actual FXAA edge changes, MSAA/fallback selection and
   unchanged resident geometry/download counts; screenshots include
   `linux-{sunrise,sunset,sun-day,blue-sky}.png` and `linux-aa-{off,fxaa}.png`.
+- A fifth Linux native workflow verifies manual GPU exposure/Auto metering,
+  white balance, roll/portrait projection, fullscreen/Esc resource reuse and
+  portrait PNG export. Numerical/widget tests cover exposure stop ratios,
+  persistence/defaults, composition guides and adjustable playback speed.
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live
@@ -225,7 +233,8 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
   cloud storage, editing/deletion UI or power-loss durability guarantee.
 - PNG export is viewport-sized; independent-resolution export remains future work.
 - Manual weather is illustrative, not live forecasting. Rain is screen-space;
-  DOF is a bounded post-process approximation, not a calibrated exposure model.
+  DOF is a bounded post-process approximation. Manual/Auto exposure and white
+  balance now exist, but scene radiance and chromatic adaptation are uncalibrated.
 
 See [astronomy notes](astronomy.md) for the calculation contract, reference
 sources and accuracy limits, [night-sky notes](data-sources/night-sky.md) for

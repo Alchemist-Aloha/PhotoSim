@@ -3,6 +3,8 @@
 Linux landscape photography simulator built with Flutter. **The Linux MVP is complete**
 under the revised [Linux release scope](docs/linux-mvp.md). Other platforms are future
 work; the full long-term specification is not a claim of implemented features.
+Implementation beyond that baseline is underway; see the [full Linux spec progress](docs/linux-spec-progress.md)
+for delivered features and the explicitly unfinished backlog.
 
 ## Run on Linux
 
@@ -53,6 +55,9 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - **Performance / Balanced / High** render-quality presets (render scale, AA, shadows and DOF quality).
 - Manual **Clear / Cloudy / Fog / Rain** presets, explicitly illustrative rather than forecast weather.
 - Depth-buffer **depth of field** linked to aperture (f/1.4–f/22), focal length, sensor and focus distance.
+- Enhanced/Manual/Auto exposure with ISO, shutter, exposure compensation and approximate white balance.
+- Portrait framing, camera roll, configurable thirds/crosshair/level guides and fullscreen preview (Esc exits).
+- Adjustable 1/5/30/60 min/s playback and target angular-offset readout.
 
 See [Linux MVP photography controls and export](docs/linux-mvp.md) for usage, limits and validation.
 
@@ -68,6 +73,7 @@ flutter test integration_test/linux_workflow_test.dart -d linux
 flutter test integration_test/linux_imagery_test.dart -d linux
 flutter test integration_test/linux_photography_test.dart -d linux
 flutter test integration_test/linux_sunlight_test.dart -d linux
+flutter test integration_test/linux_spec_photography_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```

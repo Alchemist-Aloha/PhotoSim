@@ -25,11 +25,11 @@ List<TileId> terrainCoverage(SimulationState state) {
   final reach = state.terrainForwardKm * 1000 / tileMeters;
   final pitch = state.pitch * radians;
   final along =
-      math.cos(pitch) - math.sin(pitch).abs() * math.tan(state.verticalFov / 2);
+      math.cos(pitch) - math.sin(pitch).abs() * state.verticalFrustumExtent;
   // If the frustum includes zenith/nadir, its horizontal projection spans every azimuth.
   final halfAngle = along <= 0
       ? math.pi
-      : math.atan(math.tan(state.horizontalFov / 2) / along);
+      : math.atan(state.horizontalFrustumExtent / along);
   // Circumscribe the range arc so polygon chords cannot cut requested coverage short.
   final arcReach = reach / math.cos(halfAngle / 32);
   final sector = <math.Point<double>>[

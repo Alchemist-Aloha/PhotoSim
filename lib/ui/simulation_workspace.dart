@@ -13,7 +13,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
-import '../core/geo.dart';
 import '../core/constellations.dart';
 import '../render/constellations.dart';
 import '../core/night_sky.dart';
@@ -30,6 +29,7 @@ import '../render/photography.dart';
 import '../core/sunlight.dart';
 import '../data/image_export.dart';
 import 'rain_overlay.dart';
+import 'photography_overlays.dart';
 import '../render/night_sky.dart';
 
 class SimulationWorkspace extends StatefulWidget {
@@ -38,7 +38,9 @@ class SimulationWorkspace extends StatefulWidget {
     required this.state,
     required this.onChanged,
     this.onPausePlayback,
+    this.cleanPreview = false,
   });
+  final bool cleanPreview;
   final VoidCallback? onPausePlayback;
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
@@ -176,6 +178,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     } else if (next.terrainForwardKm > 0 &&
         (old.azimuth != next.azimuth ||
             old.pitch != next.pitch ||
+            old.roll != next.roll ||
+            old.portrait != next.portrait ||
             old.sensor != next.sensor ||
             old.focalLength != next.focalLength)) {
       coverageDebounce?.cancel();
@@ -188,7 +192,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.weather != next.weather ||
         old.atmosphericEffects != next.atmosphericEffects ||
         old.weatherLightTransmission != next.weatherLightTransmission ||
-        old.depthOfField != next.depthOfField) {
+        old.depthOfField != next.depthOfField ||
+        old.exposureProcessing != next.exposureProcessing) {
       for (final entry in textures.entries) {
         applyTexture(entry.key, entry.value);
       }
@@ -332,7 +337,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         : (scene.UnlitMaterial(colorTexture: texture)
             // Display-referred surfaces bypass the backend's fog and depth-of-field passes.
             ..displayReferred =
-                !widget.state.atmosphericEffects && !widget.state.depthOfField
+                !widget.state.atmosphericEffects &&
+                !widget.state.depthOfField &&
+                !widget.state.exposureProcessing
             ..baseColorFactor = vm.Vector4.all(
               widget.state.weatherLightTransmission,
             )
@@ -456,7 +463,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           image,
           '$credits\n'
           '${snapshot.timestamp.toIso8601String()} · ${snapshot.sensor.label} · ${snapshot.focalLength.toStringAsFixed(1)} mm · '
-          'f/${snapshot.aperture.toStringAsFixed(1)} · ${snapshot.weather.label} (illustrative) · visibility ${snapshot.weatherVisibilityKm.toStringAsFixed(1)} km · light ${(snapshot.weatherLightTransmission * 100).round()}% · rain ${(snapshot.rainIntensity * 100).round()}%',
+          'f/${snapshot.aperture.toStringAsFixed(1)} · ISO ${snapshot.iso.round()} · ${snapshot.shutterLabel} · ${snapshot.exposureMode.label} · ${snapshot.weather.label} (illustrative) · visibility ${snapshot.weatherVisibilityKm.toStringAsFixed(1)} km · light ${(snapshot.weatherLightTransmission * 100).round()}% · rain ${(snapshot.rainIntensity * 100).round()}%',
         );
       } finally {
         image.dispose();
@@ -627,18 +634,25 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final active = world;
     if (active == null) return const Center(child: CircularProgressIndicator());
     final state = widget.state;
-    final yaw = state.azimuth * radians, pitch = state.pitch * radians;
+    final frame = state.cameraFrame;
     final eye = vm.Vector3(0, (ground ?? 0) + state.height, 0);
     final direction = vm.Vector3(
-      math.sin(yaw) * math.cos(pitch),
-      math.sin(pitch),
-      -math.cos(yaw) * math.cos(pitch),
+      frame.forward.x,
+      frame.forward.y,
+      frame.forward.z,
     );
+    final cameraUp = vm.Vector3(frame.up.x, frame.up.y, frame.up.z);
+    final skyLayerState = widget.cleanPreview
+        ? state.copyWith(
+            showConstellations: false,
+            target: CelestialTarget.none,
+          )
+        : state;
     final sky = state.sky;
     configurePhotography(active, state);
     final sun = sky.sun;
     moonRenderer!.update(sky, eye);
-    nightRenderer?.update(state, eye);
+    nightRenderer?.update(skyLayerState, eye);
     final sunDirection = vm.Vector3(
       sun.direction.x,
       sun.direction.y,
@@ -683,99 +697,101 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           : vm.Vector3(0.85, 0.90, 1);
     return Column(
       children: [
-        Material(
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Wrap(
-              spacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                DropdownButton<RenderQuality>(
-                  value: state.renderQuality,
-                  items: [
-                    for (final quality in RenderQuality.values)
-                      DropdownMenuItem(
-                        value: quality,
-                        child: Text('Quality: ${quality.label}'),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      widget.onChanged(
-                        widget.state.copyWith(renderQuality: value),
-                      );
-                    }
-                  },
-                ),
-                DropdownButton<Weather>(
-                  value: state.weather,
-                  items: [
-                    for (final weather in Weather.values)
-                      DropdownMenuItem(
-                        value: weather,
-                        child: Text('Weather: ${weather.label}'),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      widget.onChanged(widget.state.copyWith(weather: value));
-                    }
-                  },
-                ),
-                const Tooltip(
-                  message: 'Manual illustrative weather, not observed conditions or a forecast.',
-                  child: Icon(
-                    Icons.info_outline,
-                    semanticLabel: 'Weather presets are illustrative',
+        if (!widget.cleanPreview)
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Wrap(
+                spacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  DropdownButton<RenderQuality>(
+                    value: state.renderQuality,
+                    items: [
+                      for (final quality in RenderQuality.values)
+                        DropdownMenuItem(
+                          value: quality,
+                          child: Text('Quality: ${quality.label}'),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        widget.onChanged(
+                          widget.state.copyWith(renderQuality: value),
+                        );
+                      }
+                    },
                   ),
-                ),
-                OutlinedButton.icon(
-                  onPressed:
-                      ground == null || loading || imageryLoading || exporting
-                      ? null
-                      : exportImage,
-                  icon: const Icon(Icons.image_outlined),
-                  label: Text(exporting ? 'Exporting…' : 'Export PNG'),
-                ),
-                Text(
-                  'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
-                ),
-                Text(
-                  'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
-                ),
-                if (textures.length < loaded || partialImagery.isNotEmpty)
-                  const Text('Fallback surface where imagery is missing'),
-                OutlinedButton.icon(
-                  onPressed: showTerrainRange,
-                  icon: const Icon(Icons.terrain),
-                  label: const Text('Terrain range'),
-                ),
-                FilterChip(
-                  label: const Text('Constellations'),
-                  tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
-                  selected: state.showConstellations,
-                  onSelected: (value) => widget.onChanged(
-                    state.copyWith(showConstellations: value),
+                  DropdownButton<Weather>(
+                    value: state.weather,
+                    items: [
+                      for (final weather in Weather.values)
+                        DropdownMenuItem(
+                          value: weather,
+                          child: Text('Weather: ${weather.label}'),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        widget.onChanged(widget.state.copyWith(weather: value));
+                      }
+                    },
                   ),
-                ),
-                FilterChip(
-                  label: const Text('Approximate relighting'),
-                  selected: state.relitImagery,
-                  onSelected: setRelighting,
-                ),
-                Text(
-                  state.relitImagery
-                      ? 'UTC-driven Sun/Moon light · approximate atmosphere'
-                      : state.atmosphericEffects || state.depthOfField
-                      ? 'Illustrative weather/DOF · captured shadows remain'
-                      : 'Natural imagery retains captured lighting',
-                ),
-              ],
+                  const Tooltip(
+                    message: 'Manual illustrative weather, not observed conditions or a forecast.',
+                    child: Icon(
+                      Icons.info_outline,
+                      semanticLabel: 'Weather presets are illustrative',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed:
+                        ground == null || loading || imageryLoading || exporting
+                        ? null
+                        : exportImage,
+                    icon: const Icon(Icons.image_outlined),
+                    label: Text(exporting ? 'Exporting…' : 'Export PNG'),
+                  ),
+                  Text(
+                    'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
+                  ),
+                  Text(
+                    'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
+                  ),
+                  if (textures.length < loaded || partialImagery.isNotEmpty)
+                    const Text('Fallback surface where imagery is missing'),
+                  OutlinedButton.icon(
+                    onPressed: showTerrainRange,
+                    icon: const Icon(Icons.terrain),
+                    label: const Text('Terrain range'),
+                  ),
+                  FilterChip(
+                    label: const Text('Constellations'),
+                    tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
+                    selected: state.showConstellations,
+                    onSelected: (value) => widget.onChanged(
+                      state.copyWith(showConstellations: value),
+                    ),
+                  ),
+                  FilterChip(
+                    label: const Text('Approximate relighting'),
+                    selected: state.relitImagery,
+                    onSelected: setRelighting,
+                  ),
+                  Text(
+                    state.relitImagery
+                        ? 'UTC-driven Sun/Moon light · approximate atmosphere'
+                        : state.atmosphericEffects || state.depthOfField
+                        ? 'Illustrative weather/DOF · captured shadows remain'
+                        : 'Natural imagery retains captured lighting',
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        if (failed > 0 || repository!.cacheWarning != null)
+        if (!widget.cleanPreview &&
+            (failed > 0 || repository!.cacheWarning != null))
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -796,7 +812,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               ],
             ),
           ),
-        if (imageryFailures > 0 || imagery!.cacheWarning != null)
+        if (!widget.cleanPreview &&
+            (imageryFailures > 0 || imagery!.cacheWarning != null))
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -829,7 +846,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 )
               : Center(
                   child: AspectRatio(
-                    aspectRatio: state.sensor.width / state.sensor.height,
+                    aspectRatio: state.sensorWidth / state.sensorHeight,
                     child: GestureDetector(
                       onPanUpdate: (details) => widget.onChanged(
                         state.copyWith(
@@ -840,7 +857,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           nightRenderer?.updateLabels(
-                            state,
+                            skyLayerState,
                             constraints.biggest,
                           );
                           return Stack(
@@ -863,6 +880,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                           camera: scene.PerspectiveCamera(
                                             position: eye,
                                             target: eye + direction,
+                                            up: cameraUp,
                                             fovRadiansY: state.verticalFov,
                                             fovNear: 0.5,
                                             fovFar: 50000,
@@ -878,15 +896,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                   ],
                                 ),
                               ),
-                              const IgnorePointer(
-                                child: Center(
-                                  child: Icon(
-                                    Icons.add,
-                                    color: Colors.white54,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
+                              if (!widget.cleanPreview)
+                                PhotographyOverlays(state: state),
                             ],
                           );
                         },
@@ -895,43 +906,44 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                   ),
                 ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Wrap(
-            spacing: 16,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              const Text('Drag to aim · Change UTC time to move the Sun'),
-              if (terrainProviders.isNotEmpty)
-                Text(
-                  terrainProviders.values
-                      .map((provider) => provider.attribution)
-                      .toSet()
-                      .join(' · '),
-                  style: Theme.of(context).textTheme.bodySmall,
+        if (!widget.cleanPreview)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Wrap(
+              spacing: 16,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('Drag to aim · Change UTC time to move the Sun'),
+                if (terrainProviders.isNotEmpty)
+                  Text(
+                    terrainProviders.values
+                        .map((provider) => provider.attribution)
+                        .toSet()
+                        .join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                if (imageProviders.isNotEmpty)
+                  Text(
+                    imageProviders.values
+                        .expand((providers) => providers)
+                        .map((provider) => provider.attribution)
+                        .toSet()
+                        .join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                TextButton(
+                  onPressed: showSources,
+                  child: const Text('© Terrain & imagery sources'),
                 ),
-              if (imageProviders.isNotEmpty)
                 Text(
-                  imageProviders.values
-                      .expand((providers) => providers)
-                      .map((provider) => provider.attribution)
-                      .toSet()
-                      .join(' · '),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
                 ),
-              TextButton(
-                onPressed: showSources,
-                child: const Text('© Terrain & imagery sources'),
-              ),
-              Text(
-                '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
-              ),
-              Text(
-                'Imagery: ${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
-              ),
-            ],
+                Text(
+                  'Imagery: ${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
+                ),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
