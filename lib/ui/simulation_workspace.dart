@@ -27,6 +27,7 @@ import '../data/terrain/terrain_sources.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
 import '../render/photography.dart';
+import '../core/sunlight.dart';
 import '../data/image_export.dart';
 import 'rain_overlay.dart';
 import '../render/night_sky.dart';
@@ -112,7 +113,17 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         client: client,
         directory: Directory('${directory.path}/photosim'),
       );
-      skySource = scene.PhysicalSkySource(turbidity: 2);
+      skySource = scene.PhysicalSkySource(
+        turbidity: 2,
+        rayleighCoefficient: 1,
+        rayleighColor: vm.Vector3(
+          clearSkyRayleigh.red,
+          clearSkyRayleigh.green,
+          clearSkyRayleigh.blue,
+        ),
+        mieCoefficient: clearSkyMie,
+        mieEccentricity: 0.76,
+      );
       overcastSky = scene.GradientSkySource();
       world = scene.Scene()..skybox = scene.Skybox(skySource!);
       world!.directionalLight = scene.DirectionalLight(
@@ -633,12 +644,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       sun.direction.y,
       sun.direction.z,
     );
-    final daylight = (sun.altitude / 15).clamp(0.0, 1.0);
+    final solarLight = sunlight(sun.altitude);
     final twilight = ((sun.altitude + 18) / 18).clamp(0.0, 1.0);
     skySource!
       ..sunDirection = sunDirection
       ..sunAngularRadius = sun.angularRadius;
-    // shortcut: clear-sky color/brightness ramps, use calibrated radiometry for exposure simulation.
+    // shortcut: artistic ambient fill, use calibrated radiometry for exposure simulation.
     // Keep night terrain distinguishable from the sky without adding directional shadows.
     active.environmentIntensity = 0.04 + 0.21 * twilight;
     final transmission = state.weatherLightTransmission;
@@ -665,10 +676,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           ? -sunDirection
           : -vm.Vector3(moon.x, moon.y, moon.z)
       ..intensity =
-          (sun.altitude > 0 ? 3 * daylight : moonlightIntensity(sky)) *
+          (sun.altitude > 0 ? solarLight.intensity : moonlightIntensity(sky)) *
           transmission
       ..color = sun.altitude > 0
-          ? vm.Vector3(1, 0.45 + 0.53 * daylight, 0.15 + 0.80 * daylight)
+          ? vm.Vector3(solarLight.red, solarLight.green, solarLight.blue)
           : vm.Vector3(0.85, 0.90, 1);
     return Column(
       children: [

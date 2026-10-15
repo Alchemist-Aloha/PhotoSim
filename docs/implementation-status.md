@@ -48,8 +48,11 @@ this does not mark every requirement of the long-term specification complete.
 - Pinned Astronomia 1.1.1 behind an application-level calculation interface.
 - Topocentric solar/lunar positions and angular sizes, observer-dependent Moon
   illumination and waxing/waning readouts shared by both workspaces.
-- UTC-driven directional sunlight and shadows, approximate color/brightness
-  ramps and Flutter Scene's built-in clear-sky background.
+- UTC-driven directional sunlight and shadows, clear-air RGB air-mass extinction
+  for dimmer/redder low Sun, bluer Rayleigh clear sky with reduced aerosol glow,
+  and approximate ambient fill. Astronomy/geometry remain unchanged.
+- Explicit FXAA (default), MSAA 4× with capability fallback, Off and quality-driven
+  Auto controls in Rendering; persisted in plans without geographic reloads.
 - Resolved untextured Moon sphere with correct apparent size, phase and limb
   orientation, depth-tested against terrain; phase-dependent approximate moonlight.
 - Corrected east/west viewport handedness, with a GPU bright-limb regression test.
@@ -119,7 +122,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 115 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 118 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
@@ -179,6 +182,10 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   aperture-dependent GPU pixels, geography/download invariants, and actual UI PNG
   export with sensor aspect ratio. Screenshots include `linux-weather-*.png`,
   `linux-dof-{open,stopped}.png` and `linux-export.png`.
+- A fourth Linux native test verifies red/dimmer sunrise and sunset disks,
+  blue clear-sky pixels, actual FXAA edge changes, MSAA/fallback selection and
+  unchanged resident geometry/download counts; screenshots include
+  `linux-{sunrise,sunset,sun-day,blue-sky}.png` and `linux-aa-{off,fxaa}.png`.
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live

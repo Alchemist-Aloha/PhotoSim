@@ -222,6 +222,24 @@ class CameraInspector extends StatelessWidget {
             if (value != null) onChanged(state.copyWith(renderQuality: value));
           },
         ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<Antialiasing>(
+          key: ValueKey(state.antialiasing),
+          initialValue: state.antialiasing,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Antialiasing'),
+          items: [
+            for (final mode in Antialiasing.values)
+              DropdownMenuItem(value: mode, child: Text(mode.label)),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(state.copyWith(antialiasing: value));
+          },
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'FXAA is enabled by default. MSAA falls back to FXAA if unsupported; Auto follows the quality preset.',
+        ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Approximate relighting'),

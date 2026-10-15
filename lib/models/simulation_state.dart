@@ -38,6 +38,16 @@ enum RenderQuality {
   final String label;
 }
 
+enum Antialiasing {
+  automatic('Auto (quality preset)'),
+  off('Off'),
+  fxaa('FXAA'),
+  msaa('MSAA 4×');
+
+  const Antialiasing(this.label);
+  final String label;
+}
+
 enum Weather {
   clear('Clear', 100, 1, 0),
   cloudy('Cloudy', 18, 0.35, 0),
@@ -74,6 +84,7 @@ class SimulationState {
     this.terrainRenderKm = 40,
     this.target = CelestialTarget.none,
     this.renderQuality = RenderQuality.balanced,
+    this.antialiasing = Antialiasing.fxaa,
     this.weather = Weather.clear,
     double? weatherVisibilityKm,
     double? weatherLightTransmission,
@@ -144,6 +155,7 @@ class SimulationState {
   final DateTime timestamp;
   final CelestialTarget target;
   final RenderQuality renderQuality;
+  final Antialiasing antialiasing;
   final Weather weather;
   final double weatherVisibilityKm, weatherLightTransmission, rainIntensity;
   bool get atmosphericEffects =>
@@ -210,6 +222,7 @@ class SimulationState {
     double? terrainRenderKm,
     CelestialTarget? target,
     RenderQuality? renderQuality,
+    Antialiasing? antialiasing,
     Weather? weather,
     double? weatherVisibilityKm,
     double? weatherLightTransmission,
@@ -242,6 +255,7 @@ class SimulationState {
       terrainRenderKm: terrainRenderKm ?? this.terrainRenderKm,
       target: target ?? this.target,
       renderQuality: renderQuality ?? this.renderQuality,
+      antialiasing: antialiasing ?? this.antialiasing,
       weather: weather ?? this.weather,
       weatherVisibilityKm:
           weatherVisibilityKm ??

@@ -38,6 +38,8 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
 - Phase-lit Moon at its calculated position and angular size, with terrain occlusion.
 - UTC-driven Sun/Moon lighting, cascaded terrain shadows and approximate clear sky.
+- Bluer clear skies and air-mass extinction for dimmer, redder sunrise/sunset.
+- Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
 - Collapsible inspector, UTC date/time controls and shared minute-resolution day slider.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
@@ -65,6 +67,7 @@ flutter test
 flutter test integration_test/linux_workflow_test.dart -d linux
 flutter test integration_test/linux_imagery_test.dart -d linux
 flutter test integration_test/linux_photography_test.dart -d linux
+flutter test integration_test/linux_sunlight_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```

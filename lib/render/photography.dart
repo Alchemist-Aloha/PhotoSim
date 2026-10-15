@@ -7,6 +7,13 @@ import '../models/simulation_state.dart';
 void configurePhotography(scene.Scene world, SimulationState state) {
   final quality = state.renderQuality;
   world.renderScale = quality == RenderQuality.performance ? 0.7 : 1;
+  final aa = switch (state.antialiasing) {
+    Antialiasing.automatic => scene.AntiAliasingMode.auto,
+    Antialiasing.off => scene.AntiAliasingMode.none,
+    Antialiasing.fxaa => scene.AntiAliasingMode.fxaa,
+    Antialiasing.msaa => scene.AntiAliasingMode.msaa,
+  };
+  if (world.antiAliasingMode != aa) world.antiAliasingMode = aa;
   world.renderQuality
     ..tier = switch (quality) {
       RenderQuality.performance => scene.RenderQualityTier.low,

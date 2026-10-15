@@ -30,6 +30,7 @@ class SavedPlan {
     'terrainForwardKm': state.terrainForwardKm,
     'terrainRenderKm': state.terrainRenderKm,
     'renderQuality': state.renderQuality.name,
+    'antialiasing': state.antialiasing.name,
     'weather': state.weather.name,
     'weatherVisibilityKm': state.weatherVisibilityKm,
     'weatherLightTransmission': state.weatherLightTransmission,
@@ -75,6 +76,9 @@ class SavedPlan {
           terrainRenderKm: (json['terrainRenderKm'] as num?)?.toDouble() ?? 40,
           renderQuality: RenderQuality.values.byName(
             json['renderQuality'] as String? ?? 'balanced',
+          ),
+          antialiasing: Antialiasing.values.byName(
+            json['antialiasing'] as String? ?? 'fxaa',
           ),
           weather: Weather.values.byName(json['weather'] as String? ?? 'clear'),
           weatherVisibilityKm: (json['weatherVisibilityKm'] as num?)

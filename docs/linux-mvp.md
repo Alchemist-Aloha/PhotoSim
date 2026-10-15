@@ -25,11 +25,22 @@ quality/weather access.
 
 In the 3D toolbar:
 
-| Quality | Render scale | Automatic AA tier | Shadow map | DOF gather |
+| Quality | Render scale | AA when Auto is selected | Shadow map | DOF gather |
 |---|---:|---|---:|---:|
 | Performance | 70% | Low (off) | 1024 | 16 taps |
 | Balanced (default) | 100% | Medium (FXAA) | 2048 | 32 taps |
 | High | 100% | High (MSAA where supported) | 4096 | 48 taps |
+
+**Rendering → Antialiasing** selects FXAA (enabled by default), MSAA 4×,
+Off, or Auto (follow the quality preset above). Explicit AA choices are independent
+of quality and persist in plans; old plans default to FXAA. Unsupported MSAA
+falls back to FXAA. The same effect is included in PNG exports. AA changes do
+not rebuild terrain or download source data.
+
+Clear-sky rendering now uses reduced aerosol scattering and wavelength-dependent
+Rayleigh coefficients for a bluer sky. Air-mass extinction makes the Sun and
+direct sunlight dimmer and redder near either horizon. This is a clear-air
+appearance approximation, not calibrated exposure or full twilight/refraction.
 
 These are explicit backend budgets, not promises of FPS or higher source detail.
 Backend capability fallbacks still apply. Shadows are skipped for unlit natural
@@ -95,7 +106,7 @@ leave an empty destination that must be removed or renamed before retrying.
 
 ## Verification
 
-- Clean Flutter analysis; 115 unit/widget tests.
+- Clean Flutter analysis; 118 unit/widget tests.
 - Linux workflow: map/camera/time/sky/lighting, save, recreate, reopen and cached geography.
 - Linux imagery workflow: live Switzerland, France, Australia and Beijing sources,
   terrain range/FOV replanning and resident-resource invariants.
@@ -112,6 +123,7 @@ flutter test
 flutter test integration_test/linux_workflow_test.dart -d linux
 flutter test integration_test/linux_imagery_test.dart -d linux
 flutter test integration_test/linux_photography_test.dart -d linux
+flutter test integration_test/linux_sunlight_test.dart -d linux
 flutter build linux --release
 ```
 

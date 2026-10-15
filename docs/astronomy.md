@@ -107,8 +107,18 @@ light. A built-in Flutter Scene `PhysicalSkySource` uses the same direction
 and calculated solar angular radius; the skybox draws behind terrain. The
 manual test-light slider has been removed.
 
-Direct intensity ramps from zero at solar center altitude 0° to 3 at 15°;
-color warms at low altitude. Ambient intensity ramps between 0.04 at −18°
+Direct solar light uses Kasten–Young relative air mass and RGB clear-air extinction
+(`lib/core/sunlight.dart`), instead of the old linear intensity/color ramps.
+Long atmospheric paths dim the red channel and attenuate green/blue more strongly,
+producing dim red/orange low-Sun lighting. A last-solar-diameter fade avoids an
+abrupt directional-light switch at 0°; it is not a refracted limb calculation.
+The sky uses matching clear-air optical depths: Rayleigh tint (0.058, 0.135,
+0.331), coefficient 1, Mie coefficient 0.002, turbidity 2 and eccentricity 0.76.
+This gives a bluer clear sky with less washed-out aerosol glow. The built-in sky
+shader applies view-path extinction to the actual angular-size solar disk.
+Sun/Moon positions, geometry and geographic resources are unchanged.
+
+Ambient intensity ramps between 0.04 at −18°
 and 0.25 at 0°. The dim, shadowless night floor keeps lit/fallback and approximately
 relit terrain distinguishable from the dark sky, even without moonlight. It does
 not brighten the sky or unlit celestial objects; natural imagery still retains
@@ -118,6 +128,13 @@ model goes black below the solar horizon; only ambient terrain lighting has
 a twilight ramp. Stars and a simplified Milky Way brightness map are rendered
 by the separate [night-sky module](data-sources/night-sky.md), with their own
 solar/lunar visibility approximation.
+
+Linux GPU tests sample the actual Sun disks near 1° altitude on both sunrise
+and sunset and compare their RGB/brightness with a 30° Sun. They also verify a
+blue clear-sky sample, FXAA edge-pixel changes and MSAA/fallback operation without
+geographic reloads. Captures: `linux-{sunrise,sunset,sun-day,blue-sky}.png` and
+`linux-aa-{off,fxaa}.png` in `build/validation/`. These are isolated rendering
+fixtures, not photometric reference measurements.
 
 `lib/render/moon.dart` renders a 128-segment, 64-ring untextured lunar sphere,
 rescaled to 30 km with radius `distance × sin(angularRadius)` to preserve its

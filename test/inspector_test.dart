@@ -7,6 +7,41 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 
 void main() {
+  testWidgets(
+    'rendering section exposes antialiasing without changing camera/time',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(310, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      var state = SimulationState();
+      final original = state;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, update) => CameraInspector(
+                state: state,
+                onChanged: (next) => update(() => state = next),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Optics'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rendering'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(DropdownButtonFormField<Antialiasing>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('MSAA 4×').last);
+      await tester.pumpAndSettle();
+      expect(state.antialiasing, Antialiasing.msaa);
+      expect(state.renderQuality, original.renderQuality);
+      expect(state.location, original.location);
+      expect(state.focalLength, original.focalLength);
+      expect(state.timestamp, original.timestamp);
+      expect(tester.takeException(), isNull);
+    },
+  );
   test(
     'weather overrides validate, persist and reset only on preset changes',
     () {

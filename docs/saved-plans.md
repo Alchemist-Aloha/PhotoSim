@@ -25,6 +25,8 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Optional `terrainRings` (integer 1–3), `terrainForwardKm` (0–40) and
   `terrainRenderKm` (2–40). Older plans default to 1 ring, forward off and a
   40 km whole-tile render radius. Missing fields do not require a schema bump.
+- Optional `antialiasing` (`automatic`, `off`, `fxaa`, `msaa`); missing fields
+  default to FXAA. This preference is independent of quality and preserves geometry.
 - Optional `renderQuality` (`performance`, `balanced`, `high`), `weather`
   (`clear`, `cloudy`, `fog`, `rain`), `depthOfField`, `aperture` (1.4–22) and
   `focusDistance` (1–1,000,000 meters). Legacy defaults: Balanced, Clear, off,
