@@ -10,6 +10,7 @@ import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
+import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/rain_overlay.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -23,7 +24,7 @@ void main() {
         'photosim-photo-native-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      var state = SimulationState(height: 100, pitch: -40);
+      var state = SimulationState(height: 100, pitch: -40, relitImagery: false);
       late StateSetter rebuild;
       var paused = false;
       await tester.pumpWidget(
@@ -35,10 +36,22 @@ void main() {
               child: StatefulBuilder(
                 builder: (context, update) {
                   rebuild = update;
-                  return SimulationWorkspace(
-                    state: state,
-                    onPausePlayback: () => paused = true,
-                    onChanged: (next) => update(() => state = next),
+                  void change(SimulationState next) =>
+                      update(() => state = next);
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: SimulationWorkspace(
+                          state: state,
+                          onPausePlayback: () => paused = true,
+                          onChanged: change,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 310,
+                        child: CameraInspector(state: state, onChanged: change),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -111,6 +124,53 @@ void main() {
         weatherImages[Weather.fog],
         isNot(orderedEquals(weatherImages[Weather.clear]!)),
       );
+      await tester.tap(find.text('Weather'));
+      await tester.pump(const Duration(milliseconds: 400));
+      for (final edit in [
+        ('Visibility', 6.0),
+        ('Light transmission', 80.0),
+        ('Rain intensity', 25.0),
+      ]) {
+        tester.widget<Slider>(find.byKey(ValueKey(edit.$1))).onChanged!(
+          edit.$2,
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+      expect(
+        world.fog.density,
+        closeTo(scene.Fog.visibilityDensity(6000), 1e-12),
+      );
+      expect(
+        tester.widget<RainOverlay>(find.byType(RainOverlay)).intensity,
+        0.25,
+      );
+      expect(state.weatherLightTransmission, 0.8);
+      expect(counts(), initialCounts);
+      await File('build/validation/linux-weather-panel.png')
+          .writeAsBytes(await pixels());
+      tester
+          .widget<DropdownButtonFormField<Weather>>(
+            find.byType(DropdownButtonFormField<Weather>),
+          )
+          .onChanged!(Weather.clear);
+      await tester.pump(const Duration(milliseconds: 400));
+      tester
+          .widget<Slider>(find.byKey(const ValueKey('Visibility')))
+          .onChanged!(2);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(world.fog.enabled, isTrue);
+      expect(
+        (nodes.first.mesh!.primitives.single.material as scene.UnlitMaterial)
+            .displayReferred,
+        isFalse,
+      );
+      tester
+          .widget<Slider>(find.byKey(const ValueKey('Visibility')))
+          .onChanged!(100);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(world.fog.enabled, isFalse);
+      await tester.tap(find.text('Weather'));
+      await tester.pump(const Duration(milliseconds: 400));
       for (final quality in RenderQuality.values) {
         tester
             .widget<DropdownButton<RenderQuality>>(

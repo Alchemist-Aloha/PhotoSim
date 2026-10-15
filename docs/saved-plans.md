@@ -19,7 +19,8 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Sensor enum identifier and focal length in millimeters (8–600 mm).
 - Canonical UTC ISO-8601 simulation timestamp.
 - Selected target (`none`, `sun`, `moon`, `galacticCenter`).
-- Natural/approximate-relighting preference.
+- Natural/approximate-relighting preference. New sessions enable approximate
+  relighting; opening a plan preserves its stored preference.
 - Optional `showConstellations` toggle; missing in older plans defaults to off.
 - Optional `terrainRings` (integer 1–3), `terrainForwardKm` (0–40) and
   `terrainRenderKm` (2–40). Older plans default to 1 ring, forward off and a
@@ -28,6 +29,9 @@ Each snapshot is a standalone UTF-8 JSON file containing:
   (`clear`, `cloudy`, `fog`, `rain`), `depthOfField`, `aperture` (1.4–22) and
   `focusDistance` (1–1,000,000 meters). Legacy defaults: Balanced, Clear, off,
   f/8 and 1 km focus. All fields are validated and preserve UTC/camera state.
+- Optional `weatherVisibilityKm` (0.1–100), `weatherLightTransmission` (0–1)
+  and `rainIntensity` (0–1). Missing fields use the selected weather preset's
+  defaults. Parameter edits persist; changing presets resets their defaults.
 
 Legacy version-1 files remain readable: their obsolete `lens` preset field is
 ignored, while focal length and sensor are preserved. New version-2 files omit

@@ -141,8 +141,8 @@ Above solar altitude 0°, the primary light remains solar; simultaneous daytime
 moonlight is omitted. Natural imagery remains unaffected by either light.
 
 Natural NAIP imagery remains unlit and retains captured shadows/colors when
-time changes. Enable **Approximate relighting** to see solar shading and
-shadows on imagery; baked-in source shadows can still be doubled. Missing
+time changes. **Approximate relighting**, enabled by default for new sessions,
+shows solar shading and shadows on imagery; baked-in source shadows can still be doubled. Missing
 imagery uses the existing lit terrain fallback.
 
 The native Linux workflow checks time-driven solar direction, solar angular

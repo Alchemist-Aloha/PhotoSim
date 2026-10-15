@@ -114,6 +114,11 @@ void main() {
       ),
     );
     await tester.pump(const Duration(seconds: 3));
+    expect(camera().relitImagery, isTrue);
+    tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .onChanged(camera().copyWith(relitImagery: false));
+    await tester.pump();
     final original = camera();
     await tester.tapAt(
       tester.getCenter(find.byType(FlutterMap)) + const Offset(100, 50),

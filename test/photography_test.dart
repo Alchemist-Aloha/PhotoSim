@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
-import 'package:photosim/render/photography.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/rain_overlay.dart';
 
@@ -66,7 +65,7 @@ void main() {
     expect(changed.location, original.location);
     expect(changed.focusDistance, 3);
     for (final weather in Weather.values) {
-      expect(weatherTransmission(weather), inInclusiveRange(0, 1));
+      expect(weather.lightTransmission, inInclusiveRange(0, 1));
     }
   });
 
@@ -87,7 +86,10 @@ void main() {
           ),
         ),
       );
-      await tester.scrollUntilVisible(find.byType(SwitchListTile), 300);
+      await tester.scrollUntilVisible(find.text('Depth of field'), 200);
+      await tester.tap(find.text('Depth of field'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.byType(SwitchListTile), 200);
       await tester.tap(find.byType(SwitchListTile));
       await tester.pump();
       expect(state.depthOfField, isTrue);

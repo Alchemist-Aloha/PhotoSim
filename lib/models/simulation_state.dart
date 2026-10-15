@@ -39,13 +39,19 @@ enum RenderQuality {
 }
 
 enum Weather {
-  clear('Clear'),
-  cloudy('Cloudy'),
-  fog('Fog'),
-  rain('Rain');
+  clear('Clear', 100, 1, 0),
+  cloudy('Cloudy', 18, 0.35, 0),
+  fog('Fog', 0.7, 0.2, 0),
+  rain('Rain', 3.5, 0.15, 0.6);
 
-  const Weather(this.label);
+  const Weather(
+    this.label,
+    this.visibilityKm,
+    this.lightTransmission,
+    this.rainIntensity,
+  );
   final String label;
+  final double visibilityKm, lightTransmission, rainIntensity;
 }
 
 @immutable
@@ -61,7 +67,7 @@ class SimulationState {
     this.sensor = Sensor.fullFrame,
     this.focalLength = 24,
     this.groundElevation,
-    this.relitImagery = false,
+    this.relitImagery = true,
     this.showConstellations = false,
     this.terrainRings = 1,
     this.terrainForwardKm = 0,
@@ -69,11 +75,18 @@ class SimulationState {
     this.target = CelestialTarget.none,
     this.renderQuality = RenderQuality.balanced,
     this.weather = Weather.clear,
+    double? weatherVisibilityKm,
+    double? weatherLightTransmission,
+    double? rainIntensity,
     this.depthOfField = false,
     this.aperture = 8,
     this.focusDistance = 1000,
     DateTime? timestamp,
-  }) : timestamp = (timestamp ?? DateTime.utc(2026, 6, 21, 19)).toUtc() {
+  }) : weatherVisibilityKm = weatherVisibilityKm ?? weather.visibilityKm,
+       weatherLightTransmission =
+           weatherLightTransmission ?? weather.lightTransmission,
+       rainIntensity = rainIntensity ?? weather.rainIntensity,
+       timestamp = (timestamp ?? DateTime.utc(2026, 6, 21, 19)).toUtc() {
     if (this.timestamp.year < 1900 ||
         this.timestamp.year > 2100 ||
         !latitude.isFinite ||
@@ -91,6 +104,15 @@ class SimulationState {
         !focalLength.isFinite ||
         focalLength < minFocalLength ||
         focalLength > maxFocalLength ||
+        !this.weatherVisibilityKm.isFinite ||
+        this.weatherVisibilityKm < 0.1 ||
+        this.weatherVisibilityKm > 100 ||
+        !this.weatherLightTransmission.isFinite ||
+        this.weatherLightTransmission < 0 ||
+        this.weatherLightTransmission > 1 ||
+        !this.rainIntensity.isFinite ||
+        this.rainIntensity < 0 ||
+        this.rainIntensity > 1 ||
         !aperture.isFinite ||
         aperture < 1.4 ||
         aperture > 22 ||
@@ -123,6 +145,11 @@ class SimulationState {
   final CelestialTarget target;
   final RenderQuality renderQuality;
   final Weather weather;
+  final double weatherVisibilityKm, weatherLightTransmission, rainIntensity;
+  bool get atmosphericEffects =>
+      weather != Weather.clear ||
+      weatherVisibilityKm < 100 ||
+      weatherLightTransmission != 1;
   final bool depthOfField;
   final double aperture, focusDistance;
 
@@ -184,6 +211,9 @@ class SimulationState {
     CelestialTarget? target,
     RenderQuality? renderQuality,
     Weather? weather,
+    double? weatherVisibilityKm,
+    double? weatherLightTransmission,
+    double? rainIntensity,
     bool? depthOfField,
     double? aperture,
     double? focusDistance,
@@ -213,6 +243,21 @@ class SimulationState {
       target: target ?? this.target,
       renderQuality: renderQuality ?? this.renderQuality,
       weather: weather ?? this.weather,
+      weatherVisibilityKm:
+          weatherVisibilityKm ??
+          (weather != null && weather != this.weather
+              ? weather.visibilityKm
+              : this.weatherVisibilityKm),
+      weatherLightTransmission:
+          weatherLightTransmission ??
+          (weather != null && weather != this.weather
+              ? weather.lightTransmission
+              : this.weatherLightTransmission),
+      rainIntensity:
+          rainIntensity ??
+          (weather != null && weather != this.weather
+              ? weather.rainIntensity
+              : this.rainIntensity),
       depthOfField: depthOfField ?? this.depthOfField,
       aperture: aperture ?? this.aperture,
       focusDistance: focusDistance ?? this.focusDistance,

@@ -175,6 +175,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     if (old.terrainRenderKm != next.terrainRenderKm) updateTerrainVisibility();
     if (old.relitImagery != next.relitImagery ||
         old.weather != next.weather ||
+        old.atmosphericEffects != next.atmosphericEffects ||
+        old.weatherLightTransmission != next.weatherLightTransmission ||
         old.depthOfField != next.depthOfField) {
       for (final entry in textures.entries) {
         applyTexture(entry.key, entry.value);
@@ -319,10 +321,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         : (scene.UnlitMaterial(colorTexture: texture)
             // Display-referred surfaces bypass the backend's fog and depth-of-field passes.
             ..displayReferred =
-                widget.state.weather == Weather.clear &&
-                !widget.state.depthOfField
+                !widget.state.atmosphericEffects && !widget.state.depthOfField
             ..baseColorFactor = vm.Vector4.all(
-              weatherTransmission(widget.state.weather),
+              widget.state.weatherLightTransmission,
             )
             ..baseColorFactor.a = 1);
     // Reassign the mesh to notify Scene of the material change; geometry stays resident.
@@ -444,7 +445,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           image,
           '$credits\n'
           '${snapshot.timestamp.toIso8601String()} · ${snapshot.sensor.label} · ${snapshot.focalLength.toStringAsFixed(1)} mm · '
-          'f/${snapshot.aperture.toStringAsFixed(1)} · ${snapshot.weather.label} (illustrative)',
+          'f/${snapshot.aperture.toStringAsFixed(1)} · ${snapshot.weather.label} (illustrative) · visibility ${snapshot.weatherVisibilityKm.toStringAsFixed(1)} km · light ${(snapshot.weatherLightTransmission * 100).round()}% · rain ${(snapshot.rainIntensity * 100).round()}%',
         );
       } finally {
         image.dispose();
@@ -640,7 +641,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     // shortcut: clear-sky color/brightness ramps, use calibrated radiometry for exposure simulation.
     // Keep night terrain distinguishable from the sky without adding directional shadows.
     active.environmentIntensity = 0.04 + 0.21 * twilight;
-    final transmission = weatherTransmission(state.weather);
+    final transmission = state.weatherLightTransmission;
     moonRenderer!.node.visible = state.weather == Weather.clear;
     if (state.weather == Weather.clear) {
       if (active.skybox?.source != skySource) {
@@ -755,7 +756,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 Text(
                   state.relitImagery
                       ? 'UTC-driven Sun/Moon light · approximate atmosphere'
-                      : state.weather != Weather.clear || state.depthOfField
+                      : state.atmosphericEffects || state.depthOfField
                       ? 'Illustrative weather/DOF · captured shadows remain'
                       : 'Natural imagery retains captured lighting',
                 ),
@@ -858,8 +859,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                         ),
                                       ),
                                     ),
-                                    if (state.weather == Weather.rain)
-                                      const RainOverlay(),
+                                    if (state.weather == Weather.rain &&
+                                        state.rainIntensity > 0)
+                                      RainOverlay(
+                                        intensity: state.rainIntensity,
+                                      ),
                                   ],
                                 ),
                               ),

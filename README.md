@@ -30,7 +30,9 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - **Terrain range** button: surrounding radius, FOV-aware forward fetching, and render distance.
 - Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
   a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile.
-- Natural imagery and opt-in approximate relighting, without rebuilding terrain.
+- Approximate relighting enabled by default; optional natural imagery, without rebuilding terrain.
+- Collapsible inspector sections for optics, position/orientation, depth of field, weather and rendering.
+- Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
 - Independent bounded terrain/imagery caches with corruption recovery and source metadata.
 - Drag the 3D preview to look around; change focal length to zoom optically.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.

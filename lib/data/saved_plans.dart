@@ -31,6 +31,9 @@ class SavedPlan {
     'terrainRenderKm': state.terrainRenderKm,
     'renderQuality': state.renderQuality.name,
     'weather': state.weather.name,
+    'weatherVisibilityKm': state.weatherVisibilityKm,
+    'weatherLightTransmission': state.weatherLightTransmission,
+    'rainIntensity': state.rainIntensity,
     'depthOfField': state.depthOfField,
     'aperture': state.aperture,
     'focusDistance': state.focusDistance,
@@ -74,6 +77,11 @@ class SavedPlan {
             json['renderQuality'] as String? ?? 'balanced',
           ),
           weather: Weather.values.byName(json['weather'] as String? ?? 'clear'),
+          weatherVisibilityKm: (json['weatherVisibilityKm'] as num?)
+              ?.toDouble(),
+          weatherLightTransmission: (json['weatherLightTransmission'] as num?)
+              ?.toDouble(),
+          rainIntensity: (json['rainIntensity'] as num?)?.toDouble(),
           depthOfField: json['depthOfField'] as bool? ?? false,
           aperture: (json['aperture'] as num?)?.toDouble() ?? 8,
           focusDistance: (json['focusDistance'] as num?)?.toDouble() ?? 1000,

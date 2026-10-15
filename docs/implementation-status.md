@@ -37,7 +37,8 @@ this does not mark every requirement of the long-term specification complete.
 - Progressive 256×256 image previews and a 1024×1024 camera-tile replacement.
 - Texture swaps preserve existing geometry; switching natural/relit mode also
   preserves geometry and shared camera/time state.
-- Natural, display-referred imagery by default; opt-in approximate relighting.
+- Approximate relighting enabled by default for new sessions; saved lighting
+  preferences remain authoritative. Optional natural, display-referred imagery.
 - Pixels unavailable from every source stay a labeled fallback surface; unavailable
   high-resolution imagery retains a successful preview.
 - Independent 256 MiB imagery cache (64 MiB previews, 192 MiB detail), in addition
@@ -76,6 +77,9 @@ this does not mark every requirement of the long-term specification complete.
   for natural imagery/overcast weather. Mesh/texture resources remain resident.
 - Manual illustrative Clear/Cloudy/Fog/Rain, with overcast sky, fog, attenuation
   and clipped animated rain; no forecasts or weather network requests.
+  Collapsible inspector sections expose preset, visibility, light transmission
+  and rain intensity with reset and saved-plan compatibility. Native tests verify
+  the parameter uniforms, rain density and no geographic resource reloads.
 - Physical depth-buffer DOF linked to aperture, focus distance, focal length and
   sensor, with settings persisted in plans and backward-compatible defaults.
 - No paid service, secrets, custom shaders or fabricated geographic imagery.
@@ -115,7 +119,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 113 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 115 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image

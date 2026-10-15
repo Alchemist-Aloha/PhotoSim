@@ -15,6 +15,14 @@ aperture-linked depth of field.
 
 ## Photography controls
 
+The right inspector is grouped into collapsible **Optics**, **Position & orientation**,
+**Depth of field**, **Weather**, **Rendering**, and **About this preview** sections.
+Optics starts expanded; the other sections start collapsed. Expansion is retained
+while using the current workspace/session. Rendering includes quality, approximate
+relighting (enabled by default in new sessions) and constellation guides. Existing
+saved plans retain their own relighting preference. The 3D toolbar keeps quick
+quality/weather access.
+
 In the 3D toolbar:
 
 | Quality | Render scale | Automatic AA tier | Shadow map | DOF gather |
@@ -37,6 +45,15 @@ screen-space streaks clipped to the photograph. No weather service, account,
 network request, wind simulation, wet-surface reconstruction or precipitation
 physics is involved.
 
+Expand **Weather** in the inspector to adjust visibility (0.1–100 km), light
+transmission (0–100%) and, for Rain, intensity (0–100%). Visibility controls
+exponential fog; light transmission scales directional lighting and natural-image
+brightness; rain intensity changes streak density, with zero removing the overlay.
+Custom visibility also works with Clear. Selecting a different preset restores
+its parameter defaults; **Reset weather parameters** restores the current preset.
+These values persist in plans. Legacy plans use the selected preset's defaults.
+No parameter changes fetch or rebuild geographic data.
+
 In the camera inspector, enable **Depth of field**, set aperture **f/1.4–f/22**,
 and select focus distance on a logarithmic **1 m–1,000 km** slider. The far endpoint
 approximates infinity. The backend uses depth-buffer thin-lens bokeh, the actual
@@ -51,8 +68,8 @@ mapping and the original photographic shadows remain. Approximate relighting
 does not recover physical reflectance from imagery. Rain is a screen overlay
 after DOF, not a depth-aware volume.
 
-All five new settings (quality, weather, DOF enabled, aperture and focus distance),
-plus existing range/appearance preferences, persist in version-2 plans. Old plans use
+Quality, weather and its parameters, DOF enabled, aperture, focus distance,
+and existing range/appearance preferences persist in version-2 plans. Old plans use
 Balanced / Clear / DOF off / f/8 / 1 km focus defaults.
 
 ## PNG export
@@ -78,7 +95,7 @@ leave an empty destination that must be removed or renamed before retrying.
 
 ## Verification
 
-- Clean Flutter analysis; 113 unit/widget tests.
+- Clean Flutter analysis; 115 unit/widget tests.
 - Linux workflow: map/camera/time/sky/lighting, save, recreate, reopen and cached geography.
 - Linux imagery workflow: live Switzerland, France, Australia and Beijing sources,
   terrain range/FOV replanning and resident-resource invariants.

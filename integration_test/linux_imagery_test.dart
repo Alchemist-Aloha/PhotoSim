@@ -27,6 +27,7 @@ void main() {
           longitude: site.$2,
           height: 100,
           pitch: -40,
+          relitImagery: false,
           timestamp: DateTime.utc(2026, 6, 21, site.$4 == 'eox' ? 2 : 12),
         );
         late StateSetter rebuild;
