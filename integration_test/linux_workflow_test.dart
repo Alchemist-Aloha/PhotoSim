@@ -117,7 +117,12 @@ void main() {
     expect(camera().relitImagery, isTrue);
     tester
         .widget<CameraInspector>(find.byType(CameraInspector))
-        .onChanged(camera().copyWith(relitImagery: false));
+        .onChanged(
+          camera().copyWith(
+            relitImagery: false,
+            timestamp: DateTime.utc(2026, 6, 21, 19),
+          ),
+        );
     await tester.pump();
     final original = camera();
     await tester.tapAt(

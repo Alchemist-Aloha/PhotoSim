@@ -24,7 +24,12 @@ void main() {
         'photosim-photo-native-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      var state = SimulationState(height: 100, pitch: -40, relitImagery: false);
+      var state = SimulationState(
+        height: 100,
+        pitch: -40,
+        relitImagery: false,
+        timestamp: DateTime.utc(2026, 6, 21, 19),
+      );
       late StateSetter rebuild;
       var paused = false;
       await tester.pumpWidget(

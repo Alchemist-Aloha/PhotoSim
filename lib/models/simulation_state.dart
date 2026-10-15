@@ -116,7 +116,7 @@ class SimulationState {
        weatherLightTransmission =
            weatherLightTransmission ?? weather.lightTransmission,
        rainIntensity = rainIntensity ?? weather.rainIntensity,
-       timestamp = (timestamp ?? DateTime.utc(2026, 6, 21, 19)).toUtc() {
+       timestamp = (timestamp ?? DateTime.now()).toUtc() {
     if (this.timestamp.year < 1900 ||
         this.timestamp.year > 2100 ||
         !latitude.isFinite ||

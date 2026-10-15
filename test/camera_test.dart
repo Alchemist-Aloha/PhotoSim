@@ -4,6 +4,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/models/simulation_state.dart';
 
 void main() {
+  test('new camera uses the current instant in UTC and edits preserve it', () {
+    final before = DateTime.now().toUtc();
+    final state = SimulationState();
+    final after = DateTime.now().toUtc();
+    expect(state.timestamp.isUtc, isTrue);
+    expect(state.timestamp.isBefore(before), isFalse);
+    expect(state.timestamp.isAfter(after), isFalse);
+    expect(state.copyWith(focalLength: 50).timestamp, state.timestamp);
+    final explicit = DateTime.parse('2026-01-02T08:00:00+08:00');
+    expect(
+      SimulationState(timestamp: explicit).timestamp,
+      DateTime.utc(2026, 1, 2),
+    );
+  });
   test('physical optics match full-frame 50 mm reference', () {
     final state = SimulationState(focalLength: 50);
     expect(state.horizontalFov * 180 / math.pi, closeTo(39.59775, 0.0001));

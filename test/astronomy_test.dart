@@ -72,7 +72,10 @@ void main() {
   }
 
   test('UTC normalization, observer elevation and time update geometry', () {
-    final state = SimulationState(groundElevation: 1200);
+    final state = SimulationState(
+      groundElevation: 1200,
+      timestamp: DateTime.utc(2026, 6, 21, 19),
+    );
     final sky = state.sky;
     final offset = state.copyWith(
       timestamp: DateTime.parse('2026-06-21T12:00:00-07:00'),

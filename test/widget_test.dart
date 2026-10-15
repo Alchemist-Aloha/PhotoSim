@@ -15,10 +15,15 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final beforeStartup = DateTime.now().toUtc();
     await tester.pumpWidget(const PhotoSimApp());
+    final afterStartup = DateTime.now().toUtc();
     SimulationState camera() =>
         tester.widget<CameraInspector>(find.byType(CameraInspector)).state;
     final original = camera();
+    expect(original.timestamp.isUtc, isTrue);
+    expect(original.timestamp.isBefore(beforeStartup), isFalse);
+    expect(original.timestamp.isAfter(afterStartup), isFalse);
     await tester.tap(find.byTooltip('Select astronomical target'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Galactic center').last);
@@ -57,6 +62,15 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(const PhotoSimApp());
+      final initialInspector = tester.widget<CameraInspector>(
+        find.byType(CameraInspector),
+      );
+      initialInspector.onChanged(
+        initialInspector.state.copyWith(
+          timestamp: DateTime.utc(2026, 6, 21, 19),
+        ),
+      );
+      await tester.pump();
       expect(
         find.text(
           'Estimated local: 2026-06-21 12:00 PDT (UTC-07:00) · America/Los_Angeles',
@@ -173,16 +187,24 @@ void main() {
       expect(camera().timestamp, original.add(const Duration(minutes: 4)));
       await tester.tap(find.byTooltip(play));
       await tester.pump(const Duration(milliseconds: 200));
+      final sliderDate = camera().timestamp;
+      final editedTime = DateTime.utc(
+        sliderDate.year,
+        sliderDate.month,
+        sliderDate.day,
+        6,
+        40,
+      );
       tester
           .widget<Slider>(find.byKey(const ValueKey('utc-day-slider')))
           .onChanged!(400);
       await tester.pump(const Duration(seconds: 1));
-      expect(camera().timestamp, DateTime.utc(2026, 6, 21, 6, 40));
+      expect(camera().timestamp, editedTime);
       expect(find.byTooltip(play), findsOneWidget);
       await tester.tap(find.byTooltip(play));
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump(const Duration(seconds: 1));
-      expect(camera().timestamp, DateTime.utc(2026, 6, 21, 6, 40));
+      expect(camera().timestamp, editedTime);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester
           .widget<CameraInspector>(find.byType(CameraInspector))

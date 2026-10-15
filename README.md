@@ -26,6 +26,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Geographic field-of-view wedge calculated from physical sensor and focal length.
 - Full-frame / APS-C sensor pills and a single 8–600 mm focal-length slider.
 - Shared camera position, azimuth, pitch, height, focal length, and UTC timestamp.
+- New sessions start at the current system date/time (stored as UTC); saved plans restore their saved time.
 - Account-free Mapterhorn terrain: Copernicus GLO-30 plus finer open regional
   DEMs, with Mapzen fallback, rendered in a camera-relative WGS84 frame.
 - Terrain-derived camera height, progressive loading, distance/FOV quadtree LOD, and tile skirts.

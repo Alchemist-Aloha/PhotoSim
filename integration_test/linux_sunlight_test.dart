@@ -17,7 +17,11 @@ void main() {
   testWidgets(
     'Linux blue sky, dim red sunrise/sunset and actual edge antialiasing',
     (tester) async {
-      var state = SimulationState(height: 100, focalLength: 200);
+      var state = SimulationState(
+        height: 100,
+        focalLength: 200,
+        timestamp: DateTime.utc(2026, 6, 21, 19),
+      );
       final capture = GlobalKey();
       late StateSetter rebuild;
       await tester.pumpWidget(

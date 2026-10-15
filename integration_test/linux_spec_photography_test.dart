@@ -41,6 +41,7 @@ void main() {
         height: 100,
         pitch: -40,
         exposureMode: ExposureMode.manual,
+        timestamp: DateTime.utc(2026, 6, 21, 19),
       ),
     );
     await tester.pump();
