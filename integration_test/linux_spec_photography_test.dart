@@ -52,7 +52,7 @@ void main() {
     await tester.pump();
     await openWorkspace(tester, '3D Preview');
     for (var i = 0; i < 240; i++) {
-      if (find.text('Imagery · 9/9 textures').evaluate().isNotEmpty &&
+      if (find.text('Imagery 9/9').evaluate().isNotEmpty &&
           tester
                   .widget<OutlinedButton>(
                     find.widgetWithText(OutlinedButton, 'Export PNG'),
@@ -63,7 +63,7 @@ void main() {
       }
       await tester.pump(const Duration(milliseconds: 500));
     }
-    expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+    expect(find.text('Imagery 9/9'), findsOneWidget);
     final world = tester
         .widget<scene.SceneView>(find.byType(scene.SceneView))
         .scene!;

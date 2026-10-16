@@ -52,14 +52,14 @@ void main() {
         );
         for (
           var i = 0;
-          i < 240 && find.text('Imagery · 9/9 textures').evaluate().isEmpty;
+          i < 240 && find.text('Imagery 9/9').evaluate().isEmpty;
           i++
         ) {
           await tester.pump(const Duration(milliseconds: 500));
         }
-        expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+        expect(find.text('Terrain 9/9'), findsOneWidget);
         expect(find.textContaining('© Mapterhorn'), findsOneWidget);
-        expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+        expect(find.text('Imagery 9/9'), findsOneWidget);
         expect(find.textContaining(site.$3), findsOneWidget);
         expect(
           find.textContaining('Imagery unavailable or incomplete:'),
@@ -163,25 +163,19 @@ void main() {
             final expected = terrainCoverage(state).length;
             for (var i = 0; i < 360; i++) {
               if (find
-                      .text('Real terrain · $expected/$expected tiles')
+                      .text('Terrain $expected/$expected')
                       .evaluate()
                       .isNotEmpty &&
                   find
-                      .text('Imagery · $expected/$expected textures')
+                      .text('Imagery $expected/$expected')
                       .evaluate()
                       .isNotEmpty) {
                 break;
               }
               await tester.pump(const Duration(milliseconds: 500));
             }
-            expect(
-              find.text('Real terrain · $expected/$expected tiles'),
-              findsOneWidget,
-            );
-            expect(
-              find.text('Imagery · $expected/$expected textures'),
-              findsOneWidget,
-            );
+            expect(find.text('Terrain $expected/$expected'), findsOneWidget);
+            expect(find.text('Imagery $expected/$expected'), findsOneWidget);
             expect(
               terrainNodes().map((node) => node.name).toSet(),
               terrainCoverage(state).map((tile) => tile.key).toSet(),
@@ -264,7 +258,7 @@ void main() {
           rebuild(() => state = state.copyWith(azimuth: 180));
           await waitForCoverage();
           expect(tester.takeException(), isNull);
-          await tester.tap(find.text('© Terrain & imagery sources'));
+          await tester.tap(find.byKey(const ValueKey('preview-sources')));
           await tester.pump(const Duration(milliseconds: 300));
           final credits = tester
               .widget<SelectableText>(find.byType(SelectableText))

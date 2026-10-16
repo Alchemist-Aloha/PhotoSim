@@ -119,12 +119,12 @@ void main() {
     Future<void> waitForImagery() async {
       for (
         var i = 0;
-        i < 240 && find.text('Imagery · 9/9 textures').evaluate().isEmpty;
+        i < 240 && find.text('Imagery 9/9').evaluate().isEmpty;
         i++
       ) {
         await tester.pump(const Duration(milliseconds: 500));
       }
-      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+      expect(find.text('Imagery 9/9'), findsOneWidget);
     }
 
     Future<void> capture(String name) async {
@@ -192,12 +192,12 @@ void main() {
     expect(find.byType(scene.SceneView), findsOneWidget);
     for (
       var i = 0;
-      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i < 120 && find.text('Terrain 9/9').evaluate().isEmpty;
       i++
     ) {
       await tester.pump(const Duration(milliseconds: 500));
     }
-    expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+    expect(find.text('Terrain 9/9'), findsOneWidget);
     expect(camera().groundElevation, inInclusiveRange(500, 3000));
     await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);
@@ -748,7 +748,7 @@ void main() {
       tester.widget<scene.SceneView>(find.byType(scene.SceneView)).scene,
       same(world),
     );
-    expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+    expect(find.text('Terrain 9/9'), findsOneWidget);
     await capture('linux-preview');
     await openWorkspace(tester, 'Map');
     await tester.pump(const Duration(seconds: 1));
@@ -763,19 +763,19 @@ void main() {
     await openWorkspace(tester, '3D Preview');
     for (
       var i = 0;
-      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i < 120 && find.text('Terrain 9/9').evaluate().isEmpty;
       i++
     ) {
       await tester.pump(const Duration(milliseconds: 500));
     }
     expect(
       tester
-          .widget<Text>(find.byKey(const ValueKey('terrain-cache-count')))
-          .data,
+          .widget<Tooltip>(find.byKey(const ValueKey('terrain-cache-count')))
+          .message,
       '9 cached · 0 downloaded',
     );
     await waitForImagery();
-    expect(find.text('10 cached · 0 downloaded'), findsOneWidget);
+    expect(find.byTooltip('10 cached · 0 downloaded'), findsOneWidget);
     expect(camera().relitImagery, isTrue);
     expect(camera().groundElevation, isNotNull);
     await openWorkspace(tester, 'Map');
@@ -790,12 +790,12 @@ void main() {
     await openWorkspace(tester, '3D Preview');
     for (
       var i = 0;
-      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i < 120 && find.text('Terrain 9/9').evaluate().isEmpty;
       i++
     ) {
       await tester.pump(const Duration(milliseconds: 500));
     }
-    expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+    expect(find.text('Terrain 9/9'), findsOneWidget);
     expect(camera().groundElevation, isNotNull);
     expect(camera().groundElevation, isNot(beforeMove.groundElevation));
     await waitForImagery();
@@ -865,7 +865,7 @@ void main() {
     await openWorkspace(tester, '3D Preview');
     for (
       var i = 0;
-      i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+      i < 120 && find.text('Terrain 9/9').evaluate().isEmpty;
       i++
     ) {
       await tester.pump(const Duration(milliseconds: 500));
@@ -873,11 +873,11 @@ void main() {
     await waitForImagery();
     expect(
       tester
-          .widget<Text>(find.byKey(const ValueKey('terrain-cache-count')))
-          .data,
+          .widget<Tooltip>(find.byKey(const ValueKey('terrain-cache-count')))
+          .message,
       '9 cached · 0 downloaded',
     );
-    expect(find.text('10 cached · 0 downloaded'), findsOneWidget);
+    expect(find.byTooltip('10 cached · 0 downloaded'), findsOneWidget);
     expect(
       SavedPlan('Compare', camera()).encode(),
       SavedPlan('Compare', composition).encode(),

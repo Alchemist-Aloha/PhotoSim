@@ -85,12 +85,12 @@ void main() {
       );
       for (
         var i = 0;
-        i < 200 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
+        i < 200 && find.text('Terrain 9/9').evaluate().isEmpty;
         i++
       ) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+      expect(find.text('Terrain 9/9'), findsOneWidget);
       expect(terrainRequests, 9);
       expect(previewRequests, 3);
       expect(detailRequests, 0);
@@ -108,12 +108,12 @@ void main() {
       imagesReady.complete();
       for (
         var i = 0;
-        i < 200 && find.text('Imagery · 9/9 textures').evaluate().isEmpty;
+        i < 200 && find.text('Imagery 9/9').evaluate().isEmpty;
         i++
       ) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+      expect(find.text('Imagery 9/9'), findsOneWidget);
       expect(previewRequests, 9);
       expect(detailRequests, 1);
       expect(terrainRequests, 9);
@@ -142,13 +142,37 @@ void main() {
       );
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('preview-info')),
-          matching: find.textContaining('Click preview'),
+          of: find.byKey(const ValueKey('preview-actions')),
+          matching: find.byTooltip(
+            'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
+          ),
         ),
         findsOneWidget,
       );
-      expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
-      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+      expect(
+        tester.getSize(find.byKey(const ValueKey('preview-actions'))).width,
+        lessThanOrEqualTo(540),
+      );
+      final terrainStatus = tester.getRect(
+        find.byKey(const ValueKey('terrain-status')),
+      );
+      final imageryStatus = tester.getRect(
+        find.byKey(const ValueKey('imagery-status')),
+      );
+      expect(terrainStatus.top, lessThan(viewRect.top + 48));
+      expect(imageryStatus.top, terrainStatus.top);
+      expect(terrainStatus.overlaps(imageryStatus), isFalse);
+      final credit = tester.widget<Text>(
+        find.byKey(const ValueKey('preview-credit')),
+      );
+      expect(credit.maxLines, 1);
+      expect(credit.overflow, TextOverflow.ellipsis);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('preview-info'))).bottom,
+        viewRect.bottom,
+      );
+      expect(find.text('Terrain 9/9'), findsOneWidget);
+      expect(find.text('Imagery 9/9'), findsOneWidget);
       for (var i = 0; i < nodes.length; i++) {
         expect(nodes[i].mesh!.primitives.single.geometry, same(geometry[i]));
       }
@@ -195,7 +219,7 @@ void main() {
       for (var i = 0; i < nodes.length; i++) {
         expect(nodes[i].mesh!.primitives.single.geometry, same(geometry[i]));
       }
-      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+      expect(find.text('Imagery 9/9'), findsOneWidget);
       expect(terrainRequests, 9);
       expect(previewRequests, 9);
       expect(detailRequests, 1);

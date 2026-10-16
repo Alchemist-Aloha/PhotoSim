@@ -333,31 +333,6 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       cacheError: cacheError,
     );
     final scaffold = Scaffold(
-      drawer: cleanPreview
-          ? null
-          : NavigationDrawer(
-              selectedIndex: workspace.index,
-              onDestinationSelected: (index) {
-                setState(() => workspace = Workspace.values[index]);
-                Navigator.of(context).pop();
-              },
-              children: const [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(28, 24, 16, 16),
-                  child: Text('PhotoSim'),
-                ),
-                NavigationDrawerDestination(
-                  icon: Icon(Icons.map_outlined),
-                  selectedIcon: Icon(Icons.map),
-                  label: Text('Map'),
-                ),
-                NavigationDrawerDestination(
-                  icon: Icon(Icons.landscape_outlined),
-                  selectedIcon: Icon(Icons.landscape),
-                  label: Text('3D Preview'),
-                ),
-              ],
-            ),
       floatingActionButton: cleanPreview
           ? FloatingActionButton.small(
               tooltip: 'Exit fullscreen preview (Esc)',
@@ -369,13 +344,6 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           ? null
           : AppBar(
               title: const Text('PhotoSim'),
-              leading: Builder(
-                builder: (context) => IconButton(
-                  tooltip: 'Open navigation',
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-              ),
               actions: [
                 PopupMenuButton<bool>(
                   tooltip: 'Photography plans',
@@ -425,133 +393,189 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                 const SizedBox(width: 12),
               ],
             ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final viewport = workspace == Workspace.map
-              ? MapWorkspace(
-                  key: ValueKey(openedPlan),
-                  state: state,
-                  onChanged: update,
-                )
-              : rasterCache == null
-              ? Center(
-                  child: Text(cacheError ?? 'Loading disk cache settings…'),
-                )
-              : SimulationWorkspace(
-                  rasterCache: rasterCache,
-                  httpClient: terrainClient,
-                  state: state,
-                  cleanPreview: cleanPreview,
-                  onChanged: update,
-                  onPausePlayback: () => setState(stopPlayback),
-                );
-          return Column(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(child: viewport),
-                    if (!cleanPreview &&
-                        inspectorVisible &&
-                        constraints.maxWidth >= 900) ...[
-                      const VerticalDivider(width: 1),
-                      SizedBox(width: 310, child: inspector),
-                    ],
-                  ],
+      body: Row(
+        children: [
+          if (!cleanPreview) ...[
+            NavigationRail(
+              selectedIndex: workspace.index,
+              labelType: NavigationRailLabelType.all,
+              onDestinationSelected: (index) =>
+                  setState(() => workspace = Workspace.values[index]),
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.map_outlined),
+                  selectedIcon: Icon(Icons.map),
+                  label: Text('Map'),
                 ),
-              ),
-              if (!cleanPreview &&
-                  inspectorVisible &&
-                  constraints.maxWidth < 900)
-                SizedBox(height: 240, child: inspector),
-              if (!cleanPreview) ...[
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  child: Tooltip(
-                    message:
-                        'Estimated timezone from bundled coordinate mapping. Verify near borders and offshore. '
-                        'Local rules are supported for 1970–2037. The slider uses the local day; date/time picker and astronomy remain UTC.',
-                    child: Text(
-                      local == null
-                          ? clock.warning!
-                          : 'Estimated local: ${local.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
-                                '${local.timeZoneName} (${formatUtcOffset(local.timeZoneOffset)}) · ${clock.zoneId}',
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TimeSlider(state: state, onChanged: update),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Wrap(
-                    spacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (target != null)
-                        Tooltip(
-                          message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
-                          child: Text(
-                            '${state.target.label}: ${state.containsDirection(target.direction) ? 'inside' : 'outside'} FOV · alt ${target.altitude.toStringAsFixed(1)}° · offset ${state.targetAngularOffset!.toStringAsFixed(1)}°',
-                          ),
-                        ),
-                      const Icon(Icons.schedule, size: 20),
-                      TextButton(
-                        onPressed: chooseTime,
-                        child: Text(
-                          '${state.timestamp.toIso8601String().substring(0, 16).replaceAll('T', ' ')} UTC',
-                        ),
-                      ),
-                      timeStep(-1),
-                      timeStep(1),
-                      IconButton(
-                        tooltip: playback == null
-                            ? 'Play time ($playbackSpeed simulated minutes per second)'
-                            : 'Pause time',
-                        icon: Icon(
-                          playback == null ? Icons.play_arrow : Icons.pause,
-                        ),
-                        onPressed:
-                            playback == null && nextPlaybackTime.year > 2100
-                            ? null
-                            : togglePlayback,
-                      ),
-                      PopupMenuButton<int>(
-                        tooltip: 'Playback speed',
-                        icon: const Icon(Icons.speed),
-                        initialValue: playbackSpeed,
-                        itemBuilder: (_) => [
-                          for (final speed in [1, 5, 30, 60])
-                            PopupMenuItem(
-                              value: speed,
-                              child: Text('$speed min/s'),
-                            ),
-                        ],
-                        onSelected: (value) =>
-                            setState(() => playbackSpeed = value),
-                      ),
-                      Text(
-                        'Sun az ${sky.sun.azimuth.toStringAsFixed(1)}° · alt ${sky.sun.altitude.toStringAsFixed(1)}°',
-                      ),
-                      Text(
-                        'Moon az ${sky.moon.azimuth.toStringAsFixed(1)}° · alt ${sky.moon.altitude.toStringAsFixed(1)}° · '
-                        '${(sky.moonIllumination * 100).toStringAsFixed(0)}% ${sky.moonWaxing ? 'waxing' : 'waning'}',
-                      ),
-                    ],
-                  ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.landscape_outlined),
+                  selectedIcon: Icon(Icons.landscape),
+                  label: Text('3D Preview'),
                 ),
               ],
-            ],
-          );
-        },
+            ),
+            const VerticalDivider(width: 1),
+          ],
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewport = workspace == Workspace.map
+                    ? MapWorkspace(
+                        key: ValueKey(openedPlan),
+                        state: state,
+                        onChanged: update,
+                      )
+                    : rasterCache == null
+                    ? Center(
+                        child: Text(
+                          cacheError ?? 'Loading disk cache settings…',
+                        ),
+                      )
+                    : SimulationWorkspace(
+                        rasterCache: rasterCache,
+                        httpClient: terrainClient,
+                        state: state,
+                        cleanPreview: cleanPreview,
+                        onChanged: update,
+                        onPausePlayback: () => setState(stopPlayback),
+                      );
+                return Column(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(child: viewport),
+                          if (!cleanPreview &&
+                              inspectorVisible &&
+                              constraints.maxWidth >= 900) ...[
+                            const VerticalDivider(width: 1),
+                            SizedBox(width: 310, child: inspector),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (!cleanPreview &&
+                        inspectorVisible &&
+                        constraints.maxWidth < 900)
+                      SizedBox(height: 240, child: inspector),
+                    if (!cleanPreview) ...[
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: DefaultTextStyle.merge(
+                          style: Theme.of(context).textTheme.bodySmall,
+                          child: Wrap(
+                            spacing: 16,
+                            runSpacing: 4,
+                            children: [
+                              Tooltip(
+                                message:
+                                    'Estimated timezone from bundled coordinate mapping. Verify near borders and offshore. '
+                                    'Local rules are supported for 1970–2037. The slider uses the local day; date/time picker and astronomy remain UTC.',
+                                child: Text(
+                                  local == null
+                                      ? clock.warning!
+                                      : 'Estimated local: ${local.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
+                                            '${local.timeZoneName} (${formatUtcOffset(local.timeZoneOffset)}) · ${clock.zoneId}',
+                                ),
+                              ),
+                              if (target != null)
+                                Tooltip(
+                                  message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
+                                  child: Text(
+                                    '${state.target.label}: ${state.containsDirection(target.direction) ? 'inside' : 'outside'} FOV · alt ${target.altitude.toStringAsFixed(1)}° · offset ${state.targetAngularOffset!.toStringAsFixed(1)}°',
+                                  ),
+                                ),
+
+                              Text(
+                                'Sun az ${sky.sun.azimuth.toStringAsFixed(1)}° · alt ${sky.sun.altitude.toStringAsFixed(1)}°',
+                              ),
+                              Text(
+                                'Moon az ${sky.moon.azimuth.toStringAsFixed(1)}° · alt ${sky.moon.altitude.toStringAsFixed(1)}° · '
+                                '${(sky.moonIllumination * 100).toStringAsFixed(0)}% ${sky.moonWaxing ? 'waxing' : 'waning'}',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, timelineBounds) {
+                            final controls = Wrap(
+                              spacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                const Icon(Icons.schedule, size: 20),
+                                TextButton(
+                                  onPressed: chooseTime,
+                                  child: Text(
+                                    '${state.timestamp.toIso8601String().substring(0, 16).replaceAll('T', ' ')} UTC',
+                                  ),
+                                ),
+                                timeStep(-1),
+                                timeStep(1),
+                                IconButton(
+                                  tooltip: playback == null
+                                      ? 'Play time ($playbackSpeed simulated minutes per second)'
+                                      : 'Pause time',
+                                  icon: Icon(
+                                    playback == null
+                                        ? Icons.play_arrow
+                                        : Icons.pause,
+                                  ),
+                                  onPressed:
+                                      playback == null &&
+                                          nextPlaybackTime.year > 2100
+                                      ? null
+                                      : togglePlayback,
+                                ),
+                                PopupMenuButton<int>(
+                                  tooltip: 'Playback speed',
+                                  icon: const Icon(Icons.speed),
+                                  initialValue: playbackSpeed,
+                                  itemBuilder: (_) => [
+                                    for (final speed in [1, 5, 30, 60])
+                                      PopupMenuItem(
+                                        value: speed,
+                                        child: Text('$speed min/s'),
+                                      ),
+                                  ],
+                                  onSelected: (value) =>
+                                      setState(() => playbackSpeed = value),
+                                ),
+                              ],
+                            );
+                            final slider = TimeSlider(
+                              state: state,
+                              onChanged: update,
+                            );
+                            return timelineBounds.maxWidth >= 760
+                                ? Row(
+                                    children: [
+                                      controls,
+                                      const SizedBox(width: 16),
+                                      Expanded(child: slider),
+                                    ],
+                                  )
+                                : Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [controls, slider],
+                                  );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
     return CallbackShortcuts(

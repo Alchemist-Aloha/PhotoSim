@@ -45,7 +45,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Bluer clear skies and air-mass extinction for dimmer, redder sunrise/sunset.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
-- Desktop navigation drawer for Map/3D Preview; floating ruler/stars/export controls and one in-view status/help/attribution panel.
+- Persistent navigation rail for Map/3D Preview; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
 - Collapsible inspector with weather/quality/relighting in the right panel; UTC date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.

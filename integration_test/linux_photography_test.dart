@@ -66,7 +66,7 @@ void main() {
         ),
       );
       for (var i = 0; i < 240; i++) {
-        if (find.text('Imagery · 9/9 textures').evaluate().isNotEmpty &&
+        if (find.text('Imagery 9/9').evaluate().isNotEmpty &&
             tester
                     .widget<OutlinedButton>(
                       find.widgetWithText(OutlinedButton, 'Export PNG'),
@@ -77,7 +77,7 @@ void main() {
         }
         await tester.pump(const Duration(milliseconds: 500));
       }
-      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+      expect(find.text('Imagery 9/9'), findsOneWidget);
       final view = tester.widget<scene.SceneView>(find.byType(scene.SceneView));
       final world = view.scene!;
       final nodes = world.root.children

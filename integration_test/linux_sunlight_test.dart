@@ -45,12 +45,12 @@ void main() {
       );
       for (
         var i = 0;
-        i < 240 && find.text('Imagery · 9/9 textures').evaluate().isEmpty;
+        i < 240 && find.text('Imagery 9/9').evaluate().isEmpty;
         i++
       ) {
         await tester.pump(const Duration(milliseconds: 500));
       }
-      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+      expect(find.text('Imagery 9/9'), findsOneWidget);
       final world = tester
           .widget<scene.SceneView>(find.byType(scene.SceneView))
           .scene!;

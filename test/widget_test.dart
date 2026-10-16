@@ -8,73 +8,90 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 
 void main() {
-  testWidgets(
-    'desktop drawer switches workspaces, closes on selection and preserves UTC/camera',
-    (tester) async {
-      tester.view.physicalSize = const Size(1600, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(const PhotoSimApp());
-      final original = tester
-          .widget<CameraInspector>(find.byType(CameraInspector))
-          .state;
-      Future<void> open() async {
-        await tester.tap(find.byTooltip('Open navigation'));
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
+  testWidgets('navigation rail switches workspaces and preserves UTC/camera', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const PhotoSimApp());
+    final original = tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .state;
+    expect(find.byType(NavigationDrawer), findsNothing);
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+      0,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('3D Preview'),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(FlutterMap), findsNothing);
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+      1,
+    );
+    await tester.tap(find.byTooltip('Fullscreen preview'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byKey(const ValueKey('local-day-slider')), findsNothing);
+    await tester.tap(find.byTooltip('Exit fullscreen preview (Esc)'));
+    await tester.pump();
+    expect(find.byType(NavigationRail), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Map'),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(FlutterMap), findsOneWidget);
+    final current = tester
+        .widget<CameraInspector>(find.byType(CameraInspector))
+        .state;
+    expect(current.location, original.location);
+    expect(current.timestamp, original.timestamp);
+    expect(current.focalLength, original.focalLength);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('timeline adapts to window width without hiding controls', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.view.physicalSize = const Size(1600, 900);
+    await tester.pumpWidget(const PhotoSimApp());
+    await tester.tap(find.text('3D Preview'));
+    await tester.pumpAndSettle();
+    for (final width in [800.0, 1280.0]) {
+      tester.view.physicalSize = Size(width, 900);
+      await tester.pumpAndSettle();
+      final slider = tester.getRect(
+        find.byKey(const ValueKey('local-day-slider')),
+      );
+      final play = tester.getRect(
+        find.byTooltip('Play time (5 simulated minutes per second)'),
+      );
+      if (width >= 1280) {
+        expect(slider.center.dy, closeTo(play.center.dy, 1));
+        expect(slider.left, greaterThan(play.right));
+      } else {
+        expect(slider.top, greaterThanOrEqualTo(play.bottom));
       }
+      expect(find.byTooltip('Earlier by one hour'), findsOneWidget);
+      expect(find.byTooltip('Later by one hour'), findsOneWidget);
+      expect(find.byType(NavigationRail), findsOneWidget);
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
 
-      await open();
-      expect(
-        tester
-            .widget<NavigationDrawer>(find.byType(NavigationDrawer))
-            .selectedIndex,
-        0,
-      );
-      await tester.tap(
-        find.descendant(
-          of: find.byType(NavigationDrawer),
-          matching: find.text('3D Preview'),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(
-        tester.state<ScaffoldState>(find.byType(Scaffold)).isDrawerOpen,
-        isFalse,
-      );
-      expect(find.byType(FlutterMap), findsNothing);
-      await open();
-      expect(
-        tester
-            .widget<NavigationDrawer>(find.byType(NavigationDrawer))
-            .selectedIndex,
-        1,
-      );
-      await tester.tap(
-        find.descendant(
-          of: find.byType(NavigationDrawer),
-          matching: find.text('Map'),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(
-        tester.state<ScaffoldState>(find.byType(Scaffold)).isDrawerOpen,
-        isFalse,
-      );
-      expect(find.byType(FlutterMap), findsOneWidget);
-      final current = tester
-          .widget<CameraInspector>(find.byType(CameraInspector))
-          .state;
-      expect(current.location, original.location);
-      expect(current.timestamp, original.timestamp);
-      expect(current.focalLength, original.focalLength);
-      await tester.pumpWidget(const SizedBox());
-      expect(tester.takeException(), isNull);
-    },
-  );
   testWidgets('target selection and aiming preserve location and UTC', (
     tester,
   ) async {

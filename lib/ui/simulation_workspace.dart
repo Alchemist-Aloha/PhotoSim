@@ -718,6 +718,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         ),
       );
     }
+    final credits = {
+      ...terrainProviders.values.map((provider) => provider.attribution),
+      ...imageProviders.values
+          .expand((providers) => providers)
+          .map((provider) => provider.attribution),
+    }.join(' · ');
     final active = world;
     if (active == null) return const Center(child: CircularProgressIndicator());
     final state = widget.state;
@@ -887,7 +893,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             Align(
               alignment: Alignment.topRight,
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: bounds.maxHeight * 0.4),
+                constraints: BoxConstraints(
+                  maxWidth: 540,
+                  maxHeight: bounds.maxHeight * 0.4,
+                ),
                 child: Card(
                   key: const ValueKey('preview-actions'),
                   elevation: 4,
@@ -902,6 +911,45 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          DefaultTextStyle.merge(
+                            style: Theme.of(context).textTheme.bodySmall,
+                            child: Wrap(
+                              spacing: 16,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Tooltip(
+                                  key: const ValueKey('terrain-cache-count'),
+                                  message:
+                                      '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
+                                  child: Text(
+                                    'Terrain $loaded/$total${loading ? ' · loading' : ''}',
+                                    key: const ValueKey('terrain-status'),
+                                  ),
+                                ),
+                                Tooltip(
+                                  key: const ValueKey('imagery-cache-count'),
+                                  message:
+                                      '${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
+                                  child: Text(
+                                    'Imagery ${textures.length}/$loaded${imageryLoading ? ' · loading' : ''}',
+                                    key: const ValueKey('imagery-status'),
+                                  ),
+                                ),
+                                if (textures.length < loaded ||
+                                    partialImagery.isNotEmpty)
+                                  const Tooltip(
+                                    message: 'Fallback surface where imagery is missing',
+                                    child: Text('Partial imagery'),
+                                  ),
+                                const Tooltip(
+                                  message: 'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
+                                  child: Icon(Icons.help_outline, size: 16),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
                           Wrap(
                             spacing: 12,
                             runSpacing: 8,
@@ -1001,95 +1049,34 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               ),
             ),
           if (!widget.cleanPreview)
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: bounds.maxHeight * 0.4),
-                child: Card(
-                  key: const ValueKey('preview-info'),
-                  elevation: 4,
-                  color: Theme.of(context).colorScheme.surfaceContainer
-                      .withValues(alpha: 0.9),
-                  margin: const EdgeInsets.all(12),
-                  clipBehavior: Clip.antiAlias,
-                  child: SingleChildScrollView(
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Material(
+                key: const ValueKey('preview-info'),
+                color: Theme.of(context).colorScheme.surfaceContainer
+                    .withValues(alpha: 0.9),
+                child: Tooltip(
+                  message:
+                      '${credits.isEmpty ? 'Terrain & imagery sources' : credits}\nClick for sources and licenses',
+                  child: InkWell(
+                    key: const ValueKey('preview-sources'),
+                    onTap: showSources,
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: DefaultTextStyle.merge(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      child: Text(
+                        credits.isEmpty
+                            ? '© Terrain & imagery sources'
+                            : credits,
+                        key: const ValueKey('preview-credit'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
                         style: Theme.of(context).textTheme.bodySmall,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
-                                ),
-                                Text(
-                                  '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
-                                  key: const ValueKey('terrain-cache-count'),
-                                ),
-                              ],
-                            ),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
-                                ),
-                                Text(
-                                  '${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
-                                  key: const ValueKey('imagery-cache-count'),
-                                ),
-                              ],
-                            ),
-                            if (textures.length < loaded ||
-                                partialImagery.isNotEmpty)
-                              const Text(
-                                'Fallback surface where imagery is missing',
-                              ),
-                            Wrap(
-                              spacing: 12,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                const Text(
-                                  'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
-                                ),
-                                if (terrainProviders.isNotEmpty)
-                                  Text(
-                                    terrainProviders.values
-                                        .map((provider) => provider.attribution)
-                                        .toSet()
-                                        .join(' · '),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall,
-                                  ),
-                                if (imageProviders.isNotEmpty)
-                                  Text(
-                                    imageProviders.values
-                                        .expand((providers) => providers)
-                                        .map((provider) => provider.attribution)
-                                        .toSet()
-                                        .join(' · '),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall,
-                                  ),
-                                TextButton(
-                                  onPressed: showSources,
-                                  child: const Text(
-                                    '© Terrain & imagery sources',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ),

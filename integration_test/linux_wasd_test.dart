@@ -34,7 +34,7 @@ void main() {
       await openWorkspace(tester, '3D Preview');
       Future<void> waitForImagery() async {
         for (var i = 0; i < 240; i++) {
-          if (find.text('Imagery · 9/9 textures').evaluate().isNotEmpty &&
+          if (find.text('Imagery 9/9').evaluate().isNotEmpty &&
               tester
                       .widget<OutlinedButton>(
                         find.widgetWithText(OutlinedButton, 'Export PNG'),
@@ -45,7 +45,7 @@ void main() {
           }
           await tester.pump(const Duration(milliseconds: 500));
         }
-        expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+        expect(find.text('Imagery 9/9'), findsOneWidget);
       }
 
       await waitForImagery();
