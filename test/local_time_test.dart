@@ -2,6 +2,46 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/core/local_time.dart';
 
 void main() {
+  LocalDay day(DateTime utc, double latitude, double longitude) => LocalDay(
+    localClock(timestamp: utc, latitude: latitude, longitude: longitude).time!,
+  );
+  test(
+    'local day uses local date, fractional offsets and next local midnight',
+    () {
+      final la = day(DateTime.utc(2026, 6, 21, 1), 37.744, -119.59);
+      expect(la.date, '2026-06-20');
+      expect(la.utcAt(0), DateTime.utc(2026, 6, 20, 7));
+      expect(la.utcAt(1440), DateTime.utc(2026, 6, 21, 7));
+      final nepal = day(DateTime.utc(2026, 1, 1, 1), 27.7172, 85.324);
+      expect(nepal.utcAt(0), DateTime.utc(2025, 12, 31, 18, 15));
+      expect(nepal.utcAt(720), DateTime.utc(2026, 1, 1, 6, 15));
+      expect(nepal.label(1440), '24:00 +0545');
+      expect(() => la.utcAt(double.nan), throwsArgumentError);
+      expect(() => la.utcAt(-1), throwsArgumentError);
+      expect(() => la.utcAt(1441), throwsArgumentError);
+      expect(
+        day(DateTime.utc(1970, 1, 1, 1), 37.744, -119.59).supported,
+        isFalse,
+      );
+    },
+  );
+  test('local day spans DST gaps/folds chronologically, including half-hour shifts', () {
+    final spring = day(DateTime.utc(2026, 3, 8, 19), 37.744, -119.59);
+    expect(spring.minutes, 1380);
+    expect(spring.label(119), '01:59 PST');
+    expect(spring.label(120), '03:00 PDT');
+    expect(spring.utcAt(1380), DateTime.utc(2026, 3, 9, 7));
+    final fall = day(DateTime.utc(2026, 11, 1, 20), 37.744, -119.59);
+    expect(fall.minutes, 1500);
+    expect(fall.label(90), '01:30 PDT');
+    expect(fall.label(150), '01:30 PST');
+    expect(fall.utcAt(1500), DateTime.utc(2026, 11, 2, 8));
+    final lordHowe = day(DateTime.utc(2026, 10, 3, 18), -31.55, 159.08);
+    expect(lordHowe.minutes, 1410);
+    for (final value in [0.0, 90.0, 150.0, lordHowe.minutes]) {
+      expect(lordHowe.position(lordHowe.utcAt(value)), value);
+    }
+  });
   test('offline lookup covers several zones and fractional offsets', () {
     final utc = DateTime.utc(2026, 6, 21, 19);
     for (final entry in [

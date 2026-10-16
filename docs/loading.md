@@ -43,6 +43,32 @@ No numeric vendor quota was established. Public services can still throttle or
 become unavailable; substantial distribution may require hosting/service agreements.
 The policy covers terrain/imagery requests, not the separate planning-map client.
 
+## Disk cache settings
+
+Open **Storage** in the right settings/inspector panel. Set **Total disk cache
+limit (MiB)** and press **Apply cache limit**. Default: **512 MiB**; range:
+**0–65,536 MiB** (64 GiB). Zero disables disk caching and removes existing raster
+entries. Changing the limit does not change camera/time, plans or loaded GPU assets.
+
+The limit covers committed original DEM/imagery bytes plus paired JSON provenance,
+shared across all existing provider/resolution folders. Existing files are reused;
+there is no expiry timer. Reads refresh LRU order; writes evict oldest-used entries
+when necessary. A single entry exceeding the entire limit is discarded without
+flushing useful smaller entries. Lower limits apply immediately and at startup.
+
+The setting is staged/saved in the application-support directory at
+`photosim/cache-settings.json`, not in photography plans. Files remain in the
+application-cache directory under `photosim/`. Startup removes stale raster staging
+files and orphan JSON only in known source folders; unrelated files and links are
+not traversed. File/settings failures show warnings and do not destroy plans.
+
+One shared write/settings/eviction queue protects concurrent downloads. The index
+is scanned once at startup, then updated incrementally, avoiding a whole-cache
+scan per download. It assumes one application writer, not multiple processes.
+The limit excludes GPU/RAM usage and filesystem allocation overhead; staged writes
+can temporarily exceed it. The OS/user may still clear the cache. This is not a
+permanent offline archive or an imagery freshness guarantee.
+
 ## Checks
 
 Mocked tests cover streaming concurrency, pre-cancelled/queued/deadline cancellation,

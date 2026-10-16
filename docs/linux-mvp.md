@@ -24,10 +24,11 @@ The right inspector is grouped into collapsible **Optics**, **Position & orienta
 Optics starts expanded; the other sections start collapsed. Expansion is retained
 while using the current workspace/session. Rendering includes quality, approximate
 relighting (enabled by default in new sessions) and constellation guides. Existing
-saved plans retain their own relighting preference. The 3D toolbar keeps quick
-quality/weather access.
+saved plans retain their own relighting preference. Weather, quality and relighting
+have a single home in the right panel. The preview toolbar groups Terrain range,
+Constellations and Export PNG, with terrain/imagery status on a separate row.
 
-In the 3D toolbar:
+Under Rendering:
 
 | Quality | Render scale | AA when Auto is selected | Shadow map | DOF gather |
 |---|---:|---|---:|---:|
@@ -96,9 +97,15 @@ in Downloads, falling back to Documents), then **Save PNG**. The destination
 directory must exist. Existing files are never overwritten; choose another name.
 Cancel writes nothing. Errors are reported without replacing existing images.
 
-The export captures the current photographic viewport, preserving sensor aspect
-ratio, current quality, weather and DOF. It excludes toolbars, crosshair and
-application panels. Enabled in-scene constellation/target guides remain part of
+The 3D canvas fills its available area rather than letterboxing. An inset rectangle
+marks the selected sensor/portrait aspect ratio and labels focal length, aperture
+and DOF status. Projection preserves the physical photo FOV inside that rectangle;
+DOF circle-of-confusion scaling uses photo pixels, not the larger context view.
+Clean/fullscreen keeps the photo rectangle and lens label but hides planning guides.
+
+Export crops that framed region, preserving sensor aspect ratio, quality, weather
+and DOF. It excludes the frame, lens label, crosshair, grid, level and application
+panels. Enabled in-scene constellation/target guides remain part of
 the preview. Source credits and a UTC/optics/weather caption are burned into the
 image. Geographic and celestial sources remain subject to their own terms.
 

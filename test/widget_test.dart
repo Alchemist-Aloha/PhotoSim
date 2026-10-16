@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:photosim/core/geo.dart';
-import 'package:photosim/ui/time_slider.dart';
+import 'package:photosim/core/local_time.dart';
 import 'package:photosim/app/app.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
@@ -125,7 +125,7 @@ void main() {
         isNot(moonBefore),
       );
       tester
-          .widget<Slider>(find.byKey(const ValueKey('utc-day-slider')))
+          .widget<Slider>(find.byKey(const ValueKey('local-day-slider')))
           .onChanged!(360);
       await tester.pump();
       checkGuides();
@@ -134,7 +134,7 @@ void main() {
             .widget<CameraInspector>(find.byType(CameraInspector))
             .state
             .timestamp,
-        DateTime.utc(2026, 6, 21, 6),
+        DateTime.utc(2026, 6, 21, 13),
       );
       for (final entry in [
         (DateTime.utc(1900), 'Earlier by one hour'),
@@ -188,15 +188,15 @@ void main() {
       await tester.tap(find.byTooltip(play));
       await tester.pump(const Duration(milliseconds: 200));
       final sliderDate = camera().timestamp;
-      final editedTime = DateTime.utc(
-        sliderDate.year,
-        sliderDate.month,
-        sliderDate.day,
-        6,
-        40,
-      );
+      final editedTime = LocalDay(
+        localClock(
+          timestamp: sliderDate,
+          latitude: camera().latitude,
+          longitude: camera().longitude,
+        ).time!,
+      ).utcAt(400);
       tester
-          .widget<Slider>(find.byKey(const ValueKey('utc-day-slider')))
+          .widget<Slider>(find.byKey(const ValueKey('local-day-slider')))
           .onChanged!(400);
       await tester.pump(const Duration(seconds: 1));
       expect(camera().timestamp, editedTime);
@@ -235,58 +235,6 @@ void main() {
       await tester.tap(find.byTooltip(play));
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 1));
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'day slider rounds minutes, preserves state and stays inside endpoint dates',
-    (tester) async {
-      var state = SimulationState(
-        timestamp: DateTime.utc(1900),
-        groundElevation: 1200,
-        relitImagery: true,
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, setState) => TimeSlider(
-                state: state,
-                onChanged: (next) => setState(() => state = next),
-              ),
-            ),
-          ),
-        ),
-      );
-      Slider slider() =>
-          tester.widget<Slider>(find.byKey(const ValueKey('utc-day-slider')));
-      expect(slider().semanticFormatterCallback!(59.6), '01:00 UTC');
-      for (final value in [0.0, 59.6, 720.0, 1439.0]) {
-        slider().onChanged!(value);
-        await tester.pump();
-        expect(
-          state.timestamp,
-          DateTime.utc(1900).add(Duration(minutes: value.round())),
-        );
-        expect(state.timestamp.isUtc, isTrue);
-        expect(state.groundElevation, 1200);
-        expect(state.relitImagery, isTrue);
-        expect(state.latitude, 37.744);
-      }
-      state = state.copyWith(timestamp: DateTime.utc(2100, 12, 31, 23, 59, 59));
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: TimeSlider(state: state, onChanged: (next) => state = next),
-          ),
-        ),
-      );
-      expect(slider().value, 1439);
-      slider().onChanged!(1439);
-      expect(state.timestamp, DateTime.utc(2100, 12, 31, 23, 59));
-      slider().onChanged!(0);
-      expect(state.timestamp, DateTime.utc(2100, 12, 31));
       expect(tester.takeException(), isNull);
     },
   );

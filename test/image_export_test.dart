@@ -31,6 +31,40 @@ void main() {
     },
   );
 
+  testWidgets('PNG crops the photo region instead of exporting context', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder)
+        ..drawColor(const ui.Color(0xFFFF0000), ui.BlendMode.src);
+      const crop = ui.Rect.fromLTWH(100, 50, 200, 200);
+      canvas.drawRect(crop, ui.Paint()..color = const ui.Color(0xFF336699));
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(400, 300);
+      try {
+        final decoded = img.decodePng(
+          await encodePreview(image, 'Test credits', crop: crop),
+        )!;
+        expect(decoded.width, 200);
+        expect(decoded.height, 200);
+        expect(decoded.getPixel(0, 0).r, 51);
+        expect(decoded.getPixel(0, 0).b, 153);
+        expect(decoded.getPixel(0, 199).r, lessThan(51));
+        await expectLater(
+          encodePreview(
+            image,
+            '',
+            crop: const ui.Rect.fromLTWH(-1, 0, 200, 200),
+          ),
+          throwsArgumentError,
+        );
+      } finally {
+        image.dispose();
+        picture.dispose();
+      }
+    });
+  });
   test('exclusive staged PNG writes reject bad paths, preserve existing files and clean staging', () async {
     final directory = await Directory.systemTemp.createTemp(
       'photosim-export-test-',

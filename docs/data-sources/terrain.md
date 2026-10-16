@@ -150,14 +150,16 @@ Sun/Moon lighting brightness is approximate; see [astronomy notes](../astronomy.
 
 ## Native cache
 
-The application cache directory contains two provider namespaces:
+The existing provider namespaces remain readable:
 
-- `photosim/mapterhorn-v1/`: 128 MiB, raw lossless WebP.
-- `photosim/terrain-v1/`: 128 MiB, existing Mapzen PNGs.
+- `photosim/mapterhorn-v1/`: raw lossless WebP.
+- `photosim/terrain-v1/`: Mapzen PNGs.
 
-Total configured elevation budget remains **256 MiB**, independent of imagery.
-Old Mapzen paths remain readable; their former 256 MiB budget shrinks on the next
-write/eviction. The shared cache retains `.png` filenames even for WebP; decoding
+**Storage → Total disk cache limit (MiB)** controls one terrain + imagery budget,
+default **512 MiB**, configurable from **0 to 65,536 MiB**. The former fixed
+per-provider quotas no longer constrain the application. Lowering the limit trims
+immediately; zero disables disk caching. See [cache settings](../loading.md#disk-cache-settings).
+The shared cache retains `.png` filenames even for WebP; decoding
 uses the provider/actual encoding, not the filename. Parent rasters use their true
 zoom-12 cache keys and request URLs, not the target child's identity.
 
@@ -165,8 +167,9 @@ Sidecars record provider, source raster tile, original URL, pixel dimensions,
 encoding, horizontal CRS, attribution, UTC download time, unknown acquisition time
 and the datum warning. Successful original rasters are cached, not generated meshes.
 Corrupt entries are removed/refetched; failed responses never populate caches.
-PNG/WebP files and metadata are evicted least-recently-used first. Non-tile files
-are untouched. Staged writes are renamed; cache filesystem errors preserve network
+PNG/WebP files and metadata are evicted least-recently-used across all raster
+sources. Startup cleans stale raster staging files and orphan sidecars only in
+known cache directories. Unrelated files and linked directories are untouched. Staged writes are renamed; cache filesystem errors preserve network
 rendering and usable read-only entries. No cache refresh UI is implemented.
 
 ## Validation

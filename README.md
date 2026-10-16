@@ -36,7 +36,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Approximate relighting enabled by default; optional natural imagery, without rebuilding terrain.
 - Collapsible inspector sections for optics, position/orientation, depth of field, weather and rendering.
 - Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
-- Independent bounded terrain/imagery caches with corruption recovery and source metadata.
+- Persistent terrain/imagery disk caching with one adjustable size limit under **Storage** (512 MiB default), LRU eviction, corruption recovery and source metadata.
 - Drag the 3D preview to look around; change focal length to zoom optically.
 - Click the 3D preview and hold WASD to move at 30 m/s; the camera climbs/descends with terrain while keeping its height offset.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
@@ -45,7 +45,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Bluer clear skies and air-mass extinction for dimmer, redder sunrise/sunset.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
-- Collapsible inspector, UTC date/time controls and shared minute-resolution day slider.
+- Collapsible inspector with weather/quality/relighting in the right panel; UTC date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
 - 5,044 bundled stars and licensed simplified Milky Way brightness contours.
@@ -58,13 +58,14 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Manual **Clear / Cloudy / Fog / Rain** presets, explicitly illustrative rather than forecast weather.
 - Depth-buffer **depth of field** linked to aperture (f/1.4–f/22), focal length, sensor and focus distance.
 - Enhanced/Manual/Auto exposure with ISO, shutter, exposure compensation and approximate white balance.
-- Portrait framing, camera roll, configurable thirds/crosshair/level guides and fullscreen preview (Esc exits).
+- Full-area 3D context preview with a sensor-aspect photo rectangle and focal-length/aperture/DOF label; portrait/roll, composition guides and fullscreen preview (Esc exits).
 - Adjustable 1/5/30/60 min/s playback and target angular-offset readout.
 
 See [Linux MVP photography controls and export](docs/linux-mvp.md) for usage, limits and validation.
 
-The preview maintains the sensor's aspect ratio so map and 3D fields of view
-agree. Camera controls never translate the 3D camera implicitly.
+The inset photo rectangle matches the sensor's aspect ratio and map FOV; the
+surrounding 3D context fills the available canvas. Lens/roll controls preserve
+position; WASD moves explicitly. PNG export crops to the photo rectangle.
 
 ## Build and verify
 
@@ -90,7 +91,7 @@ integration tests are analyzed too. No extra lint dependency is required.
 
 Ship the **entire bundle directory**, not just its executable. The integration
 test requires a live Linux graphical session and internet access on its first
-terrain/imagery visit. Subsequent visits reuse the independent disk caches. It writes screenshots to
+terrain/imagery visit. Subsequent visits reuse the source-separated disk caches within the shared size limit. It writes screenshots to
 `build/validation/`.
 
 See [implementation status](docs/implementation-status.md) for validation
@@ -130,7 +131,7 @@ Forward coverage follows sensor/focal length, pitch and azimuth after a 400 ms
 pause; long lenses prefer finer tiles, subject to a 256-tile budget. Overlapping
 meshes/textures stay resident. Settings persist in saved plans.
 
-The 256 MiB elevation LRU disk budget remains split between Mapterhorn and Mapzen. Where regional tiles are absent, the
+Terrain and imagery share a persistent LRU disk budget configured under **Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
 loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,
 but current mesh density does not display their finest native detail. Cached terrain works without network access, but this is not a complete
 offline-region feature. Source vertical datums are uncorrected; do not use the

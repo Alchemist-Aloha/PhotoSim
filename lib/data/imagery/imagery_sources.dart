@@ -6,30 +6,36 @@ import 'package:http/http.dart' as http;
 
 import '../../core/terrain_geo.dart';
 import '../terrain/tile_cache.dart';
+import '../raster_cache.dart';
 import 'imagery_provider.dart';
 import 'imagery_repository.dart';
 
 /// Regional aerial imagery first; fill remaining coverage with the global mosaic.
 class ImagerySources {
-  ImagerySources({required http.Client client, required Directory directory})
-    : sources = [
-        for (final provider in imageryProviders)
-          ImageryRepository(
-            client: client,
-            provider: provider,
-            retainTransparency: true,
-            previewCache: TileCache(
-              Directory('${directory.path}/${provider.cacheKey}-256-v1'),
-              maxBytes: 16 * 1024 * 1024,
-              maxEntryBytes: 8 * 1024 * 1024,
-            ),
-            detailCache: TileCache(
-              Directory('${directory.path}/${provider.cacheKey}-1024-v1'),
-              maxBytes: 48 * 1024 * 1024,
-              maxEntryBytes: 8 * 1024 * 1024,
-            ),
-          ),
-      ];
+  ImagerySources({
+    required http.Client client,
+    required Directory directory,
+    RasterCache? budget,
+  }) : sources = [
+         for (final provider in imageryProviders)
+           ImageryRepository(
+             client: client,
+             provider: provider,
+             retainTransparency: true,
+             previewCache: TileCache(
+               Directory('${directory.path}/${provider.cacheKey}-256-v1'),
+               maxBytes: 16 * 1024 * 1024,
+               budget: budget,
+               maxEntryBytes: 8 * 1024 * 1024,
+             ),
+             detailCache: TileCache(
+               Directory('${directory.path}/${provider.cacheKey}-1024-v1'),
+               maxBytes: 48 * 1024 * 1024,
+               budget: budget,
+               maxEntryBytes: 8 * 1024 * 1024,
+             ),
+           ),
+       ];
 
   final List<ImageryRepository> sources;
   int get cacheHits => sources.fold(0, (sum, source) => sum + source.cacheHits);

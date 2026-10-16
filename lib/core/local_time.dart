@@ -8,7 +8,7 @@ Map<String, tz.Location> _loadLocations() {
   return tz.timeZoneDatabase.locations;
 }
 
-/// Presentation only: never use these wall-clock fields as simulation timestamps.
+/// Local wall clocks require timezone conversion; simulation timestamps remain UTC.
 ({String zoneId, tz.TZDateTime? time, String? warning}) localClock({
   required DateTime timestamp,
   required double latitude,
@@ -44,6 +44,40 @@ Map<String, tz.Location> _loadLocations() {
     time: tz.TZDateTime.from(utc, location),
     warning: null,
   );
+}
+
+/// Chronological local calendar day: DST gaps are skipped and both folded hours remain reachable.
+class LocalDay {
+  LocalDay(tz.TZDateTime time)
+    : start = tz.TZDateTime(time.location, time.year, time.month, time.day),
+      end = tz.TZDateTime(time.location, time.year, time.month, time.day + 1);
+  final tz.TZDateTime start, end;
+  double get minutes =>
+      end.difference(start).inMicroseconds / Duration.microsecondsPerMinute;
+  bool get supported =>
+      start.native.year >= 1970 && end.native.year <= 2037 && minutes > 0;
+  String get date =>
+      '${start.year.toString().padLeft(4, '0')}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
+
+  DateTime utcAt(double minute) {
+    if (!minute.isFinite || minute < 0 || minute > minutes) {
+      throw ArgumentError('Minute outside local day');
+    }
+    if (minute == minutes) return end.native;
+    final result = start.native.add(Duration(minutes: minute.round()));
+    return result.isAfter(end.native) ? end.native : result;
+  }
+
+  double position(DateTime utc) => utc.isAtSameMomentAs(end)
+      ? minutes
+      : utc.difference(start).inMinutes.toDouble().clamp(0, minutes);
+
+  String label(double minute) {
+    final utc = utcAt(minute);
+    if (utc == end.native) return '24:00 ${end.timeZoneName}';
+    final time = tz.TZDateTime.from(utc, start.location);
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} ${time.timeZoneName}';
+  }
 }
 
 String formatUtcOffset(Duration offset) {

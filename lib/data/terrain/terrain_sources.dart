@@ -9,20 +9,25 @@ import 'terrain_patch.dart';
 import 'terrain_provider.dart';
 import 'terrain_repository.dart';
 import 'tile_cache.dart';
+import '../raster_cache.dart';
 
 class TerrainSources {
-  TerrainSources({required http.Client client, required Directory directory})
-    : sources = [
-        for (final provider in TerrainProvider.values)
-          TerrainRepository(
-            client: client,
-            provider: provider,
-            cache: TileCache(
-              Directory('${directory.path}/${provider.cacheKey}'),
-              maxBytes: 128 * 1024 * 1024,
-            ),
-          ),
-      ];
+  TerrainSources({
+    required http.Client client,
+    required Directory directory,
+    RasterCache? budget,
+  }) : sources = [
+         for (final provider in TerrainProvider.values)
+           TerrainRepository(
+             client: client,
+             provider: provider,
+             cache: TileCache(
+               Directory('${directory.path}/${provider.cacheKey}'),
+               maxBytes: 128 * 1024 * 1024,
+               budget: budget,
+             ),
+           ),
+       ];
 
   final List<TerrainRepository> sources;
   int get cacheHits => sources.fold(0, (sum, source) => sum + source.cacheHits);

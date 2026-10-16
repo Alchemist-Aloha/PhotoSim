@@ -26,8 +26,8 @@ requirements separately from excluded platform work.
 - Terrarium decoding, pixel-center elevation interpolation, double-precision
   WGS84 ECEF/ENU, meter-scale camera-relative geometry and ellipsoid curvature.
 - Default progressive 3×3 zoom-13 terrain, generated normals/UVs, camera ground vertex,
-  distance/FOV quadtree LOD, skirts and native LRU elevation caching (128 MiB per service,
-  256 MiB total). Native 1–5 m source detail is not displayed by the existing mesh.
+  distance/FOV quadtree LOD, skirts and native LRU elevation caching within the configurable shared
+  terrain/imagery disk budget. Native 1–5 m source detail is not displayed by the existing mesh.
 - Automatic free imagery selection: NAIP, Swiss-only SWISSIMAGE, IGN BD ORTHO
   and the CC BY EOX Sentinel-2 2016 global mosaic. Exact EPSG:3857 bounds,
   natural-color processing, bounded/cancellable requests and visible source credits.
@@ -45,9 +45,9 @@ requirements separately from excluded platform work.
   preferences remain authoritative. Optional natural, display-referred imagery.
 - Pixels unavailable from every source stay a labeled fallback surface; unavailable
   high-resolution imagery retains a successful preview.
-- Independent 256 MiB imagery cache (64 MiB previews, 192 MiB detail), in addition
-  to the existing 256 MiB elevation cache. Four provider namespaces share those
-  configured budgets equally; existing NAIP paths remain readable. Corruption recovery,
+- Terrain/imagery share one persistent LRU disk-cache limit under **Storage**:
+  512 MiB default, configurable 0–65,536 MiB. Provider/resolution namespaces stay
+  separate on disk without fixed individual quotas; old NAIP paths remain readable. Corruption recovery,
   source metadata, dimension-checked PNG/indexed PNG/JPEG and isolate compositing.
 - Pinned Astronomia 1.1.1 behind an application-level calculation interface.
 - Topocentric solar/lunar positions and angular sizes, observer-dependent Moon
@@ -62,7 +62,8 @@ requirements separately from excluded platform work.
 - Corrected east/west viewport handedness, with a GPU bright-limb regression test.
 - Sun/Moon geodesic map bearing guides with altitude labels, dashed below
   horizontal and explicitly distinguished from terrain visibility predictions.
-- Shared UTC-day slider at minute resolution, retaining camera and appearance state.
+- Shared 00:00–24:00 local-day slider with UTC conversion, DST gaps/folds,
+  minute resolution and a stable date during dragging; camera/appearance preserved.
 - Validated 1900–2100 UTC date range, with disabled hour steps at the boundaries.
 - Offline estimated local clock for camera coordinates: IANA zone, abbreviation,
   local date/time and UTC offset, including DST and fractional offsets.
@@ -78,7 +79,10 @@ requirements separately from excluded platform work.
   sky rotation, two GPU batches, terrain depth tests and saved layer preference.
 - Named version-2 JSON photography snapshots (legacy version-1 files remain readable): camera, optics, UTC, selected target
   and imagery preference; local save/open, fresh-app restoration and corruption warnings.
-- Attributed, same-aspect-ratio PNG export of the current viewport, capped to
+- Full-area context preview with an inset sensor-aspect photo region and
+  focal-length/aperture/DOF label. Projection and DOF scaling preserve the physical
+  photo; weather/quality/relighting are only in the right settings panel.
+- Attributed, sensor-aspect PNG export cropped to the framed photo, capped to
   4096 px / 12 MP, with no application controls and no overwriting existing files.
 - Performance/Balanced/High backend rendering budgets; unnecessary shadows skipped
   for natural imagery/overcast weather. Mesh/texture resources remain resident.
@@ -109,7 +113,8 @@ requirements separately from excluded platform work.
 - `lib/data/terrain/tile_cache.dart`: reused provider/resolution-scoped native cache.
 - `lib/ui/simulation_workspace.dart`: progressive orchestration and GPU upload.
 - `lib/ui/map_workspace.dart`: camera/FOV and celestial bearing guides.
-- `lib/ui/time_slider.dart`: selected UTC-day scrubbing, shared by both workspaces.
+- `lib/ui/time_slider.dart`: chronological local-day scrubbing converted to UTC,
+  shared by both workspaces; unavailable rule dates stay disabled.
 - `lib/models/simulation_state.dart`: authoritative camera/time/ground and
   imagery appearance preference.
 
@@ -126,7 +131,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 142 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 157 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
@@ -205,6 +210,12 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   cancellable 429/503 Retry-After/backoff without delaying cached data. Small live
   probes found HTTP 200, not rate-limit errors; EOX detail took 23.35 seconds.
   See [loading diagnostics and policy](loading.md).
+- Storage settings persist outside plans, trim immediately and leave resident GPU
+  resources untouched. The native loading workflow applies zero through the actual
+  inspector, verifies all 19 raster entries are removed, checks persistence and
+  confirms unchanged geometry/textures/download counts. Unit/widget tests cover
+  global LRU, metadata accounting, bounds, oversized entries, concurrent writes,
+  startup migration/cleanup, settings failures and field validation.
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live
@@ -239,7 +250,8 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
 - Solar brightness/color and ambient twilight are approximate; the built-in
   sky becomes black below the solar horizon. Natural imagery retains its lighting.
 - Approximate static timezone boundaries; local display only for 1970–2037.
-  No local-wall-time input or timezone override. Civil-time rules can change.
+  Local-day scrubbing converts to UTC; no arbitrary local date/time text input or
+  timezone override. Civil-time rules can change.
 - Plans are unencrypted native local snapshots; no file-picker import/export,
   cloud storage, editing/deletion UI or power-loss durability guarantee.
 - PNG export is viewport-sized; independent-resolution export remains future work.

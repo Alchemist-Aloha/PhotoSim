@@ -4,13 +4,19 @@ import 'package:flutter/material.dart';
 
 import '../core/geo.dart';
 import '../models/simulation_state.dart';
+import '../data/raster_cache.dart';
+import 'cache_settings_panel.dart';
 
 class CameraInspector extends StatelessWidget {
   const CameraInspector({
     super.key,
     required this.state,
     required this.onChanged,
+    this.rasterCache,
+    this.cacheError,
   });
+  final RasterCache? rasterCache;
+  final String? cacheError;
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
 
@@ -352,6 +358,13 @@ class CameraInspector extends StatelessWidget {
           value: state.relitImagery,
           onChanged: (value) => onChanged(state.copyWith(relitImagery: value)),
         ),
+        Text(
+          state.relitImagery
+              ? 'UTC-driven Sun/Moon light · approximate atmosphere'
+              : state.atmosphericEffects || state.depthOfField
+              ? 'Illustrative weather/DOF · captured shadows remain'
+              : 'Natural imagery retains captured lighting',
+        ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Constellation guides'),
@@ -382,6 +395,9 @@ class CameraInspector extends StatelessWidget {
         const Text(
           'Composition guides are omitted from PNG exports. The level is the geometric horizontal plane, not a terrain-horizon prediction.',
         ),
+      ]),
+      section('Storage', Icons.storage, [
+        CacheSettingsPanel(cache: rasterCache, error: cacheError),
       ]),
       section('About this preview', Icons.info_outline, [
         const Text(

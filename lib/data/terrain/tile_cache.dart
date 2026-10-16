@@ -3,22 +3,27 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../../core/terrain_geo.dart';
+import '../raster_cache.dart';
 
-/// Bounded raster storage; each provider/resolution uses a separate directory.
+/// Source-separated rasters; a shared budget overrides the standalone maxBytes limit.
 class TileCache {
   TileCache(
     this.directory, {
     this.maxBytes = 256 * 1024 * 1024,
     this.maxEntryBytes = 1024 * 1024,
+    this.budget,
   });
   final Directory directory;
+  final RasterCache? budget;
   final int maxBytes, maxEntryBytes;
-  String? warning;
+  String? _warning;
+  String? get warning => _warning ?? budget?.warning;
   Future<void> _writes = Future.value();
 
   File _file(TileId tile) => File('${directory.path}/${tile.key}.png');
 
   Future<Uint8List?> read(TileId tile) async {
+    if (budget?.maxBytes == 0) return null;
     try {
       final file = _file(tile);
       if (!await file.exists()) return null;
@@ -27,26 +32,28 @@ class TileCache {
         return null;
       }
       final bytes = await file.readAsBytes();
+      budget?.touch(file);
       try {
         await file.setLastModified(DateTime.now());
       } on FileSystemException {
-        warning = 'Read-only disk cache; cached terrain is still available.';
+        _warning = 'Read-only disk cache; cached terrain is still available.';
       }
       return bytes;
     } on FileSystemException {
-      warning = 'Disk cache unavailable; using network data.';
+      _warning = 'Disk cache unavailable; using network data.';
       return null;
     }
   }
 
   Future<void> remove(TileId tile) async {
+    if (budget != null) return budget!.remove(_file(tile));
     try {
       final file = _file(tile);
       if (await file.exists()) await file.delete();
       final metadata = File('${file.path}.json');
       if (await metadata.exists()) await metadata.delete();
     } on FileSystemException {
-      warning = 'Could not remove a corrupt cached tile.';
+      _warning = 'Could not remove a corrupt cached tile.';
     }
   }
 
@@ -55,8 +62,7 @@ class TileCache {
     Uint8List bytes, {
     Map<String, Object?> metadata = const {},
   }) {
-    // Serialize writes/eviction so concurrent tile downloads cannot race cache maintenance.
-    _writes = _writes.then((_) async {
+    Future<void> persist() async {
       try {
         await directory.create(recursive: true);
         final file = _file(tile);
@@ -79,12 +85,16 @@ class TileCache {
           flush: true,
         );
         await metadataFile.rename('${file.path}.json');
-        await _evict();
+        if (budget == null) await _evict();
       } on FileSystemException {
-        warning = 'Disk cache unavailable; using network data.';
+        _warning = 'Disk cache unavailable; using network data.';
+        if (budget != null) rethrow;
       }
-    });
-    return _writes;
+    }
+
+    if (budget != null) return budget!.write(_file(tile), persist);
+    // Standalone caches retain their local serialized budget.
+    return _writes = _writes.then((_) => persist());
   }
 
   Future<void> _evict() async {

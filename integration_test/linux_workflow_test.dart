@@ -10,6 +10,8 @@ import 'package:flutter_scene/scene.dart' as scene;
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/app/app.dart';
 import 'package:photosim/core/geo.dart';
+import 'package:photosim/core/local_time.dart';
+import 'package:photosim/render/photo_framing.dart';
 import 'package:photosim/core/night_sky.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
@@ -21,7 +23,12 @@ Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
       key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
   final image = await boundary.toImage();
   final raw = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-  final viewport = tester.getRect(find.byType(scene.SceneView));
+  final viewport = tester
+      .getRect(find.byKey(const ValueKey('photo-region')))
+      .deflate(8);
+  final lensLabel = tester
+      .getRect(find.byKey(const ValueKey('photo-lens-label')))
+      .inflate(8);
   var total = 0.0, count = 0;
   for (
     var y = viewport.top.toInt() + 8;
@@ -33,6 +40,7 @@ Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
       x < viewport.right.toInt() - 8;
       x += 8
     ) {
+      if (lensLabel.contains(Offset(x.toDouble(), y.toDouble()))) continue;
       final offset = (y * image.width + x) * 4;
       total +=
           0.2126 * raw.getUint8(offset) +
@@ -54,10 +62,16 @@ Future<int> brightSkyPixels(
       key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
   final image = await boundary.toImage();
   final raw = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-  final rect = tester.getRect(find.byType(scene.SceneView));
+  final rect = tester
+      .getRect(find.byKey(const ValueKey('photo-region')))
+      .deflate(8);
+  final lensLabel = tester
+      .getRect(find.byKey(const ValueKey('photo-lens-label')))
+      .inflate(8);
   var count = 0;
   for (var y = rect.top.toInt() + 8; y < rect.bottom.toInt() - 8; y++) {
     for (var x = rect.left.toInt() + 8; x < rect.right.toInt() - 8; x++) {
+      if (lensLabel.contains(Offset(x.toDouble(), y.toDouble()))) continue;
       if ((x - rect.center.dx).abs() < 16 && (y - rect.center.dy).abs() < 16) {
         continue;
       }
@@ -224,15 +238,35 @@ void main() {
     // Actual image detail, not merely a material assignment on a still-green render.
     expect(colors.length, greaterThan(500));
     await capture('linux-naip-natural');
+    final inspectorScroll = find.descendant(
+      of: find.byKey(const PageStorageKey('scene-inspector')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Rendering'),
+      300,
+      scrollable: inspectorScroll,
+    );
+    await tester.tap(find.text('Rendering'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.text('Approximate relighting'));
     await tester.tap(find.text('Approximate relighting'));
     await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('Optics'),
+      -300,
+      scrollable: inspectorScroll,
+    );
+    await tester.pump(const Duration(milliseconds: 400));
     expect(
       texturedMeshes.first.mesh!.primitives.single.material,
       isA<scene.PhysicallyBasedMaterial>(),
     );
     expect(
-      (initialView.camera! as scene.PerspectiveCamera).fovRadiansY,
-      aimed.verticalFov,
+      (tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
+              as scene.PerspectiveCamera)
+          .fovRadiansY,
+      previewVerticalFov(aimed, tester.getSize(find.byType(scene.SceneView))),
     );
     expect(
       (initialView.camera! as scene.PerspectiveCamera).position.y,
@@ -267,16 +301,23 @@ void main() {
     await capture('linux-solar-day');
     final dayBrightness = await viewportBrightness(tester, captureKey);
     final timeSlider = tester.getRect(
-      find.byKey(const ValueKey('utc-day-slider')),
+      find.byKey(const ValueKey('local-day-slider')),
     );
     await tester.tapAt(
       Offset(
-        timeSlider.left + 24 + (timeSlider.width - 48) * 390 / 1439,
+        timeSlider.left + 24 + (timeSlider.width - 48) * 1410 / 1440,
         timeSlider.center.dy,
       ),
     );
     await tester.pump(const Duration(seconds: 1));
-    expect(camera().timestamp.day, original.timestamp.day);
+    final selectedLocal = localClock(
+      timestamp: camera().timestamp,
+      latitude: camera().latitude,
+      longitude: camera().longitude,
+    ).time!;
+    expect(selectedLocal.day, original.timestamp.day);
+    expect(selectedLocal.hour, 23);
+    expect(camera().timestamp.day, original.timestamp.day + 1);
     expect(camera().timestamp.hour, 6);
     final beforePlayback = camera().timestamp;
     await tester.tap(
@@ -677,7 +718,10 @@ void main() {
     expect(updatedView.scene, same(world));
     expect(
       (updatedView.camera! as scene.PerspectiveCamera).fovRadiansY,
-      camera().verticalFov,
+      previewVerticalFov(
+        camera(),
+        tester.getSize(find.byType(scene.SceneView)),
+      ),
     );
     expect(camera().sensor, Sensor.apsC);
     await tester.tap(find.byTooltip('Later by one hour'));

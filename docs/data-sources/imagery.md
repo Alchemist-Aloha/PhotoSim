@@ -90,12 +90,13 @@ and only missing previews/details load. Render-radius changes do not fetch image
 
 Provider/resolution namespaces reuse the existing native raster cache:
 
-- `photosim/{naip-natural,swissimage,ign-ortho,eox-s2-2016}-256-v1/`: 16 MiB each.
-- Corresponding `*-1024-v1/`: 48 MiB each.
+- `photosim/{naip-natural,swissimage,ign-ortho,eox-s2-2016}-256-v1/` for previews.
+- Corresponding `*-1024-v1/` for detail.
 
-Total configured budgets remain **64 MiB previews + 192 MiB detail**, independent
-of the 256 MiB elevation cache. Existing NAIP cache paths remain readable; their
-previous larger budgets shrink upon the next write/eviction. Sidecar JSON records
+All imagery and terrain share the configurable disk budget under **Storage**,
+default **512 MiB**, rather than fixed per-source/per-resolution quotas. Existing
+cache paths remain readable. Lowering the limit evicts oldest-used rasters across
+all sources; zero disables disk caching. See [cache settings](../loading.md#disk-cache-settings). Sidecar JSON records
 provider, original request URL, dimensions, EPSG:3857, attribution, download time,
 partial coverage and unknown exact acquisition time. Only original source rasters,
 not generated composites, are cached. Corrupt entries are refetched; failed and

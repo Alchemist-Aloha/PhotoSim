@@ -55,11 +55,15 @@ terrain-horizon predictions. Labels do not intercept map placement/dragging.
 Fixed-length guides can leave the viewport or overlap when zoomed out or when
 Sun/Moon directions coincide; screen-spaced labels remain future work.
 
-`lib/ui/time_slider.dart` provides a shared UTC-day slider from 00:00 to 23:59
-at minute resolution. It preserves the selected UTC date and all camera/imagery
-preferences; scrubbing clears seconds/subseconds. Use the date picker or hour
-steps to cross dates. Endpoint dates remain inside 1900–2100. Date/time pickers
-are explicitly UTC; the local clock described below is presentation-only.
+`lib/ui/time_slider.dart` spans **00:00–24:00 in the camera location's estimated
+local calendar day**, converting selections to shared UTC state. It preserves
+camera/imagery preferences. The scale is chronological: DST spring days can be
+23 hours and autumn days 25 hours; missing hours are skipped and both occurrences
+of repeated hours are selectable, distinguished by abbreviation. Fractional-hour
+zones/shifts work too. The local date is held during a drag so reaching 24:00
+cannot repeatedly advance the date; on release, 24:00 becomes the next local day's
+00:00. The tooltip identifies the local date and IANA zone. Date/time pickers and
+hour steps remain explicitly UTC and support 1900–2100.
 
 Play/pause advances one simulated minute every 200 ms (five minutes per second).
 Playback stops on manual time edits, app backgrounding, disposal, or the upper
@@ -67,7 +71,8 @@ date limit. Camera/appearance changes and workspace switching preserve playback.
 It changes shared UTC state, not terrain geometry or geographic downloads.
 
 Widget tests check guide bearings, marker alignment, below-horizontal styling,
-slider minute rounding, UTC/date bounds and state preservation. The native GPU
+local-day minute rounding, DST spans, 24:00 dragging, unavailable-rule guards,
+UTC conversion and state preservation. The native GPU
 workflow uses the actual slider to change lighting while retaining terrain
 geometry and terrain/imagery download counters, including during playback.
 
@@ -91,7 +96,9 @@ than silently displaying a wrong offset, local display is restricted to
 **1970–2037**, with an explicit unavailable warning outside that range or for
 missing zones. UTC editing and astronomy still support **1900–2100**. Future
 political changes also require database updates; this is not a legal guarantee
-of future civil time. There is no local-wall-time input or timezone override.
+of future civil time. The local-day slider is disabled outside the supported rules
+or when a complete day crosses their boundary; UTC controls remain available.
+There is no arbitrary local date/time text input or timezone override.
 
 Offline tests cover US spring gaps/autumn folds, European and southern-hemisphere
 DST, fractional offsets, local date rollover, instant preservation, invalid

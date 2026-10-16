@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/models/simulation_state.dart';
+import 'package:photosim/data/raster_cache.dart';
+import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 
 import '../test/imagery_fixture.dart';
@@ -16,11 +18,16 @@ import '../test/terrain_fixture.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
-    'slow imagery cannot hold terrain loading or start detail early',
+    'slow imagery cannot block meshes; storage settings trim without rebuilding',
     (tester) async {
       final directory = await Directory.systemTemp.createTemp(
         'photosim-loading-',
       );
+      final cache = RasterCache(
+        Directory('${directory.path}/photosim'),
+        settingsFile: File('${directory.path}/cache-settings.json'),
+      );
+      await cache.initialize();
       final imagesReady = Completer<void>();
       final preview = imageryFixture(256), detail = imageryFixture(1024);
       var terrainRequests = 0, previewRequests = 0, detailRequests = 0;
@@ -52,11 +59,25 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: StatefulBuilder(
-              builder: (context, setState) => SimulationWorkspace(
-                state: state,
-                onChanged: (next) => setState(() => state = next),
-                httpClient: client,
-                cacheDirectory: directory,
+              builder: (context, setState) => Row(
+                children: [
+                  Expanded(
+                    child: SimulationWorkspace(
+                      state: state,
+                      onChanged: (next) => setState(() => state = next),
+                      httpClient: client,
+                      rasterCache: cache,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 310,
+                    child: CameraInspector(
+                      state: state,
+                      onChanged: (next) => setState(() => state = next),
+                      rasterCache: cache,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -99,6 +120,53 @@ void main() {
       for (var i = 0; i < nodes.length; i++) {
         expect(nodes[i].mesh!.primitives.single.geometry, same(geometry[i]));
       }
+      Future<List<FileSystemEntity>> files() => cache.directory
+          .list(recursive: true, followLinks: false)
+          .where((file) => file is File)
+          .toList();
+      expect(
+        (await files()).where((file) => file.path.endsWith('.png')),
+        hasLength(19),
+      );
+      final inspectorScroll = find.descendant(
+        of: find.byKey(const PageStorageKey('scene-inspector')),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Storage'),
+        300,
+        scrollable: inspectorScroll,
+      );
+      await tester.tap(find.text('Storage'));
+      await tester.pump(const Duration(milliseconds: 400));
+      final field = find.byKey(const PageStorageKey('cache-limit'));
+      await tester.ensureVisible(field);
+      await tester.enterText(field, '0');
+      await tester.ensureVisible(find.text('Apply cache limit'));
+      await tester.tap(find.text('Apply cache limit'));
+      for (
+        var i = 0;
+        i < 100 && find.text('Cache limit saved.').evaluate().isEmpty;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('Cache limit saved.'), findsOneWidget);
+      expect(cache.limitMiB, 0);
+      expect(await files(), isEmpty);
+      final reopened = RasterCache(
+        cache.directory,
+        settingsFile: cache.settingsFile,
+      );
+      await reopened.initialize();
+      expect(reopened.limitMiB, 0);
+      for (var i = 0; i < nodes.length; i++) {
+        expect(nodes[i].mesh!.primitives.single.geometry, same(geometry[i]));
+      }
+      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
+      expect(terrainRequests, 9);
+      expect(previewRequests, 9);
+      expect(detailRequests, 1);
       expect(tester.takeException(), isNull);
     },
   );

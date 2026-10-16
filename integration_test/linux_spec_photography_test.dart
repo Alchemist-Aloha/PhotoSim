@@ -12,6 +12,8 @@ import 'package:photosim/app/app.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/photography_overlays.dart';
+import 'package:photosim/render/photo_framing.dart';
+import 'package:photosim/ui/simulation_workspace.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -130,10 +132,25 @@ void main() {
             as scene.PerspectiveCamera;
     expect(camera.up.x, closeTo(state().cameraFrame.up.x, 1e-6));
     expect(camera.up.y, closeTo(state().cameraFrame.up.y, 1e-6));
-    expect(camera.fovRadiansY, state().verticalFov);
-    expect(world.depthOfField.sensorHeight, 0.036);
     final size = tester.getSize(find.byType(scene.SceneView));
-    expect(size.width / size.height, closeTo(2 / 3, 1e-8));
+    final region = photoRegion(
+      size,
+      state().sensorWidth / state().sensorHeight,
+    );
+    expect(camera.fovRadiansY, previewVerticalFov(state(), size));
+    expect(world.depthOfField.sensorHeight, 0.036);
+    expect(world.depthOfField.blurScale, region.height / size.height);
+    expect(size.width, tester.getSize(find.byType(SimulationWorkspace)).width);
+    final frame = tester.getRect(find.byKey(const ValueKey('photo-region')));
+    expect(frame.width / frame.height, closeTo(2 / 3, 1e-8));
+    expect(
+      (frame.center - tester.getCenter(find.byType(scene.SceneView))).distance,
+      lessThan(1e-6),
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('photo-lens-label'))).data,
+      contains('${state().focalLength.toStringAsFixed(1)} mm'),
+    );
     expect(find.byType(PhotographyOverlays), findsOneWidget);
     change(state().copyWith(exposureMode: ExposureMode.automatic));
     await tester.pump(const Duration(seconds: 1));
@@ -146,7 +163,17 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(find.byType(AppBar), findsNothing);
     expect(find.byType(CameraInspector), findsNothing);
-    expect(find.byType(PhotographyOverlays), findsNothing);
+    expect(
+      tester
+          .widget<PhotographyOverlays>(find.byType(PhotographyOverlays))
+          .showGuides,
+      isFalse,
+    );
+    expect(find.byKey(const ValueKey('photo-region')), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(scene.SceneView)),
+      tester.getSize(find.byType(Scaffold)),
+    );
     expect(find.textContaining('UTC-driven'), findsNothing);
     expect(
       tester.widget<scene.SceneView>(find.byType(scene.SceneView)).scene,

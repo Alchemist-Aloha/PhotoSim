@@ -12,6 +12,7 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/rain_overlay.dart';
+import 'package:photosim/render/photo_framing.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 void main() {
@@ -106,11 +107,48 @@ void main() {
       }
 
       await Directory('build/validation').create(recursive: true);
+      final inspectorScroll = find.descendant(
+        of: find.byKey(const PageStorageKey('scene-inspector')),
+        matching: find.byType(Scrollable),
+      );
+      Future<void> toggleSection(String title) async {
+        await tester.scrollUntilVisible(
+          find.text(title),
+          300,
+          scrollable: inspectorScroll,
+        );
+        await tester.tap(find.text(title));
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      final toolbar = find.byType(SimulationWorkspace);
+      expect(
+        find.descendant(
+          of: toolbar,
+          matching: find.byType(DropdownButton<Weather>),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: toolbar,
+          matching: find.byType(DropdownButton<RenderQuality>),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: toolbar,
+          matching: find.text('Approximate relighting'),
+        ),
+        findsNothing,
+      );
+      await toggleSection('Weather');
       final weatherImages = <Weather, Uint8List>{};
       for (final weather in Weather.values) {
         tester
-            .widget<DropdownButton<Weather>>(
-              find.byType(DropdownButton<Weather>),
+            .widget<DropdownButtonFormField<Weather>>(
+              find.byType(DropdownButtonFormField<Weather>),
             )
             .onChanged!(weather);
         await tester.pump(const Duration(seconds: 1));
@@ -129,8 +167,6 @@ void main() {
         weatherImages[Weather.fog],
         isNot(orderedEquals(weatherImages[Weather.clear]!)),
       );
-      await tester.tap(find.text('Weather'));
-      await tester.pump(const Duration(milliseconds: 400));
       for (final edit in [
         ('Visibility', 6.0),
         ('Light transmission', 80.0),
@@ -174,12 +210,12 @@ void main() {
           .onChanged!(100);
       await tester.pump(const Duration(milliseconds: 400));
       expect(world.fog.enabled, isFalse);
-      await tester.tap(find.text('Weather'));
-      await tester.pump(const Duration(milliseconds: 400));
+      await toggleSection('Weather');
+      await toggleSection('Rendering');
       for (final quality in RenderQuality.values) {
         tester
-            .widget<DropdownButton<RenderQuality>>(
-              find.byType(DropdownButton<RenderQuality>),
+            .widget<DropdownButtonFormField<RenderQuality>>(
+              find.byType(DropdownButtonFormField<RenderQuality>),
             )
             .onChanged!(quality);
         await tester.pump(const Duration(seconds: 1));
@@ -304,8 +340,9 @@ void main() {
       final exported = img.decodePng(await File(path).readAsBytes())!;
       final size = tester.getSize(find.byType(scene.SceneView));
       expect(exported.width / exported.height, closeTo(1.5, 0.01));
-      expect(exported.width, closeTo(size.width, 1));
-      expect(exported.height, closeTo(size.height, 1));
+      final region = photoRegion(size, state.sensorWidth / state.sensorHeight);
+      expect(exported.width, closeTo(region.width, 1));
+      expect(exported.height, closeTo(region.height, 1));
       await File('build/validation/linux-export.png')
           .writeAsBytes(await File(path).readAsBytes());
       expect(tester.takeException(), isNull);

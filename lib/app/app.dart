@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/saved_plans.dart';
+import '../data/raster_cache.dart';
 
 import '../core/local_time.dart';
 
@@ -17,8 +18,9 @@ import '../ui/simulation_workspace.dart';
 import '../ui/time_slider.dart';
 
 class PhotoSimApp extends StatelessWidget {
-  const PhotoSimApp({super.key, this.plans});
+  const PhotoSimApp({super.key, this.plans, this.rasterCache});
   final PlanRepository? plans;
+  final RasterCache? rasterCache;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -32,15 +34,16 @@ class PhotoSimApp extends StatelessWidget {
         border: OutlineInputBorder(),
       ),
     ),
-    home: WorkspaceShell(plans: plans),
+    home: WorkspaceShell(plans: plans, rasterCache: rasterCache),
   );
 }
 
 enum Workspace { map, simulation }
 
 class WorkspaceShell extends StatefulWidget {
-  const WorkspaceShell({super.key, this.plans});
+  const WorkspaceShell({super.key, this.plans, this.rasterCache});
   final PlanRepository? plans;
+  final RasterCache? rasterCache;
 
   @override
   State<WorkspaceShell> createState() => _WorkspaceShellState();
@@ -54,6 +57,31 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   Workspace workspace = Workspace.map;
   bool inspectorVisible = true;
   bool cleanPreview = false;
+  RasterCache? rasterCache;
+  String? cacheError;
+
+  Future<void> initializeCache() async {
+    try {
+      final cache =
+          widget.rasterCache ??
+          RasterCache(
+            Directory(
+              '${(await getApplicationCacheDirectory()).path}/photosim',
+            ),
+            settingsFile: File(
+              '${(await getApplicationSupportDirectory()).path}/photosim/cache-settings.json',
+            ),
+          );
+      await cache.initialize();
+      if (mounted) setState(() => rasterCache = cache);
+    } on Exception {
+      if (mounted) {
+        setState(
+          () => cacheError = 'Disk cache settings unavailable. Restart after checking disk permissions.',
+        );
+      }
+    }
+  }
 
   Future<void> setCleanPreview(bool value) async {
     setState(() {
@@ -205,6 +233,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(initializeCache());
   }
 
   void stopPlayback() {
@@ -297,7 +326,12 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       longitude: state.longitude,
     );
     final local = clock.time;
-    final inspector = CameraInspector(state: state, onChanged: update);
+    final inspector = CameraInspector(
+      state: state,
+      onChanged: update,
+      rasterCache: rasterCache,
+      cacheError: cacheError,
+    );
     final scaffold = Scaffold(
       floatingActionButton: cleanPreview
           ? FloatingActionButton.small(
@@ -385,7 +419,12 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   state: state,
                   onChanged: update,
                 )
+              : rasterCache == null
+              ? Center(
+                  child: Text(cacheError ?? 'Loading disk cache settings…'),
+                )
               : SimulationWorkspace(
+                  rasterCache: rasterCache,
                   httpClient: terrainClient,
                   state: state,
                   cleanPreview: cleanPreview,
@@ -421,7 +460,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   child: Tooltip(
                     message:
                         'Estimated timezone from bundled coordinate mapping. Verify near borders and offshore. '
-                        'Local rules are supported for 1970–2037; all controls and astronomy remain UTC.',
+                        'Local rules are supported for 1970–2037. The slider uses the local day; date/time picker and astronomy remain UTC.',
                     child: Text(
                       local == null
                           ? clock.warning!

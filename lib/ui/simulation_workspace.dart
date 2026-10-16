@@ -26,8 +26,10 @@ import '../data/terrain/terrain_sources.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
 import '../render/photography.dart';
+import '../render/photo_framing.dart';
 import '../core/sunlight.dart';
 import '../data/image_export.dart';
+import '../data/raster_cache.dart';
 import 'rain_overlay.dart';
 import 'photography_overlays.dart';
 import 'wasd_navigation.dart';
@@ -44,7 +46,9 @@ class SimulationWorkspace extends StatefulWidget {
     this.cleanPreview = false,
     this.httpClient,
     this.cacheDirectory,
+    this.rasterCache,
   });
+  final RasterCache? rasterCache;
   final http.Client? httpClient;
   final Directory? cacheDirectory;
   final bool cleanPreview;
@@ -104,8 +108,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   Future<void> initialize() async {
     try {
       await scene.Scene.initializeStaticResources();
-      final directory =
-          widget.cacheDirectory ?? await getApplicationCacheDirectory();
+      final budget =
+          widget.rasterCache ??
+          RasterCache(
+            Directory(
+              '${(widget.cacheDirectory ?? await getApplicationCacheDirectory()).path}/photosim',
+            ),
+          );
+      await budget.initialize();
       if (!mounted) return;
       terrainCredits =
           (jsonDecode(
@@ -124,11 +134,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       if (!mounted) return;
       repository = TerrainSources(
         client: client,
-        directory: Directory('${directory.path}/photosim'),
+        directory: budget.directory,
+        budget: budget,
       );
       imagery = ImagerySources(
         client: client,
-        directory: Directory('${directory.path}/photosim'),
+        directory: budget.directory,
+        budget: budget,
       );
       skySource = scene.PhysicalSkySource(
         turbidity: 2,
@@ -414,9 +426,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     node.mesh = scene.Mesh(geometry, material);
   }
 
-  void setRelighting(bool value) =>
-      widget.onChanged(widget.state.copyWith(relitImagery: value));
-
   Future<void> loadImagery(
     int token,
     Completer<void> stop, {
@@ -507,8 +516,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       final snapshot = widget.state;
       final boundary =
           photoKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-      if (boundary.size.shortestSide < 32) {
-        throw StateError('Preview is too small to export');
+      final region = photoRegion(
+        boundary.size,
+        snapshot.sensorWidth / snapshot.sensorHeight,
+      );
+      if (region.shortestSide < 32) {
+        throw StateError('Photo region is too small to export');
       }
       final ratio = math.min(
         MediaQuery.devicePixelRatioOf(context),
@@ -532,6 +545,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           '$credits\n'
           '${snapshot.timestamp.toIso8601String()} · ${snapshot.sensor.label} · ${snapshot.focalLength.toStringAsFixed(1)} mm · '
           'f/${snapshot.aperture.toStringAsFixed(1)} · ISO ${snapshot.iso.round()} · ${snapshot.shutterLabel} · ${snapshot.exposureMode.label} · ${snapshot.weather.label} (illustrative) · visibility ${snapshot.weatherVisibilityKm.toStringAsFixed(1)} km · light ${(snapshot.weatherLightTransmission * 100).round()}% · rain ${(snapshot.rainIntensity * 100).round()}%',
+          crop: Rect.fromLTRB(
+            region.left * ratio,
+            region.top * ratio,
+            region.right * ratio,
+            region.bottom * ratio,
+          ),
         );
       } finally {
         image.dispose();
@@ -552,7 +571,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Exports the current preview with weather, depth of field and source credits; no crosshair or application controls. Maximum 4096 px / 12 MP. Existing files are never overwritten.',
+                  'Exports the framed photo region with weather, depth of field and source credits; no frame, lens label, crosshair or controls. Maximum 4096 px / 12 MP. Existing files are never overwritten.',
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -732,6 +751,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           )
         : state;
     final sky = state.sky;
+    // shortcut: Auto meters the whole context canvas; add backend ROI metering for photo-only Auto.
     configurePhotography(active, state);
     final sun = sky.sun;
     moonRenderer!.update(sky, eye);
@@ -785,89 +805,54 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             color: Theme.of(context).colorScheme.surfaceContainer,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Wrap(
-                spacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  DropdownButton<RenderQuality>(
-                    value: state.renderQuality,
-                    items: [
-                      for (final quality in RenderQuality.values)
-                        DropdownMenuItem(
-                          value: quality,
-                          child: Text('Quality: ${quality.label}'),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: showTerrainRange,
+                        icon: const Icon(Icons.terrain),
+                        label: const Text('Terrain range'),
+                      ),
+                      FilterChip(
+                        label: const Text('Constellations'),
+                        tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
+                        selected: state.showConstellations,
+                        onSelected: (value) => widget.onChanged(
+                          state.copyWith(showConstellations: value),
                         ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed:
+                            ground == null ||
+                                loading ||
+                                imageryLoading ||
+                                exporting
+                            ? null
+                            : exportImage,
+                        icon: const Icon(Icons.image_outlined),
+                        label: Text(exporting ? 'Exporting…' : 'Export PNG'),
+                      ),
                     ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        widget.onChanged(
-                          widget.state.copyWith(renderQuality: value),
-                        );
-                      }
-                    },
                   ),
-                  DropdownButton<Weather>(
-                    value: state.weather,
-                    items: [
-                      for (final weather in Weather.values)
-                        DropdownMenuItem(
-                          value: weather,
-                          child: Text('Weather: ${weather.label}'),
-                        ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
+                      ),
+                      Text(
+                        'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
+                      ),
+                      if (textures.length < loaded || partialImagery.isNotEmpty)
+                        const Text('Fallback surface where imagery is missing'),
                     ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        widget.onChanged(widget.state.copyWith(weather: value));
-                      }
-                    },
-                  ),
-                  const Tooltip(
-                    message: 'Manual illustrative weather, not observed conditions or a forecast.',
-                    child: Icon(
-                      Icons.info_outline,
-                      semanticLabel: 'Weather presets are illustrative',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed:
-                        ground == null || loading || imageryLoading || exporting
-                        ? null
-                        : exportImage,
-                    icon: const Icon(Icons.image_outlined),
-                    label: Text(exporting ? 'Exporting…' : 'Export PNG'),
-                  ),
-                  Text(
-                    'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
-                  ),
-                  Text(
-                    'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
-                  ),
-                  if (textures.length < loaded || partialImagery.isNotEmpty)
-                    const Text('Fallback surface where imagery is missing'),
-                  OutlinedButton.icon(
-                    onPressed: showTerrainRange,
-                    icon: const Icon(Icons.terrain),
-                    label: const Text('Terrain range'),
-                  ),
-                  FilterChip(
-                    label: const Text('Constellations'),
-                    tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
-                    selected: state.showConstellations,
-                    onSelected: (value) => widget.onChanged(
-                      state.copyWith(showConstellations: value),
-                    ),
-                  ),
-                  FilterChip(
-                    label: const Text('Approximate relighting'),
-                    selected: state.relitImagery,
-                    onSelected: setRelighting,
-                  ),
-                  Text(
-                    state.relitImagery
-                        ? 'UTC-driven Sun/Moon light · approximate atmosphere'
-                        : state.atmosphericEffects || state.depthOfField
-                        ? 'Illustrative weather/DOF · captured shadows remain'
-                        : 'Natural imagery retains captured lighting',
                   ),
                 ],
               ),
@@ -927,72 +912,76 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                           'Camera ground tile unavailable. Retry terrain or select another location.',
                         ),
                 )
-              : Center(
-                  child: AspectRatio(
-                    aspectRatio: state.sensorWidth / state.sensorHeight,
-                    child: WasdNavigation(
-                      enabled:
-                          !exporting &&
-                          cameraGroundField != null &&
-                          cameraGroundTile?.key ==
-                              TileId.at(state.location).key,
-                      onMove: navigate,
-                      child: GestureDetector(
-                        onPanUpdate: (details) => widget.onChanged(
-                          state.copyWith(
-                            azimuth: state.azimuth + details.delta.dx * 0.2,
-                            pitch: state.pitch - details.delta.dy * 0.2,
-                          ),
-                        ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            nightRenderer?.updateLabels(
-                              skyLayerState,
-                              constraints.biggest,
-                            );
-                            return Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                // Scene's +Z-forward camera reverses east/west in our ENU axes.
-                                RepaintBoundary(
-                                  key: photoKey,
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      Semantics(
-                                        label: state.showConstellations
-                                            ? 'Constellation guides. Labels in the field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
-                                            : '3D photography preview',
-                                        child: Transform.flip(
-                                          flipX: true,
-                                          child: scene.SceneView(
-                                            active,
-                                            camera: scene.PerspectiveCamera(
-                                              position: eye,
-                                              target: eye + direction,
-                                              up: cameraUp,
-                                              fovRadiansY: state.verticalFov,
-                                              fovNear: 0.5,
-                                              fovFar: 50000,
-                                            ),
+              : WasdNavigation(
+                  enabled:
+                      !exporting &&
+                      cameraGroundField != null &&
+                      cameraGroundTile?.key == TileId.at(state.location).key,
+                  onMove: navigate,
+                  child: GestureDetector(
+                    onPanUpdate: (details) => widget.onChanged(
+                      state.copyWith(
+                        azimuth: state.azimuth + details.delta.dx * 0.2,
+                        pitch: state.pitch - details.delta.dy * 0.2,
+                      ),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // shortcut: stream for the photo frustum; add viewport-aware prefetch for outer context if needed.
+                        final region = photoRegion(
+                          constraints.biggest,
+                          state.sensorWidth / state.sensorHeight,
+                        );
+                        nightRenderer?.updateLabels(skyLayerState, region.size);
+                        // Keep physical CoC calibrated to photo pixels, not the larger context canvas.
+                        active.depthOfField.blurScale =
+                            constraints.maxHeight > 0
+                            ? region.height / constraints.maxHeight
+                            : 1;
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            RepaintBoundary(
+                              key: photoKey,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Semantics(
+                                    label: state.showConstellations
+                                        ? 'Constellation guides. Labels in the photo field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
+                                        : '3D photography preview',
+                                    // Scene's +Z-forward camera reverses east/west in our ENU axes.
+                                    child: Transform.flip(
+                                      flipX: true,
+                                      child: scene.SceneView(
+                                        active,
+                                        camera: scene.PerspectiveCamera(
+                                          position: eye,
+                                          target: eye + direction,
+                                          up: cameraUp,
+                                          fovRadiansY: previewVerticalFov(
+                                            state,
+                                            constraints.biggest,
                                           ),
+                                          fovNear: 0.5,
+                                          fovFar: 50000,
                                         ),
                                       ),
-                                      if (state.weather == Weather.rain &&
-                                          state.rainIntensity > 0)
-                                        RainOverlay(
-                                          intensity: state.rainIntensity,
-                                        ),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                if (!widget.cleanPreview)
-                                  PhotographyOverlays(state: state),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
+                                  if (state.weather == Weather.rain &&
+                                      state.rainIntensity > 0)
+                                    RainOverlay(intensity: state.rainIntensity),
+                                ],
+                              ),
+                            ),
+                            PhotographyOverlays(
+                              state: state,
+                              showGuides: !widget.cleanPreview,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

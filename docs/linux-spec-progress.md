@@ -35,6 +35,23 @@ When forward fetching is enabled they can change required coverage, preserving
 overlapping meshes/textures. Time, exposure and guide changes do not fetch or
 rebuild geographic data. Fullscreen is transient UI state, not a saved plan field.
 
+## Preview and timeline refinements
+
+The scene fills the available preview canvas (the entire window in clean/fullscreen
+mode). A centered, inset sensor-aspect rectangle identifies the photograph and
+labels focal length, f-number and DOF enabled/off. Camera projection expands for
+surrounding context, while photo FOV, framing/roll and physical DOF pixel scaling
+remain tied to the rectangle. PNG export crops the rectangle and excludes frame/
+lens/composition UI. Clean mode retains the frame/label, not planning guides.
+Weather, quality and relighting live only in the right inspector; the toolbar
+contains view/export actions with a separate loading-status row.
+
+The bottom slider uses the estimated local calendar day, 00:00–24:00, with
+chronological DST gaps/folds and UTC-authoritative state. See [astronomy](astronomy.md).
+Outer context uses available terrain under existing fetch limits; it does not
+silently expand streaming coverage. Auto exposure still meters the whole context
+canvas, not a photo-only ROI; manual exposure/physical photo FOV are unchanged.
+
 ## Horizontal WASD navigation
 
 Click the 3D preview to focus it. Hold W/S to move forward/back along the crosshair's
@@ -82,7 +99,7 @@ persistence, polar/dateline tiles and WGS84 frame-transform agreement.
 | §8, §15.2 | Rise/set, solar-noon/twilight and Galactic visibility event services/timeline; refraction with atmospheric inputs and event-horizon handling |
 | §8.8, §15.3 | Bright-planet ephemerides/rendering, prominent-star/planet target selection and labels; independent reference fixtures |
 | §6, §7.4, §13 | Viewport/screen-error terrain and texture refinement, neighbor-aware transitions, horizon culling, explicit GPU budgets and measured FPS/latency/memory regressions |
-| §7.6, §13.4, §16 | Acquisition dates when available, refresh/expiry/cache settings and restrictions-aware eviction; metadata/indexing storage requirements |
+| §7.6, §13.4, §16 | Acquisition dates when available, refresh/expiry and restrictions-aware eviction (shared size setting/LRU implemented); metadata/indexing storage requirements |
 | §10 | Improved below-horizon twilight, atmospheric perspective/extinction/airglow/light pollution, simultaneous physical solar/lunar contributions and better radiometric/color validation |
 | §11 | Optional forecast client/cache with UTC/location matching, source/freshness metadata and clear out-of-window/offline behavior; manual weather is implemented |
 | §12.2, §12.5 | Extract GPU orchestration behind the renderer interface, explicit resource/lost-device recovery and lifecycle profiling |
@@ -96,7 +113,7 @@ dates must remain explicitly unknown rather than invented.
 
 ## Verification for this slice
 
-- 142 unit/widget tests (including WASD and HTTP scheduling/backoff), including stop ratios, framing/roll, bounds, old/new plan
+- 157 unit/widget tests (including local days, photo framing/cropping, WASD, HTTP backoff and cache settings), including stop ratios, framing/roll, bounds, old/new plan
   formats, exposure controls, overlays and playback rate.
 - New Linux native photography-tools workflow verifies GPU exposure response,
   Auto metering, white-balance settings, portrait projection/DOF sensor size,
