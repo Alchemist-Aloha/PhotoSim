@@ -21,6 +21,6 @@ SimulationState moveCamera(
   return state.copyWith(
     latitude: next.latitude.clamp(-85.05112878, 85.05112878),
     longitude: next.longitude,
-    fixedElevation: elevation,
+    clearFixedElevation: true,
   );
 }

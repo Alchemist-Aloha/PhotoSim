@@ -107,11 +107,11 @@ class CameraInspector extends StatelessWidget {
         ),
         if (state.cameraElevation != null)
           Text(
-            'Camera elevation: ${state.cameraElevation!.toStringAsFixed(1)} m${state.fixedElevation == null ? '' : ' (fixed for WASD)'}',
+            'Camera elevation: ${state.cameraElevation!.toStringAsFixed(1)} m${state.fixedElevation == null ? '' : ' (saved elevation override)'}',
           ),
         if (state.fixedElevation != null) ...[
           const Text(
-            'WASD holds absolute elevation, not ground clearance. The height offset below is inactive until changed; movement can enter terrain.',
+            'Saved elevation override. WASD or changing the height offset resumes terrain-following movement.',
           ),
           TextButton(
             onPressed: () =>

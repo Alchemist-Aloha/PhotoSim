@@ -44,26 +44,32 @@ and capped frame deltas to prevent jumps after stalls. Keyboard shortcuts with
 Ctrl/Alt/Meta are not consumed. Movement stops on focus loss, dialogs, leaving 3D,
 backgrounding and disposal; typing in text fields does not move the camera.
 
-The first step captures absolute camera elevation = loaded terrain elevation +
-height offset. That value stays unchanged by WASD, regardless of the new terrain
-height. The map/astronomy use the actual moved coordinates and the fixed elevation.
-An elevation readout and **Resume ground-relative height** are in the inspector;
-changing the height offset or moving the camera through the map clears the lock.
-The lock persists in plans. No collision/ground-following is applied: horizontal
-movement can enter terrain on a rising slope.
+WASD follows the terrain: each step recomputes ground elevation, then adds the
+unchanged camera-height offset. It climbs uphill and descends downhill rather than
+holding a frozen absolute elevation. Old saved elevation overrides are released by
+WASD. The map/astronomy use the moved coordinates and updated elevation.
 
-Nearby motion retains the geographic mesh origin and one camera-tile height field.
+Grounding conservatively uses the higher of the source raster and the actual
+rendered triangle surface. This avoids entering a coarse hillside even where the
+raster between its vertices is lower. The current camera patch is retained for
+bounded local triangle queries; skirts are not treated as walkable surfaces.
+Small tile-edge roundoff is handled conservatively. If no reliable sample exists,
+the step pauses rather than guessing a height. This is terrain grounding, not
+collision handling for buildings, vegetation, overhangs or external 3D objects.
+
+Nearby motion retains the geographic mesh origin and one camera-tile mesh/raster.
 Double-precision WGS84 frame transforms move terrain into the current observer's
 ENU frame without rebuilding geometry or changing sky direction conventions.
 Coverage updates are throttled; leaving the zoom-13 camera tile rebases/streams
 geography and can briefly pause navigation while ground data loads. Missing
 camera-ground data disables movement instead of guessing an altitude.
 
-The Linux WASD native workflow covers held W, fixed elevation/height offset,
-resource/download reuse, dialog and map focus, map synchronization and a 5 km
-terrain rebase that preserves elevation. Unit/widget checks cover all directions,
-pitch independence, diagonals, lifecycle/modifiers/disposal, saved lock/defaults,
-validation, polar/dateline behavior and WGS84 frame-transform agreement.
+The Linux WASD native workflow covers held W, terrain-following camera elevation,
+unchanged height offset, resource/download reuse, dialog/map focus, map sync and a
+5 km terrain rebase that samples the new ground. Unit/widget checks cover source
+valleys below coarser visible meshes, uphill/downhill slopes, boundaries, legacy
+elevation overrides, directions, pitch independence, diagonals, lifecycle/modifiers,
+persistence, polar/dateline tiles and WGS84 frame-transform agreement.
 
 ## Still required / partial, ordered for subsequent slices
 
@@ -90,7 +96,7 @@ dates must remain explicitly unknown rather than invented.
 
 ## Verification for this slice
 
-- 128 unit/widget tests (including WASD), including stop ratios, framing/roll, bounds, old/new plan
+- 130 unit/widget tests (including WASD), including stop ratios, framing/roll, bounds, old/new plan
   formats, exposure controls, overlays and playback rate.
 - New Linux native photography-tools workflow verifies GPU exposure response,
   Auto metering, white-balance settings, portrait projection/DOF sensor size,

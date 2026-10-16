@@ -13,7 +13,7 @@ import 'package:photosim/ui/map_workspace.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
-    'Linux WASD moves horizontally at fixed elevation, reuses terrain and stops for dialogs/map',
+    'Linux WASD follows terrain, reuses meshes and stops for dialogs/map',
     (tester) async {
       await tester.pumpWidget(const PhotoSimApp());
       await tester.pump(const Duration(seconds: 2));
@@ -76,14 +76,15 @@ void main() {
         (bearing(original.location, moved.location) + 180) % 360 - 180,
         closeTo(0, 0.1),
       );
-      expect(moved.fixedElevation, original.cameraElevation);
+      expect(moved.fixedElevation, isNull);
+      expect(moved.cameraElevation, moved.groundElevation! + original.height);
       expect(moved.height, original.height);
       expect(moved.timestamp, original.timestamp);
       expect(moved.pitch, original.pitch);
       final camera =
           tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
               as scene.PerspectiveCamera;
-      expect(camera.position.y, closeTo(original.cameraElevation!, 0.001));
+      expect(camera.position.y, closeTo(moved.cameraElevation!, 0.001));
       expect(counts(), beforeCounts);
       expect(nodes.first.localTransform.getTranslation().z, greaterThan(0));
       for (var i = 0; i < nodes.length; i++) {
@@ -120,16 +121,23 @@ void main() {
       expect(state().location, stopped);
       await tester.tap(find.text('3D Preview'));
       await waitForImagery();
-      expect(state().cameraElevation, original.cameraElevation);
-      // Crossing the resident tile loads/rebases geography but must not follow its elevation.
+      expect(
+        state().cameraElevation,
+        state().groundElevation! + original.height,
+      );
+      // Crossing a tile must sample the new ground before enabling terrain-follow navigation.
       inspector().onChanged(moveCamera(state(), 5000, 0));
       await tester.pump();
       await waitForImagery();
-      expect(state().cameraElevation, original.cameraElevation);
+      expect(state().fixedElevation, isNull);
+      expect(
+        state().cameraElevation,
+        state().groundElevation! + original.height,
+      );
       final rebased =
           tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
               as scene.PerspectiveCamera;
-      expect(rebased.position.y, closeTo(original.cameraElevation!, 0.001));
+      expect(rebased.position.y, closeTo(state().cameraElevation!, 0.001));
       inspector().onChanged(state().copyWith(clearFixedElevation: true));
       await tester.pump();
       expect(

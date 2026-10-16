@@ -13,59 +13,71 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/wasd_navigation.dart';
 
 void main() {
-  test('WASD is horizontal, bearing-relative and holds total elevation over changed terrain', () {
-    final state = SimulationState(
-      groundElevation: 1200,
-      height: 1.7,
-      azimuth: 90,
-      pitch: 85,
-      roll: 80,
-    );
-    final moved = moveCamera(state, 30, 0);
-    expect(bearing(state.location, moved.location), closeTo(90, 1e-7));
-    expect(
-      const Distance().as(LengthUnit.Meter, state.location, moved.location),
-      closeTo(30, 0.1),
-    );
-    expect(moved.cameraElevation, 1201.7);
-    expect(moved.height, state.height);
-    expect(moved.pitch, state.pitch);
-    expect(moved.roll, state.roll);
-    expect(moved.timestamp, state.timestamp);
-    expect(moved.copyWith(groundElevation: 1400).cameraElevation, 1201.7);
-    expect(
-      moved.copyWith(groundElevation: 1400).sky.sun.altitude,
-      moved.copyWith(groundElevation: 800).sky.sun.altitude,
-    );
-    final forward = moveCamera(state.copyWith(pitch: -85), 30, 0);
-    expect(forward.location, moved.location);
-    expect(
-      bearing(state.location, moveCamera(state, 0, 30).location),
-      closeTo(180, 1e-7),
-    );
-    expect(
-      bearing(state.location, moveCamera(state, -30, 0).location),
-      closeTo(270, 1e-7),
-    );
-    expect(
-      (bearing(state.location, moveCamera(state, 0, -30).location) + 180) %
-              360 -
-          180,
-      closeTo(0, 1e-7),
-    );
-    expect(moved.copyWith(height: 2).fixedElevation, isNull);
-    expect(moved.copyWith(latitude: 40).fixedElevation, isNull);
-    expect(moved.copyWith(clearFixedElevation: true).fixedElevation, isNull);
-    expect(moveCamera(SimulationState(), 30, 0).fixedElevation, isNull);
-    expect(identical(moveCamera(state, 0, 0), state), isTrue);
-    expect(() => moveCamera(state, double.nan, 0), throwsArgumentError);
-    expect(() => moveCamera(state, 0, double.infinity), throwsArgumentError);
-  });
-  test('navigation elevation persists with validation and legacy defaults', () {
-    final state = moveCamera(SimulationState(groundElevation: 500), 10, 0);
+  test(
+    'WASD follows terrain while preserving heading, pitch and height offset',
+    () {
+      final state = SimulationState(
+        groundElevation: 1200,
+        height: 1.7,
+        azimuth: 90,
+        pitch: 85,
+        roll: 80,
+      );
+      final moved = moveCamera(state, 30, 0);
+      expect(bearing(state.location, moved.location), closeTo(90, 1e-7));
+      expect(
+        const Distance().as(LengthUnit.Meter, state.location, moved.location),
+        closeTo(30, 0.1),
+      );
+      expect(moved.fixedElevation, isNull);
+      expect(moved.cameraElevation, isNull);
+      expect(moved.height, state.height);
+      expect(moved.pitch, state.pitch);
+      expect(moved.roll, state.roll);
+      expect(moved.timestamp, state.timestamp);
+      expect(moved.copyWith(groundElevation: 1400).cameraElevation, 1401.7);
+      expect(moved.copyWith(groundElevation: 800).cameraElevation, 801.7);
+      expect(
+        moved.copyWith(groundElevation: 1400).sky.moon.distanceKm,
+        isNot(moved.copyWith(groundElevation: 800).sky.moon.distanceKm),
+      );
+      final forward = moveCamera(state.copyWith(pitch: -85), 30, 0);
+      expect(forward.location, moved.location);
+      expect(
+        bearing(state.location, moveCamera(state, 0, 30).location),
+        closeTo(180, 1e-7),
+      );
+      expect(
+        bearing(state.location, moveCamera(state, -30, 0).location),
+        closeTo(270, 1e-7),
+      );
+      expect(
+        (bearing(state.location, moveCamera(state, 0, -30).location) + 180) %
+                360 -
+            180,
+        closeTo(0, 1e-7),
+      );
+      expect(moved.copyWith(height: 2).fixedElevation, isNull);
+      expect(moved.copyWith(latitude: 40).fixedElevation, isNull);
+      expect(moved.copyWith(clearFixedElevation: true).fixedElevation, isNull);
+      expect(moveCamera(SimulationState(), 30, 0).fixedElevation, isNull);
+      expect(identical(moveCamera(state, 0, 0), state), isTrue);
+      expect(() => moveCamera(state, double.nan, 0), throwsArgumentError);
+      expect(() => moveCamera(state, 0, double.infinity), throwsArgumentError);
+    },
+  );
+  test('WASD releases legacy elevation overrides; height offsets persist', () {
+    final state = SimulationState(groundElevation: 500, fixedElevation: 501.7);
     final restored = SavedPlan.decode(SavedPlan('Walk', state).encode()).state;
     expect(restored.cameraElevation, state.cameraElevation);
     expect(restored.groundElevation, isNull);
+    final moved = moveCamera(restored, 10, 0);
+    expect(moved.fixedElevation, isNull);
+    expect(moved.copyWith(groundElevation: 600).cameraElevation, 601.7);
+    final walkedPlan = SavedPlan.decode(SavedPlan('Walked', moved).encode())
+        .state;
+    expect(walkedPlan.fixedElevation, isNull);
+    expect(walkedPlan.height, 1.7);
     final json =
         jsonDecode(SavedPlan('Walk', state).encode()) as Map<String, Object?>;
     json.remove('fixedElevation');

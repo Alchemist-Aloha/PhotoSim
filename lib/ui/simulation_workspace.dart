@@ -78,8 +78,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   int generation = 0;
   int loaded = 0, failed = 0, total = 0;
   double? ground;
-  HeightField? cameraGroundField;
+  TerrainPatch? cameraGroundField;
   TileId? cameraGroundTile;
+  LatLng? navigationLocation;
   String? tileFailure;
   Object? error;
   bool loading = true;
@@ -180,7 +181,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.terrainRings != next.terrainRings ||
         old.terrainForwardKm != next.terrainForwardKm) {
       final nearbyNavigation =
-          next.fixedElevation != null &&
+          next.location == navigationLocation &&
           terrainOrigin != null &&
           TileId.at(next.location).key == TileId.at(terrainOrigin!).key &&
           old.terrainRings == next.terrainRings &&
@@ -229,10 +230,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final field = cameraGroundField;
     if (field != null &&
         TileId.at(next.location).key == cameraGroundTile?.key) {
-      final uv = cameraGroundTile!.uv(next.location);
-      ground = field.sample(uv.x, uv.y);
+      final sampled = field.groundElevationAt(next.location);
+      if (sampled == null) return;
+      ground = sampled;
+      navigationLocation = next.location;
       widget.onChanged(next.copyWith(groundElevation: ground));
     } else {
+      navigationLocation = next.location;
       widget.onChanged(next);
     }
   }
@@ -265,7 +269,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final location = widget.state.location;
     // shortcut: rebase on camera-tile exit; retain more height fields for uninterrupted long-range flight.
     final retainFrame =
-        widget.state.fixedElevation != null &&
+        location == navigationLocation &&
         terrainOrigin != null &&
         TileId.at(location).key == TileId.at(terrainOrigin!).key;
     final origin = retainFrame ? terrainOrigin! : location;
@@ -350,10 +354,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             terrainNodes.add(node);
             patches[id.key] = (id: id, node: node);
             if (id.key == center.key) {
-              cameraGroundField = patch.field;
+              final sampled = patch.groundElevationAt(widget.state.location);
+              if (sampled == null) {
+                throw const FormatException('Camera ground mesh unavailable');
+              }
+              cameraGroundField = patch;
               cameraGroundTile = id;
-              final uv = id.uv(widget.state.location);
-              ground = patch.field.sample(uv.x, uv.y);
+              ground = sampled;
               widget.onChanged(widget.state.copyWith(groundElevation: ground));
             }
             setState(() => loaded++);
@@ -986,7 +993,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text(
-                  'Click preview · Drag to aim · WASD: horizontal 30 m/s, fixed elevation',
+                  'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
                 ),
                 if (terrainProviders.isNotEmpty)
                   Text(

@@ -8,6 +8,69 @@ import 'package:photosim/data/terrain/terrain_patch.dart';
 import 'terrain_fixture.dart';
 
 void main() {
+  test('walking ground follows uphill/downhill and never samples below the visible mesh', () {
+    final id = TileId.at(const LatLng(37.744, -119.59));
+    final origin = id.point(0.5, 0.5);
+    // Coarse vertices are all 1000 m, but the source has a valley between them.
+    final field = HeightField(
+      Float32List.fromList([
+        for (var y = 0; y < 5; y++) ...[1000, 0, 1000, 1000, 1000],
+      ]),
+      5,
+    );
+    final patch = buildTerrainPatch(field, id, origin, 2);
+    final valley = id.point(0.3, 0.5);
+    expect(field.sample(0.3, 0.5), closeTo(0, 1e-5));
+    expect(patch.groundElevationAt(valley), greaterThan(990));
+    // A source peak omitted by coarse geometry must also remain safe.
+    final peak = HeightField(
+      Float32List.fromList([
+        for (var y = 0; y < 5; y++) ...[0, 1000, 0, 0, 0],
+      ]),
+      5,
+    );
+    final peakPatch = buildTerrainPatch(peak, id, origin, 2);
+    expect(peakPatch.groundElevationAt(valley), closeTo(1000, 1e-4));
+    final ramp = HeightField(
+      Float32List.fromList([
+        for (var y = 0; y < 5; y++) ...[0, 250, 500, 750, 1000],
+      ]),
+      5,
+    );
+    final slope = buildTerrainPatch(ramp, id, origin, 2);
+    final low = slope.groundElevationAt(id.point(0.2, 0.5))!;
+    final high = slope.groundElevationAt(id.point(0.8, 0.5))!;
+    expect(high, greaterThan(low + 500));
+    expect(slope.groundElevationAt(id.point(-0.1, 0.5)), isNull);
+  });
+  test('walking ground covers inserted vertices, cell boundaries and polar/dateline tiles', () {
+    for (final location in [
+      const LatLng(37.744, -119.59),
+      const LatLng(85, 179.9999),
+      const LatLng(-85, -179.9999),
+    ]) {
+      final id = TileId.at(location);
+      final patch = buildTerrainPatch(
+        HeightField(
+          Float32List(256 * 256)..fillRange(0, 256 * 256, 1234.5),
+          256,
+        ),
+        id,
+        location,
+        128,
+      );
+      expect(patch.groundElevationAt(location), closeTo(1234.5, 0.01));
+      for (final u in [0.0, 0.1, 0.5, 0.99, 1.0]) {
+        for (final v in [0.0, 0.1, 0.5, 0.99, 1.0]) {
+          expect(
+            patch.groundElevationAt(id.point(u, v)),
+            closeTo(1234.5, 0.01),
+            reason: '$location, $u, $v, uv=${id.uv(id.point(u, v))}',
+          );
+        }
+      }
+    }
+  });
   test('Terrarium includes negative and fractional elevations', () {
     expect(terrariumHeight(128, 0, 0), 0);
     expect(terrariumHeight(127, 255, 128), -0.5);

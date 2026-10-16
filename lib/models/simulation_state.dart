@@ -198,7 +198,7 @@ class SimulationState {
       : '${shutterSeconds.toStringAsFixed(1)} s';
   final double? groundElevation;
 
-  /// Absolute source-datum elevation captured by horizontal WASD navigation.
+  /// Legacy absolute-elevation override; WASD clears it to follow the terrain.
   final double? fixedElevation;
   double? get cameraElevation =>
       fixedElevation ??

@@ -127,6 +127,8 @@ class TerrainPatch {
     required this.indices,
     required this.resolution,
     required this.origin,
+    required this.us,
+    required this.vs,
   });
   final TileId id;
   final HeightField field;
@@ -134,6 +136,70 @@ class TerrainPatch {
   final List<int> indices;
   final int resolution;
   final LatLng origin;
+  final List<double> us, vs;
+
+  /// Conservative ground: source raster or the actual rendered surface, whichever is higher.
+  /// Skirts are excluded. Missing coverage must pause navigation, not guess a height.
+  double? groundElevationAt(LatLng location) {
+    final uv = id.uv(location);
+    if (uv.x < -1e-9 || uv.x > 1 + 1e-9 || uv.y < -1e-9 || uv.y > 1 + 1e-9) {
+      return null;
+    }
+    int interval(List<double> axis, double value) {
+      final next = axis.indexWhere((sample) => sample >= value.clamp(0.0, 1.0));
+      return (next <= 0 ? 0 : next - 1).clamp(0, axis.length - 2);
+    }
+
+    final column = interval(us, uv.x), row = interval(vs, uv.y);
+    final frame = LocalFrame(origin);
+    final zero = frame.project(location, 0);
+    final up = frame.project(location, 1) - zero;
+    Vector3 vertex(int index) => Vector3(
+      positions[index * 3],
+      positions[index * 3 + 1],
+      positions[index * 3 + 2],
+    );
+    double? edgeHeight;
+    double grounded(double height) =>
+        math.max(field.sample(uv.x, uv.y), height).clamp(-12000.0, 10000.0);
+    // Adjacent cells cover float32 edge rounding and geographic-to-planar interpolation.
+    for (
+      var y = math.max(0, row - 1);
+      y <= math.min(vs.length - 2, row + 1);
+      y++
+    ) {
+      for (
+        var x = math.max(0, column - 1);
+        x <= math.min(us.length - 2, column + 1);
+        x++
+      ) {
+        final start = (y * (us.length - 1) + x) * 6;
+        for (var triangle = start; triangle < start + 6; triangle += 3) {
+          final a = vertex(indices[triangle]);
+          final ab = vertex(indices[triangle + 1]) - a;
+          final ac = vertex(indices[triangle + 2]) - a;
+          final normal = ab.cross(ac);
+          final denominator = normal.dot(up);
+          if (denominator.abs() < 1e-12) continue;
+          final height = normal.dot(a - zero) / denominator;
+          final hit = zero + up * height - a;
+          final length2 = normal.length2;
+          final b = hit.cross(ac).dot(normal) / length2;
+          final c = ab.cross(hit).dot(normal) / length2;
+          if (b >= -1e-6 && c >= -1e-6 && b + c <= 1 + 1e-6) {
+            return grounded(height);
+          }
+          // Float32 boundary vertices can lie just inside the true geographic tile edge.
+          if (b >= -0.001 && c >= -0.001 && b + c <= 1.001) {
+            edgeHeight = edgeHeight == null
+                ? height
+                : math.max(edgeHeight, height);
+          }
+        }
+      }
+    }
+    return edgeHeight == null ? null : grounded(edgeHeight);
+  }
 }
 
 class TerrainBuildRequest {
@@ -276,5 +342,7 @@ TerrainPatch buildTerrainPatch(
     indices: indices,
     resolution: resolution,
     origin: origin,
+    us: us,
+    vs: vs,
   );
 }
