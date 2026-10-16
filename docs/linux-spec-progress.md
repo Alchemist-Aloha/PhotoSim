@@ -96,7 +96,7 @@ dates must remain explicitly unknown rather than invented.
 
 ## Verification for this slice
 
-- 130 unit/widget tests (including WASD), including stop ratios, framing/roll, bounds, old/new plan
+- 142 unit/widget tests (including WASD and HTTP scheduling/backoff), including stop ratios, framing/roll, bounds, old/new plan
   formats, exposure controls, overlays and playback rate.
 - New Linux native photography-tools workflow verifies GPU exposure response,
   Auto metering, white-balance settings, portrait projection/DOF sensor size,
@@ -111,4 +111,5 @@ Run the new native workflow with:
 ```sh
 flutter test integration_test/linux_spec_photography_test.dart -d linux
 flutter test integration_test/linux_wasd_test.dart -d linux
+flutter test integration_test/linux_loading_test.dart -d linux
 ```

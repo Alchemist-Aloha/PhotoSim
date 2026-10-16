@@ -48,8 +48,11 @@ Row zero maps to north; existing normalized UVs and clamped texture edges are
 reused. Each selected terrain patch receives a 256×256 preview (nine by default),
 with at most three jobs active. Forward-range coverage can add coarser patches;
 preview ground spacing doubles for each lower terrain zoom.
-The camera tile then upgrades to 1024×1024 without rebuilding geometry. Remaining
-tiles retain previews. Source selection is automatic; there is no source picker
+Nearby previews begin alongside the remaining terrain jobs. The camera tile
+upgrades to 1024×1024 after terrain and preview loading, without rebuilding geometry;
+slow detail exports never block terrain. Remaining tiles retain previews.
+Terrain and imagery share [HTTP concurrency/backoff](../loading.md), not a fixed
+assumed provider requests-per-second quota. Source selection is automatic; there is no source picker
 or new saved-plan setting.
 
 **Native sub-meter aerial resolution is not displayed.** At terrain zoom 13,

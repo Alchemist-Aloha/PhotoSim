@@ -58,7 +58,9 @@ screen-error selection. Web Mercator's polar coverage limit still applies.
 Aim, pitch and optics changes debounce for 400 ms when forward fetching is enabled.
 Changes reconcile the desired tile set: retained patches preserve geometry/textures,
 new patches load near-first, obsolete jobs cancel and unused patches are removed.
-The first nearby image batch loads before waiting for the rest of the terrain.
+The first nearby preview image batch runs alongside the remaining terrain, not
+before it. Slow imagery and camera-tile detail cannot hold up mesh loading.
+See [loading and HTTP backoff](../loading.md).
 Render-distance changes only hide/reveal whole tiles intersecting the radius;
 coarse tiles can extend beyond it. Flutter Scene additionally culls against the
 actual 3D view frustum. Fetch and render limits are independent (prefetching is

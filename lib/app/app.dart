@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 
 import '../data/saved_plans.dart';
 
@@ -47,6 +48,8 @@ class WorkspaceShell extends StatefulWidget {
 
 class _WorkspaceShellState extends State<WorkspaceShell>
     with WidgetsBindingObserver {
+  // Keep service cooldowns/connections alive across Map/3D workspace recreation.
+  final terrainClient = http.Client();
   SimulationState state = SimulationState();
   Workspace workspace = Workspace.map;
   bool inspectorVisible = true;
@@ -233,6 +236,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
 
   @override
   void dispose() {
+    terrainClient.close();
     stopPlayback();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -382,6 +386,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   onChanged: update,
                 )
               : SimulationWorkspace(
+                  httpClient: terrainClient,
                   state: state,
                   cleanPreview: cleanPreview,
                   onChanged: update,

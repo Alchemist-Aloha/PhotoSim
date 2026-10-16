@@ -184,7 +184,11 @@ void main() {
             throw http.RequestAbortedException(request.url);
           }
           return failure == 'http'
-              ? http.Response('unavailable', 503)
+              ? http.Response(
+                  'unavailable',
+                  503,
+                  headers: {'retry-after': '120'},
+                )
               : http.Response.bytes(terrainVoidWebpFixture(), 200);
         }
         return http.Response.bytes(terrainFixture(), 200);
@@ -231,8 +235,31 @@ void main() {
     },
   );
 
+  test('a throttled primary skips its uncached parent and falls back without waiting', () async {
+    final requests = <Uri>[];
+    final client = MockClient((request) async {
+      requests.add(request.url);
+      if (request.url.host == 'tiles.mapterhorn.com') {
+        return http.Response('busy', 429, headers: {'retry-after': '120'});
+      }
+      return http.Response.bytes(terrainFixture(), 200);
+    });
+    addTearDown(client.close);
+    final sources = TerrainSources(client: client, directory: directory);
+    final result = await sources
+        .load(id, origin, 8, abort: Completer<void>().future)
+        .timeout(const Duration(seconds: 2));
+    expect(result.provider, TerrainProvider.mapzen);
+    expect(requests.length, 2);
+    expect(requests.first.path, '/13/2/2.webp');
+    expect(requests.last.host, 's3.amazonaws.com');
+    expect(sources.downloads, 1);
+  });
   test('all services failing leaves caches empty', () async {
-    final client = MockClient((_) async => http.Response('unavailable', 503));
+    final client = MockClient(
+      (_) async =>
+          http.Response('unavailable', 503, headers: {'retry-after': '120'}),
+    );
     addTearDown(client.close);
     final sources = TerrainSources(client: client, directory: directory);
     await expectLater(

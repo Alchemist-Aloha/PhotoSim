@@ -126,7 +126,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 130 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 142 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image
@@ -199,6 +199,12 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   terrain-tile rebasing. Camera elevation follows the higher of raster ground and
   visible mesh triangles, with dedicated slope/coarse-valley/boundary tests.
   Nearby motion uses retained WGS84 frames. This is not general object collision.
+- A seventh Linux native workflow holds imagery responses pending and verifies
+  all terrain meshes/ground still load; later previews/detail retain geometry.
+  Shared HTTP scheduling caps each origin at three streamed requests and applies
+  cancellable 429/503 Retry-After/backoff without delaying cached data. Small live
+  probes found HTTP 200, not rate-limit errors; EOX detail took 23.35 seconds.
+  See [loading diagnostics and policy](loading.md).
 - Linux release bundle builds successfully.
 
 Unit tests use generated images and mocked HTTP; the native workflow uses live

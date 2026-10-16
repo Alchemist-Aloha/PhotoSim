@@ -78,6 +78,7 @@ flutter test integration_test/linux_photography_test.dart -d linux
 flutter test integration_test/linux_sunlight_test.dart -d linux
 flutter test integration_test/linux_spec_photography_test.dart -d linux
 flutter test integration_test/linux_wasd_test.dart -d linux
+flutter test integration_test/linux_loading_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```

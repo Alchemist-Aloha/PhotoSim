@@ -215,7 +215,11 @@ void main() {
       final client = MockClient(
         (request) async => request.url.queryParameters['size'] == '256,256'
             ? http.Response.bytes(imageryFixture(256), 200)
-            : http.Response('unavailable', 503),
+            : http.Response(
+                'unavailable',
+                503,
+                headers: {'retry-after': '120'},
+              ),
       );
       addTearDown(client.close);
       final preview = TileCache(Directory('${directory.path}/preview'));

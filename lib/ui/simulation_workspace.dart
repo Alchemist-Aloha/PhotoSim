@@ -42,7 +42,11 @@ class SimulationWorkspace extends StatefulWidget {
     required this.onChanged,
     this.onPausePlayback,
     this.cleanPreview = false,
+    this.httpClient,
+    this.cacheDirectory,
   });
+  final http.Client? httpClient;
+  final Directory? cacheDirectory;
   final bool cleanPreview;
   final VoidCallback? onPausePlayback;
   final SimulationState state;
@@ -72,7 +76,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   bool imageryLoading = false;
   int imageryFailures = 0;
   String? imageryFailure;
-  final client = http.Client();
+  late final http.Client client;
+  late final bool ownsClient;
   final terrainNodes = <scene.Node>[];
   Completer<void>? cancellation;
   int generation = 0;
@@ -91,13 +96,16 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   @override
   void initState() {
     super.initState();
+    ownsClient = widget.httpClient == null;
+    client = widget.httpClient ?? http.Client();
     unawaited(initialize());
   }
 
   Future<void> initialize() async {
     try {
       await scene.Scene.initializeStaticResources();
-      final directory = await getApplicationCacheDirectory();
+      final directory =
+          widget.cacheDirectory ?? await getApplicationCacheDirectory();
       if (!mounted) return;
       terrainCredits =
           (jsonDecode(
@@ -319,6 +327,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final missing = tiles
         .where((tile) => !patches.containsKey(tile.key))
         .toList();
+    Future<void>? nearbyImagery;
     // Near-first jobs, bounded concurrency; overlapping resident patches keep their buffers/textures.
     for (var start = 0; start < missing.length; start += 3) {
       if (!mounted || token != generation) return;
@@ -373,13 +382,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           }
         }),
       );
-      // Make the first nearby surfaces usable before waiting for the distant region.
+      // Preview nearby surfaces in parallel; slow imagery must not block distant terrain.
       if (start == 0 && missing.length > 3 && mounted && token == generation) {
-        await loadImagery(token, stop);
+        nearbyImagery = loadImagery(token, stop, detail: false);
       }
     }
     if (mounted && token == generation) {
       setState(() => loading = false);
+      if (nearbyImagery != null) await nearbyImagery;
       await loadImagery(token, stop, retry: retry);
     }
   }
@@ -411,6 +421,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     int token,
     Completer<void> stop, {
     bool retry = false,
+    bool detail = true,
   }) async {
     if (!mounted || token != generation) return;
     setState(() {
@@ -475,7 +486,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       );
     }
     final center = patches[centerKey];
-    if (mounted &&
+    if (detail &&
+        mounted &&
         token == generation &&
         center != null &&
         textures.containsKey(center.node) &&
@@ -588,7 +600,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     if (cancellation != null && !cancellation!.isCompleted) {
       cancellation!.complete();
     }
-    client.close();
+    if (ownsClient) client.close();
     world?.dispose();
     terrainNodes.clear();
     patches.clear();

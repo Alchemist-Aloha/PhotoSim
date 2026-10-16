@@ -121,7 +121,11 @@ void main() {
           return http.Response.bytes(imageryFixture(256, empty: true), 200);
         }
         if (request.url.host == 'imagery.nationalmap.gov') {
-          return http.Response('unavailable', 503);
+          return http.Response(
+            'unavailable',
+            503,
+            headers: {'retry-after': '120'},
+          );
         }
         return http.Response.bytes(imageryFixture(256), 200);
       });
@@ -192,7 +196,11 @@ void main() {
       final client = MockClient(
         (request) async => request.url.host == 'imagery.nationalmap.gov'
             ? http.Response.bytes(imageryFixture(256, partial: true), 200)
-            : http.Response('unavailable', 503),
+            : http.Response(
+                'unavailable',
+                503,
+                headers: {'retry-after': '120'},
+              ),
       );
       addTearDown(client.close);
       final sources = ImagerySources(client: client, directory: directory);
@@ -227,7 +235,10 @@ void main() {
   test(
     'all sources failing reports unavailable and does not cache failures',
     () async {
-      final client = MockClient((_) async => http.Response('unavailable', 503));
+      final client = MockClient(
+        (_) async =>
+            http.Response('unavailable', 503, headers: {'retry-after': '120'}),
+      );
       addTearDown(client.close);
       final sources = ImagerySources(client: client, directory: directory);
       await expectLater(
