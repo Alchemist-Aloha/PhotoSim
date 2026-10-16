@@ -82,6 +82,10 @@ requirements separately from excluded platform work.
 - Full-area context preview with an inset sensor-aspect photo region and
   focal-length/aperture/DOF label. Projection and DOF scaling preserve the physical
   photo; weather/quality/relighting are only in the right settings panel.
+- Desktop navigation drawer switches Map/3D and closes on selection without
+  resetting UTC/camera. Ruler/stars/export buttons float in the preview; one
+  bottom information card groups loading/cache counts, help and attribution.
+  Both cards hide in clean mode, do not shrink the canvas and stay out of exports.
 - Attributed, sensor-aspect PNG export cropped to the framed photo, capped to
   4096 px / 12 MP, with no application controls and no overwriting existing files.
 - Performance/Balanced/High backend rendering budgets; unnecessary shadows skipped
@@ -131,7 +135,7 @@ the rendered scene in the installed backend.
 Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
 
 - Static analysis: no issues.
-- 157 passing unit/widget tests: optics/state/geographic precision, elevations,
+- 158 passing unit/widget tests: optics/state/geographic precision, elevations,
   normals/edges/ground vertex, lossless WebP validation, all four parent quadrants,
   terrain service fallback/provenance/credits, cache behavior, bounded responses and cancellation,
   imagery export bounds, pixel orientation, no-data handling, independent image

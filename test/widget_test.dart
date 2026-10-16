@@ -8,6 +8,73 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 
 void main() {
+  testWidgets(
+    'desktop drawer switches workspaces, closes on selection and preserves UTC/camera',
+    (tester) async {
+      tester.view.physicalSize = const Size(1600, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const PhotoSimApp());
+      final original = tester
+          .widget<CameraInspector>(find.byType(CameraInspector))
+          .state;
+      Future<void> open() async {
+        await tester.tap(find.byTooltip('Open navigation'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      await open();
+      expect(
+        tester
+            .widget<NavigationDrawer>(find.byType(NavigationDrawer))
+            .selectedIndex,
+        0,
+      );
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationDrawer),
+          matching: find.text('3D Preview'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        tester.state<ScaffoldState>(find.byType(Scaffold)).isDrawerOpen,
+        isFalse,
+      );
+      expect(find.byType(FlutterMap), findsNothing);
+      await open();
+      expect(
+        tester
+            .widget<NavigationDrawer>(find.byType(NavigationDrawer))
+            .selectedIndex,
+        1,
+      );
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationDrawer),
+          matching: find.text('Map'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        tester.state<ScaffoldState>(find.byType(Scaffold)).isDrawerOpen,
+        isFalse,
+      );
+      expect(find.byType(FlutterMap), findsOneWidget);
+      final current = tester
+          .widget<CameraInspector>(find.byType(CameraInspector))
+          .state;
+      expect(current.location, original.location);
+      expect(current.timestamp, original.timestamp);
+      expect(current.focalLength, original.focalLength);
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('target selection and aiming preserve location and UTC', (
     tester,
   ) async {

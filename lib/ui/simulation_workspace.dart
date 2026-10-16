@@ -798,113 +798,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       ..color = sun.altitude > 0
           ? vm.Vector3(solarLight.red, solarLight.green, solarLight.blue)
           : vm.Vector3(0.85, 0.90, 1);
-    return Column(
-      children: [
-        if (!widget.cleanPreview)
-          Material(
-            color: Theme.of(context).colorScheme.surfaceContainer,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: showTerrainRange,
-                        icon: const Icon(Icons.terrain),
-                        label: const Text('Terrain range'),
-                      ),
-                      FilterChip(
-                        label: const Text('Constellations'),
-                        tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
-                        selected: state.showConstellations,
-                        onSelected: (value) => widget.onChanged(
-                          state.copyWith(showConstellations: value),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed:
-                            ground == null ||
-                                loading ||
-                                imageryLoading ||
-                                exporting
-                            ? null
-                            : exportImage,
-                        icon: const Icon(Icons.image_outlined),
-                        label: Text(exporting ? 'Exporting…' : 'Export PNG'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
-                      ),
-                      Text(
-                        'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
-                      ),
-                      if (textures.length < loaded || partialImagery.isNotEmpty)
-                        const Text('Fallback surface where imagery is missing'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        if (!widget.cleanPreview &&
-            (failed > 0 || repository!.cacheWarning != null))
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    failed > 0
-                        ? '$failed terrain tiles unavailable. ${tileFailure ?? ''}'
-                        : repository!.cacheWarning!,
-                  ),
-                ),
-                TextButton(
-                  onPressed: loading || imageryLoading
-                      ? null
-                      : () => loadTerrain(retry: true),
-                  child: const Text('Retry terrain'),
-                ),
-              ],
-            ),
-          ),
-        if (!widget.cleanPreview &&
-            (imageryFailures > 0 || imagery!.cacheWarning != null))
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    imageryFailures > 0
-                        ? 'Imagery unavailable or incomplete: $imageryFailure. Terrain remains usable.'
-                        : imagery!.cacheWarning!,
-                  ),
-                ),
-                TextButton(
-                  onPressed: loading || imageryLoading
-                      ? null
-                      : () =>
-                            loadImagery(generation, cancellation!, retry: true),
-                  child: const Text('Retry imagery'),
-                ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: ground == null
+    return LayoutBuilder(
+      builder: (context, bounds) => Stack(
+        fit: StackFit.expand,
+        children: [
+          ground == null
               ? Center(
                   child: loading
                       ? const CircularProgressIndicator()
@@ -985,48 +883,221 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                     ),
                   ),
                 ),
-        ),
-        if (!widget.cleanPreview)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Wrap(
-              spacing: 16,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text(
-                  'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
-                ),
-                if (terrainProviders.isNotEmpty)
-                  Text(
-                    terrainProviders.values
-                        .map((provider) => provider.attribution)
-                        .toSet()
-                        .join(' · '),
-                    style: Theme.of(context).textTheme.bodySmall,
+          if (!widget.cleanPreview)
+            Align(
+              alignment: Alignment.topRight,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: bounds.maxHeight * 0.4),
+                child: Card(
+                  key: const ValueKey('preview-actions'),
+                  elevation: 4,
+                  color: Theme.of(context).colorScheme.surfaceContainer
+                      .withValues(alpha: 0.9),
+                  margin: const EdgeInsets.all(12),
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: showTerrainRange,
+                                icon: const Icon(Icons.straighten),
+                                label: const Text('Terrain range'),
+                              ),
+                              FilterChip(
+                                label: const Text('Constellations'),
+                                showCheckmark: false,
+                                avatar: const Icon(
+                                  Icons.auto_awesome,
+                                  size: 18,
+                                ),
+                                tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
+                                selected: state.showConstellations,
+                                onSelected: (value) => widget.onChanged(
+                                  state.copyWith(showConstellations: value),
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed:
+                                    ground == null ||
+                                        loading ||
+                                        imageryLoading ||
+                                        exporting
+                                    ? null
+                                    : exportImage,
+                                icon: const Icon(Icons.image_outlined),
+                                label: Text(
+                                  exporting ? 'Exporting…' : 'Export PNG',
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (!widget.cleanPreview &&
+                              (failed > 0 || repository!.cacheWarning != null))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      failed > 0
+                                          ? '$failed terrain tiles unavailable. ${tileFailure ?? ''}'
+                                          : repository!.cacheWarning!,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: loading || imageryLoading
+                                        ? null
+                                        : () => loadTerrain(retry: true),
+                                    child: const Text('Retry terrain'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (!widget.cleanPreview &&
+                              (imageryFailures > 0 ||
+                                  imagery!.cacheWarning != null))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      imageryFailures > 0
+                                          ? 'Imagery unavailable or incomplete: $imageryFailure. Terrain remains usable.'
+                                          : imagery!.cacheWarning!,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: loading || imageryLoading
+                                        ? null
+                                        : () => loadImagery(
+                                            generation,
+                                            cancellation!,
+                                            retry: true,
+                                          ),
+                                    child: const Text('Retry imagery'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                if (imageProviders.isNotEmpty)
-                  Text(
-                    imageProviders.values
-                        .expand((providers) => providers)
-                        .map((provider) => provider.attribution)
-                        .toSet()
-                        .join(' · '),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                TextButton(
-                  onPressed: showSources,
-                  child: const Text('© Terrain & imagery sources'),
                 ),
-                Text(
-                  '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
-                ),
-                Text(
-                  'Imagery: ${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
-                ),
-              ],
+              ),
             ),
-          ),
-      ],
+          if (!widget.cleanPreview)
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: bounds.maxHeight * 0.4),
+                child: Card(
+                  key: const ValueKey('preview-info'),
+                  elevation: 4,
+                  color: Theme.of(context).colorScheme.surfaceContainer
+                      .withValues(alpha: 0.9),
+                  margin: const EdgeInsets.all(12),
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: DefaultTextStyle.merge(
+                        style: Theme.of(context).textTheme.bodySmall,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  'Real terrain · $loaded/$total tiles${loading ? ' · loading' : ''}',
+                                ),
+                                Text(
+                                  '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
+                                  key: const ValueKey('terrain-cache-count'),
+                                ),
+                              ],
+                            ),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  'Imagery · ${textures.length}/$loaded textures${imageryLoading ? ' · loading' : ''}',
+                                ),
+                                Text(
+                                  '${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
+                                  key: const ValueKey('imagery-cache-count'),
+                                ),
+                              ],
+                            ),
+                            if (textures.length < loaded ||
+                                partialImagery.isNotEmpty)
+                              const Text(
+                                'Fallback surface where imagery is missing',
+                              ),
+                            Wrap(
+                              spacing: 12,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                const Text(
+                                  'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
+                                ),
+                                if (terrainProviders.isNotEmpty)
+                                  Text(
+                                    terrainProviders.values
+                                        .map((provider) => provider.attribution)
+                                        .toSet()
+                                        .join(' · '),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                if (imageProviders.isNotEmpty)
+                                  Text(
+                                    imageProviders.values
+                                        .expand((providers) => providers)
+                                        .map((provider) => provider.attribution)
+                                        .toSet()
+                                        .join(' · '),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                TextButton(
+                                  onPressed: showSources,
+                                  child: const Text(
+                                    '© Terrain & imagery sources',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

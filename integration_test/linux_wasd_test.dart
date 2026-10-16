@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+
+import 'workspace_navigation.dart';
+
 import 'package:photosim/app/app.dart';
 import 'package:photosim/core/camera_movement.dart';
 import 'package:photosim/core/geo.dart';
@@ -28,7 +31,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.text('3D Preview'));
+      await openWorkspace(tester, '3D Preview');
       Future<void> waitForImagery() async {
         for (var i = 0; i < 240; i++) {
           if (find.text('Imagery · 9/9 textures').evaluate().isNotEmpty &&
@@ -109,7 +112,7 @@ void main() {
       expect(state().location, stopped);
       await tester.tap(find.text('Cancel'));
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.tap(find.text('Map'));
+      await openWorkspace(tester, 'Map');
       await tester.pump(const Duration(milliseconds: 500));
       expect(
         tester.widget<MapWorkspace>(find.byType(MapWorkspace)).state.location,
@@ -119,7 +122,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
       expect(state().location, stopped);
-      await tester.tap(find.text('3D Preview'));
+      await openWorkspace(tester, '3D Preview');
       await waitForImagery();
       expect(
         state().cameraElevation,

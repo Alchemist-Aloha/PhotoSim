@@ -8,6 +8,9 @@ import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
+
+import 'workspace_navigation.dart';
+
 import 'package:photosim/app/app.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
@@ -47,7 +50,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.tap(find.text('3D Preview'));
+    await openWorkspace(tester, '3D Preview');
     for (var i = 0; i < 240; i++) {
       if (find.text('Imagery · 9/9 textures').evaluate().isNotEmpty &&
           tester

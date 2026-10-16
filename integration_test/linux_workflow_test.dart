@@ -8,6 +8,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:integration_test/integration_test.dart';
+
+import 'workspace_navigation.dart';
+
 import 'package:photosim/app/app.dart';
 import 'package:photosim/core/geo.dart';
 import 'package:photosim/core/local_time.dart';
@@ -29,6 +32,10 @@ Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
   final lensLabel = tester
       .getRect(find.byKey(const ValueKey('photo-lens-label')))
       .inflate(8);
+  final hud = [
+    for (final key in ['preview-actions', 'preview-info'])
+      tester.getRect(find.byKey(ValueKey(key))).inflate(4),
+  ];
   var total = 0.0, count = 0;
   for (
     var y = viewport.top.toInt() + 8;
@@ -40,7 +47,11 @@ Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
       x < viewport.right.toInt() - 8;
       x += 8
     ) {
-      if (lensLabel.contains(Offset(x.toDouble(), y.toDouble()))) continue;
+      final pixel = Offset(x.toDouble(), y.toDouble());
+      if (lensLabel.contains(pixel) ||
+          hud.any((rect) => rect.contains(pixel))) {
+        continue;
+      }
       final offset = (y * image.width + x) * 4;
       total +=
           0.2126 * raw.getUint8(offset) +
@@ -68,10 +79,17 @@ Future<int> brightSkyPixels(
   final lensLabel = tester
       .getRect(find.byKey(const ValueKey('photo-lens-label')))
       .inflate(8);
+  final hud = [
+    for (final key in ['preview-actions', 'preview-info'])
+      tester.getRect(find.byKey(ValueKey(key))).inflate(4),
+  ];
   var count = 0;
   for (var y = rect.top.toInt() + 8; y < rect.bottom.toInt() - 8; y++) {
     for (var x = rect.left.toInt() + 8; x < rect.right.toInt() - 8; x++) {
-      if (lensLabel.contains(Offset(x.toDouble(), y.toDouble()))) continue;
+      final pixel = Offset(x.toDouble(), y.toDouble());
+      if (lensLabel.contains(pixel) || hud.any((box) => box.contains(pixel))) {
+        continue;
+      }
       if ((x - rect.center.dx).abs() < 16 && (y - rect.center.dy).abs() < 16) {
         continue;
       }
@@ -163,7 +181,7 @@ void main() {
     final expected = (aimed.azimuth + aimed.horizontalFov / radians / 2) % 360;
     expect((edgeAngle - expected + 540) % 360 - 180, closeTo(0, 1e-7));
     await capture('linux-map');
-    await tester.tap(find.text('3D Preview'));
+    await openWorkspace(tester, '3D Preview');
     for (
       var i = 0;
       i < 30 && find.byType(scene.SceneView).evaluate().isEmpty;
@@ -732,7 +750,7 @@ void main() {
     );
     expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
     await capture('linux-preview');
-    await tester.tap(find.text('Map'));
+    await openWorkspace(tester, 'Map');
     await tester.pump(const Duration(seconds: 1));
     expect(camera().azimuth, rotated.azimuth);
     expect(camera().sensor, Sensor.apsC);
@@ -742,7 +760,7 @@ void main() {
       camera().timestamp,
       original.timestamp.add(const Duration(hours: 2)),
     );
-    await tester.tap(find.text('3D Preview'));
+    await openWorkspace(tester, '3D Preview');
     for (
       var i = 0;
       i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
@@ -750,12 +768,17 @@ void main() {
     ) {
       await tester.pump(const Duration(milliseconds: 500));
     }
-    expect(find.text('9 cached · 0 downloaded'), findsOneWidget);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('terrain-cache-count')))
+          .data,
+      '9 cached · 0 downloaded',
+    );
     await waitForImagery();
-    expect(find.text('Imagery: 10 cached · 0 downloaded'), findsOneWidget);
+    expect(find.text('10 cached · 0 downloaded'), findsOneWidget);
     expect(camera().relitImagery, isTrue);
     expect(camera().groundElevation, isNotNull);
-    await tester.tap(find.text('Map'));
+    await openWorkspace(tester, 'Map');
     await tester.pump(const Duration(milliseconds: 500));
     final beforeMove = camera();
     await tester.tapAt(
@@ -764,7 +787,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(camera().latitude, isNot(beforeMove.latitude));
     expect(camera().groundElevation, isNull);
-    await tester.tap(find.text('3D Preview'));
+    await openWorkspace(tester, '3D Preview');
     for (
       var i = 0;
       i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
@@ -839,7 +862,7 @@ void main() {
       composition.location,
     );
     await capture('linux-reopened-plan');
-    await tester.tap(find.text('3D Preview'));
+    await openWorkspace(tester, '3D Preview');
     for (
       var i = 0;
       i < 120 && find.text('Real terrain · 9/9 tiles').evaluate().isEmpty;
@@ -848,8 +871,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
     }
     await waitForImagery();
-    expect(find.text('9 cached · 0 downloaded'), findsOneWidget);
-    expect(find.text('Imagery: 10 cached · 0 downloaded'), findsOneWidget);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('terrain-cache-count')))
+          .data,
+      '9 cached · 0 downloaded',
+    );
+    expect(find.text('10 cached · 0 downloaded'), findsOneWidget);
     expect(
       SavedPlan('Compare', camera()).encode(),
       SavedPlan('Compare', composition).encode(),

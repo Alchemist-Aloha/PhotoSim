@@ -43,8 +43,10 @@ labels focal length, f-number and DOF enabled/off. Camera projection expands for
 surrounding context, while photo FOV, framing/roll and physical DOF pixel scaling
 remain tied to the rectangle. PNG export crops the rectangle and excludes frame/
 lens/composition UI. Clean mode retains the frame/label, not planning guides.
-Weather, quality and relighting live only in the right inspector; the toolbar
-contains view/export actions with a separate loading-status row.
+Weather, quality and relighting live only in the right inspector. Ruler/stars/
+export actions float over the preview; one in-view information panel combines
+loading/cache status, help and source attribution. The desktop navigation drawer
+replaces the Map/3D segmented switch, closes on selection and preserves state.
 
 The bottom slider uses the estimated local calendar day, 00:00–24:00, with
 chronological DST gaps/folds and UTC-authoritative state. See [astronomy](astronomy.md).
@@ -113,7 +115,7 @@ dates must remain explicitly unknown rather than invented.
 
 ## Verification for this slice
 
-- 157 unit/widget tests (including local days, photo framing/cropping, WASD, HTTP backoff and cache settings), including stop ratios, framing/roll, bounds, old/new plan
+- 158 unit/widget tests (including local days, photo framing/cropping, WASD, HTTP backoff and cache settings), including stop ratios, framing/roll, bounds, old/new plan
   formats, exposure controls, overlays and playback rate.
 - New Linux native photography-tools workflow verifies GPU exposure response,
   Auto metering, white-balance settings, portrait projection/DOF sensor size,

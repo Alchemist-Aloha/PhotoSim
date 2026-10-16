@@ -25,8 +25,15 @@ Optics starts expanded; the other sections start collapsed. Expansion is retaine
 while using the current workspace/session. Rendering includes quality, approximate
 relighting (enabled by default in new sessions) and constellation guides. Existing
 saved plans retain their own relighting preference. Weather, quality and relighting
-have a single home in the right panel. The preview toolbar groups Terrain range,
-Constellations and Export PNG, with terrain/imagery status on a separate row.
+have a single home in the right panel. Open the app-bar **navigation menu** to
+switch between **Map** and **3D Preview**; its selected destination is highlighted
+and selection closes the drawer without resetting camera/time.
+
+Terrain range (ruler), Constellations (stars) and Export PNG float at the top-right
+of the canvas. One bottom-left in-view panel groups terrain/imagery progress with
+cache/download counts, navigation help and attribution/source links. No duplicate
+loading rows remain above or below the view. Cards scroll if space is tight;
+controls and metadata stay outside the export boundary and hide in clean mode.
 
 Under Rendering:
 

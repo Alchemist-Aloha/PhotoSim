@@ -333,6 +333,31 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       cacheError: cacheError,
     );
     final scaffold = Scaffold(
+      drawer: cleanPreview
+          ? null
+          : NavigationDrawer(
+              selectedIndex: workspace.index,
+              onDestinationSelected: (index) {
+                setState(() => workspace = Workspace.values[index]);
+                Navigator.of(context).pop();
+              },
+              children: const [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(28, 24, 16, 16),
+                  child: Text('PhotoSim'),
+                ),
+                NavigationDrawerDestination(
+                  icon: Icon(Icons.map_outlined),
+                  selectedIcon: Icon(Icons.map),
+                  label: Text('Map'),
+                ),
+                NavigationDrawerDestination(
+                  icon: Icon(Icons.landscape_outlined),
+                  selectedIcon: Icon(Icons.landscape),
+                  label: Text('3D Preview'),
+                ),
+              ],
+            ),
       floatingActionButton: cleanPreview
           ? FloatingActionButton.small(
               tooltip: 'Exit fullscreen preview (Esc)',
@@ -344,25 +369,14 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           ? null
           : AppBar(
               title: const Text('PhotoSim'),
-              actions: [
-                SegmentedButton<Workspace>(
-                  segments: const [
-                    ButtonSegment(
-                      value: Workspace.map,
-                      label: Text('Map'),
-                      icon: Icon(Icons.map_outlined),
-                    ),
-                    ButtonSegment(
-                      value: Workspace.simulation,
-                      label: Text('3D Preview'),
-                      icon: Icon(Icons.landscape_outlined),
-                    ),
-                  ],
-                  selected: {workspace},
-                  onSelectionChanged: (value) =>
-                      setState(() => workspace = value.single),
+              leading: Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Open navigation',
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
-                const SizedBox(width: 16),
+              ),
+              actions: [
                 PopupMenuButton<bool>(
                   tooltip: 'Photography plans',
                   enabled: !planBusy,

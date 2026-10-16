@@ -117,6 +117,38 @@ void main() {
       expect(previewRequests, 9);
       expect(detailRequests, 1);
       expect(terrainRequests, 9);
+      final viewRect = tester.getRect(find.byType(scene.SceneView));
+      expect(viewRect, tester.getRect(find.byType(SimulationWorkspace)));
+      for (final key in ['preview-actions', 'preview-info']) {
+        final panel = tester.getRect(find.byKey(ValueKey(key)));
+        expect(panel.left, greaterThanOrEqualTo(viewRect.left));
+        expect(panel.top, greaterThanOrEqualTo(viewRect.top));
+        expect(panel.right, lessThanOrEqualTo(viewRect.right));
+        expect(panel.bottom, lessThanOrEqualTo(viewRect.bottom));
+      }
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('preview-actions')),
+          matching: find.byIcon(Icons.straighten),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('preview-actions')),
+          matching: find.byIcon(Icons.auto_awesome),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('preview-info')),
+          matching: find.textContaining('Click preview'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Real terrain · 9/9 tiles'), findsOneWidget);
+      expect(find.text('Imagery · 9/9 textures'), findsOneWidget);
       for (var i = 0; i < nodes.length; i++) {
         expect(nodes[i].mesh!.primitives.single.geometry, same(geometry[i]));
       }
