@@ -7,6 +7,17 @@ Use the toolbar folder menu:
    its camera location. Switching to 3D reloads ground data from the geographic
    caches when available.
 
+The title shows **New plan**, **Unsaved changes**, or the saved plan name.
+Opening a snapshot with unsaved changes offers **Save changes**, **Discard
+changes**, or **Cancel**. Canceling or failing the protective save keeps the current
+composition. Each successful save still creates a new snapshot, never overwrites
+an existing one. Changes made while a save is in flight remain marked unsaved;
+the pending open is canceled rather than discarding those newer changes.
+Derived terrain elevation does not count as a composition edit.
+
+This protects plan switching, not application exit: there is no autosave or
+close-window confirmation. Save before quitting.
+
 Both actions pause playback. Saves are independent of terrain/imagery caches,
 so cache eviction does not erase plans. Storage is the platform application
 support directory plus `photosim/plans-v1`; the open dialog shows the full path.

@@ -46,7 +46,7 @@ are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
 - Persistent navigation rail for Map/3D Preview; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
-- Collapsible inspector with weather/quality/relighting in the right panel; UTC date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
+- Collapsible inspector with weather/quality/relighting in the right panel; camera-local date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
 - 5,044 bundled stars and licensed simplified Milky Way brightness contours.
@@ -81,6 +81,7 @@ flutter test integration_test/linux_sunlight_test.dart -d linux
 flutter test integration_test/linux_spec_photography_test.dart -d linux
 flutter test integration_test/linux_wasd_test.dart -d linux
 flutter test integration_test/linux_loading_test.dart -d linux
+flutter test integration_test/linux_planning_ui_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
 ```
@@ -117,7 +118,14 @@ Map rays indicate bearings, not rise/set or terrain visibility predictions.
 UTC dates are limited to 1900–2100. Estimated local display supports only
 1970–2037 because the bundled timezone transitions stop in 2037; other dates
 show an explicit warning. Coordinate-to-zone boundaries are approximate.
-All editing remains UTC. See [astronomy notes](docs/astronomy.md) for reference
+The timeline groups the estimated local date/time with the local-day slider.
+**Edit local** opens date/time pickers in the camera location's estimated timezone,
+not the computer's timezone. The UTC equivalent is previewed before **Apply time**;
+**Cancel** leaves simulation time unchanged. Nonexistent daylight-saving times
+are rejected; repeated times require an explicit occurrence choice.
+UTC remains the internal time basis. Explicit UTC editing preserves the full
+1900–2100 range and is the fallback when local rules are unavailable.
+See [astronomy notes](docs/astronomy.md) for reference
 tests and accuracy/lighting/timezone limitations.
 
 Natural imagery preserves existing colors and baked-in shadows. Opt-in

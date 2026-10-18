@@ -46,6 +46,41 @@ Map<String, tz.Location> _loadLocations() {
   );
 }
 
+/// UTC instants matching wall-clock fields at the camera location, never the host timezone.
+/// A DST gap has no matches; a repeated hour has two, in chronological order.
+List<DateTime> localTimeCandidates({
+  required DateTime wallTime,
+  required double latitude,
+  required double longitude,
+}) {
+  final clock = localClock(
+    timestamp: DateTime.utc(2000),
+    latitude: latitude,
+    longitude: longitude,
+  );
+  final location = _locations[clock.zoneId];
+  if (location == null) return [];
+  final wall = DateTime.utc(
+    wallTime.year,
+    wallTime.month,
+    wallTime.day,
+    wallTime.hour,
+    wallTime.minute,
+    wallTime.second,
+    wallTime.millisecond,
+    wallTime.microsecond,
+  );
+  final matches = <DateTime>[];
+  for (final offset in location.zones.map((zone) => zone.offset).toSet()) {
+    final utc = wall.subtract(offset);
+    if (utc.year < 1970 || utc.year > 2037) continue;
+    final local = tz.TZDateTime.from(utc, location);
+    if (local.timeZoneOffset == offset) matches.add(utc);
+  }
+  matches.sort();
+  return matches;
+}
+
 /// Chronological local calendar day: DST gaps are skipped and both folded hours remain reachable.
 class LocalDay {
   LocalDay(tz.TZDateTime time)

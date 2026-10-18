@@ -92,6 +92,168 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('local editor converts to UTC and applies only on confirmation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const PhotoSimApp());
+    CameraInspector inspector() =>
+        tester.widget<CameraInspector>(find.byType(CameraInspector));
+    final original = inspector().state.copyWith(
+      timestamp: DateTime.utc(2026, 6, 22, 3),
+    );
+    inspector().onChanged(original);
+    await tester.pump();
+    expect(
+      find.textContaining('Estimated local: 2026-06-21 20:00 PDT'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Edit local: 2026-06-21 20:00'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Local time: 20:00'));
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(TimePickerDialog)))
+        .pop(const TimeOfDay(hour: 21, minute: 30));
+    await tester.pumpAndSettle();
+    expect(find.text('UTC equivalent: 2026-06-22 04:30 UTC'), findsOneWidget);
+    expect(inspector().state.timestamp, original.timestamp);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(inspector().state.timestamp, original.timestamp);
+    await tester.tap(find.text('Edit local: 2026-06-21 20:00'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Local date: 2026-06-21'));
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(DatePickerDialog)))
+        .pop(DateTime(2026, 6, 22));
+    await tester.pumpAndSettle();
+    expect(find.text('UTC equivalent: 2026-06-23 03:00 UTC'), findsOneWidget);
+    await tester.tap(find.text('Apply time'));
+    await tester.pumpAndSettle();
+    expect(inspector().state.timestamp, DateTime.utc(2026, 6, 23, 3));
+    expect(inspector().state.location, original.location);
+    expect(inspector().state.timestamp.isUtc, isTrue);
+    inspector().onChanged(
+      original.copyWith(timestamp: DateTime.utc(2100, 12, 31)),
+    );
+    await tester.pump();
+    expect(find.textContaining('Local time unavailable:'), findsOneWidget);
+    expect(
+      tester
+          .widget<Slider>(find.byKey(const ValueKey('local-day-slider')))
+          .onChanged,
+      isNull,
+    );
+    await tester.tap(find.text('Edit UTC: 2100-12-31 00:00'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit UTC (local time unavailable)'), findsOneWidget);
+    await tester.tap(find.text('UTC date: 2100-12-31'));
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(DatePickerDialog)))
+        .pop(DateTime(1900));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Apply time'));
+    await tester.pumpAndSettle();
+    expect(inspector().state.timestamp, DateTime.utc(1900));
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'local editor blocks DST gaps and requires a repeated-hour choice',
+    (tester) async {
+      tester.view.physicalSize = const Size(1600, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const PhotoSimApp());
+      CameraInspector inspector() =>
+          tester.widget<CameraInspector>(find.byType(CameraInspector));
+      final original = inspector().state.copyWith(
+        timestamp: DateTime.utc(2026, 3, 8, 9, 30),
+      );
+      inspector().onChanged(original);
+      await tester.pump();
+      await tester.tap(find.text('Edit local: 2026-03-08 01:30'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Local time: 01:30'));
+      await tester.pumpAndSettle();
+      Navigator.of(tester.element(find.byType(TimePickerDialog)))
+          .pop(const TimeOfDay(hour: 2, minute: 30));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('This local time does not exist'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Apply time'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(inspector().state.timestamp, original.timestamp);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      inspector().onChanged(
+        original.copyWith(timestamp: DateTime.utc(2026, 11, 1, 7, 30)),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Edit local: 2026-11-01 00:30'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Local time: 00:30'));
+      await tester.pumpAndSettle();
+      Navigator.of(tester.element(find.byType(TimePickerDialog)))
+          .pop(const TimeOfDay(hour: 1, minute: 30));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('This local time occurs twice'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Apply time'),
+            )
+            .onPressed,
+        isNull,
+      );
+      tester
+          .widget<DropdownButtonFormField<DateTime>>(
+            find.byType(DropdownButtonFormField<DateTime>),
+          )
+          .onChanged!(DateTime.utc(2026, 11, 1, 9, 30));
+      await tester.pumpAndSettle();
+      expect(find.text('UTC equivalent: 2026-11-01 09:30 UTC'), findsOneWidget);
+      await tester.tap(find.text('Apply time'));
+      await tester.pumpAndSettle();
+      expect(inspector().state.timestamp, DateTime.utc(2026, 11, 1, 9, 30));
+      await tester.tap(find.text('Edit local: 2026-11-01 01:30'));
+      await tester.pumpAndSettle();
+      expect(find.text('UTC equivalent: 2026-11-01 09:30 UTC'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Apply time'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      await tester.tap(find.text('Use UTC instead (1900–2100)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit simulation time (UTC)'), findsOneWidget);
+      expect(find.text('UTC time: 09:30'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('target selection and aiming preserve location and UTC', (
     tester,
   ) async {

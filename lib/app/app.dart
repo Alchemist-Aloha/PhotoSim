@@ -112,6 +112,64 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   bool planBusy = false;
   int openedPlan = 0;
 
+  late String cleanComposition;
+  String? currentPlanName;
+  String get composition => SavedPlan('Composition', state).encode();
+  bool get hasUnsavedChanges => composition != cleanComposition;
+
+  Future<bool> savePlan(PlanRepository store) async {
+    var planName = currentPlanName ?? 'Photography plan';
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save photography plan'),
+        content: TextFormField(
+          initialValue: planName,
+          onChanged: (value) => planName = value,
+          autofocus: true,
+          maxLength: 80,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          validator: (value) => value == null || value.trim().isEmpty
+              ? 'Enter a plan name'
+              : null,
+          decoration: const InputDecoration(labelText: 'Plan name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (planName.trim().isNotEmpty) {
+                Navigator.pop(context, planName.trim());
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || name == null) return false;
+    final snapshot = SavedPlan(name, state);
+    final file = await store.save(snapshot);
+    if (!mounted) return false;
+    setState(() {
+      cleanComposition = SavedPlan('Composition', snapshot.state).encode();
+      currentPlanName = name;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          hasUnsavedChanges
+              ? 'Snapshot saved. Newer changes remain unsaved; save them before opening another plan.'
+              : 'Saved $name · ${file.path}',
+        ),
+      ),
+    );
+    return !hasUnsavedChanges;
+  }
+
   Future<void> managePlans(bool save) async {
     if (planBusy) return;
     setState(() {
@@ -128,44 +186,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           );
       if (!mounted) return;
       if (save) {
-        var planName = 'Photography plan';
-        final name = await showDialog<String>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Save photography plan'),
-            content: TextFormField(
-              initialValue: planName,
-              onChanged: (value) => planName = value,
-              autofocus: true,
-              maxLength: 80,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter a plan name'
-                  : null,
-              decoration: const InputDecoration(labelText: 'Plan name'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  if (planName.trim().isNotEmpty) {
-                    Navigator.pop(context, planName.trim());
-                  }
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        );
-        if (!mounted || name == null) return;
-        final file = await store.save(SavedPlan(name, state));
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Saved $name · ${file.path}')));
+        await savePlan(store);
       } else {
         final loaded = await store.loadAll();
         if (!mounted) return;
@@ -209,18 +230,50 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           ),
         );
         if (selected != null && mounted) {
+          if (hasUnsavedChanges) {
+            final decision = await showDialog<String>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Save changes before opening another plan?'),
+                content: Text(
+                  'Opening "${selected.name}" will replace your unsaved composition.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, 'discard'),
+                    child: const Text('Discard changes'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, 'save'),
+                    child: const Text('Save changes'),
+                  ),
+                ],
+              ),
+            );
+            if (!mounted || decision == null) return;
+            if (decision == 'save' && !await savePlan(store)) return;
+            if (!mounted) return;
+          }
           setState(() {
             state = selected.state;
+            cleanComposition = composition;
+            currentPlanName = selected.name;
             workspace = Workspace.map;
             openedPlan++;
           });
         }
       }
-    } catch (failure) {
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Plan ${save ? 'save' : 'load'} failed: $failure'),
+            content: const Text(
+              'Could not save or open the plan. Your current composition is unchanged. Check storage space and folder permissions, then try again.',
+            ),
           ),
         );
       }
@@ -233,6 +286,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    cleanComposition = composition;
     unawaited(initializeCache());
   }
 
@@ -276,33 +330,216 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     state = next;
   });
 
+  String localTimeLabel(DateTime timestamp) {
+    final clock = localClock(
+      timestamp: timestamp,
+      latitude: state.latitude,
+      longitude: state.longitude,
+    );
+    final local = clock.time;
+    return local == null
+        ? clock.warning!
+        : 'Estimated local: ${local.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
+              '${local.timeZoneName} (${formatUtcOffset(local.timeZoneOffset)}) · ${clock.zoneId}';
+  }
+
   Future<void> chooseTime() async {
     setState(stopPlayback);
-    final date = await showDatePicker(
-      context: context,
-      helpText: 'Choose simulation date (UTC)',
-      initialDate: state.timestamp,
-      firstDate: DateTime(1900),
-      lastDate: DateTime(2100, 12, 31),
+    final clock = localClock(
+      timestamp: state.timestamp,
+      latitude: state.latitude,
+      longitude: state.longitude,
     );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      helpText: 'Choose simulation time (UTC)',
-      initialTime: TimeOfDay.fromDateTime(state.timestamp),
+    var utcFallback = clock.time == null;
+    final initial = clock.time ?? state.timestamp;
+    var draft = DateTime.utc(
+      initial.year,
+      initial.month,
+      initial.day,
+      initial.hour,
+      initial.minute,
+      initial.second,
+      initial.millisecond,
+      initial.microsecond,
     );
-    if (time == null || !mounted) return;
-    update(
-      state.copyWith(
-        timestamp: DateTime.utc(
-          date.year,
-          date.month,
-          date.day,
-          time.hour,
-          time.minute,
-        ),
+    DateTime? occurrence = state.timestamp;
+    final selected = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDraft) {
+          final candidates = utcFallback
+              ? [draft]
+              : localTimeCandidates(
+                  wallTime: draft,
+                  latitude: state.latitude,
+                  longitude: state.longitude,
+                );
+          final resolved = candidates.length == 1
+              ? candidates.single
+              : candidates.contains(occurrence)
+              ? occurrence
+              : null;
+          final basis = utcFallback ? 'UTC' : 'Local';
+          return AlertDialog(
+            title: Text(
+              utcFallback
+                  ? clock.time == null
+                        ? 'Edit UTC (local time unavailable)'
+                        : 'Edit simulation time (UTC)'
+                  : 'Edit local shooting time',
+            ),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      utcFallback
+                          ? '${clock.warning ?? 'UTC editing selected'}. UTC editing preserves the full 1900–2100 simulation range.'
+                          : 'Camera timezone: ${clock.zoneId}. Enter local date and time; UTC is calculated automatically.',
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_today),
+                          label: Text(
+                            '$basis date: ${draft.toIso8601String().substring(0, 10)}',
+                          ),
+                          onPressed: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              helpText: 'Choose simulation date ($basis)',
+                              initialDate: draft,
+                              firstDate: DateTime(utcFallback ? 1900 : 1969),
+                              lastDate: DateTime(
+                                utcFallback ? 2100 : 2038,
+                                12,
+                                31,
+                              ),
+                            );
+                            if (date == null || !context.mounted) return;
+                            setDraft(() {
+                              draft = DateTime.utc(
+                                date.year,
+                                date.month,
+                                date.day,
+                                draft.hour,
+                                draft.minute,
+                              );
+                              occurrence = null;
+                            });
+                          },
+                        ),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.schedule),
+                          label: Text(
+                            '$basis time: ${draft.toIso8601String().substring(11, 16)}',
+                          ),
+                          onPressed: () async {
+                            final time = await showTimePicker(
+                              context: context,
+                              helpText: 'Choose simulation time ($basis)',
+                              initialTime: TimeOfDay.fromDateTime(draft),
+                            );
+                            if (time == null || !context.mounted) return;
+                            setDraft(() {
+                              draft = DateTime.utc(
+                                draft.year,
+                                draft.month,
+                                draft.day,
+                                time.hour,
+                                time.minute,
+                              );
+                              occurrence = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (candidates.isEmpty)
+                      Semantics(
+                        liveRegion: true,
+                        child: const Text(
+                          'This local time does not exist or falls outside supported timezone rules (1970–2037 UTC). Choose another date or time.',
+                        ),
+                      ),
+                    if (candidates.length > 1) ...[
+                      const Text(
+                        'This local time occurs twice when clocks move back. Choose which occurrence you mean.',
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<DateTime>(
+                        key: ValueKey(draft),
+                        initialValue: resolved,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Time occurrence',
+                        ),
+                        items: [
+                          for (final utc in candidates)
+                            DropdownMenuItem(
+                              value: utc,
+                              child: Text(
+                                '${localClock(timestamp: utc, latitude: state.latitude, longitude: state.longitude).time!.timeZoneName} · ${utc.toIso8601String().substring(0, 16).replaceAll('T', ' ')} UTC',
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setDraft(() => occurrence = value),
+                      ),
+                    ],
+                    if (resolved != null)
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          'UTC equivalent: ${resolved.toIso8601String().substring(0, 16).replaceAll('T', ' ')} UTC',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                    if (utcFallback && resolved != null)
+                      Text(localTimeLabel(resolved)),
+                    if (!utcFallback)
+                      TextButton(
+                        onPressed: () => setDraft(() {
+                          draft = resolved ?? state.timestamp;
+                          utcFallback = true;
+                          occurrence = null;
+                        }),
+                        child: const Text('Use UTC instead (1900–2100)'),
+                      ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Local time is estimated from the camera location. Verify near timezone borders. Local rules cover 1970–2037.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: resolved == null
+                    ? null
+                    : () => Navigator.pop(context, resolved),
+                child: const Text('Apply time'),
+              ),
+            ],
+          );
+        },
       ),
     );
+    if (selected != null && mounted) {
+      update(state.copyWith(timestamp: selected));
+    }
   }
 
   Widget timeStep(int hours) {
@@ -325,7 +562,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       latitude: state.latitude,
       longitude: state.longitude,
     );
-    final local = clock.time;
+    final editingTime = clock.time ?? state.timestamp;
     final inspector = CameraInspector(
       state: state,
       onChanged: update,
@@ -343,7 +580,22 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       appBar: cleanPreview
           ? null
           : AppBar(
-              title: const Text('PhotoSim'),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('PhotoSim'),
+                  Text(
+                    hasUnsavedChanges
+                        ? 'Unsaved changes'
+                        : currentPlanName == null
+                        ? 'New plan'
+                        : 'Saved · $currentPlanName',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
               actions: [
                 PopupMenuButton<bool>(
                   tooltip: 'Photography plans',
@@ -468,17 +720,6 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                             spacing: 16,
                             runSpacing: 4,
                             children: [
-                              Tooltip(
-                                message:
-                                    'Estimated timezone from bundled coordinate mapping. Verify near borders and offshore. '
-                                    'Local rules are supported for 1970–2037. The slider uses the local day; date/time picker and astronomy remain UTC.',
-                                child: Text(
-                                  local == null
-                                      ? clock.warning!
-                                      : 'Estimated local: ${local.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
-                                            '${local.timeZoneName} (${formatUtcOffset(local.timeZoneOffset)}) · ${clock.zoneId}',
-                                ),
-                              ),
                               if (target != null)
                                 Tooltip(
                                   message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
@@ -513,7 +754,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                                 TextButton(
                                   onPressed: chooseTime,
                                   child: Text(
-                                    '${state.timestamp.toIso8601String().substring(0, 16).replaceAll('T', ' ')} UTC',
+                                    'Edit ${clock.time == null ? 'UTC' : 'local'}: ${editingTime.toIso8601String().substring(0, 16).replaceAll('T', ' ')}',
                                   ),
                                 ),
                                 timeStep(-1),
@@ -553,19 +794,38 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                               state: state,
                               onChanged: update,
                             );
-                            return timelineBounds.maxWidth >= 760
-                                ? Row(
-                                    children: [
-                                      controls,
-                                      const SizedBox(width: 16),
-                                      Expanded(child: slider),
-                                    ],
-                                  )
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [controls, slider],
-                                  );
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    localTimeLabel(state.timestamp),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall,
+                                  ),
+                                ),
+                                Text(
+                                  clock.time == null
+                                      ? 'Local time unavailable · Edit UTC instead'
+                                      : 'Scrub the local day · Edit local date and time',
+                                ),
+                                timelineBounds.maxWidth >= 800
+                                    ? Row(
+                                        children: [
+                                          controls,
+                                          const SizedBox(width: 16),
+                                          Expanded(child: slider),
+                                        ],
+                                      )
+                                    : Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [controls, slider],
+                                      ),
+                              ],
+                            );
                           },
                         ),
                       ),

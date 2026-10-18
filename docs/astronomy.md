@@ -98,7 +98,14 @@ missing zones. UTC editing and astronomy still support **1900–2100**. Future
 political changes also require database updates; this is not a legal guarantee
 of future civil time. The local-day slider is disabled outside the supported rules
 or when a complete day crosses their boundary; UTC controls remain available.
-There is no arbitrary local date/time text input or timezone override.
+The date/time editor defaults to the camera location's estimated **local** time,
+not the host computer's timezone, and previews the converted UTC instant before
+applying it. It rejects nonexistent wall times during spring-forward gaps or
+skipped days. When a time occurs twice, the user chooses the occurrence labeled
+with its timezone abbreviation and UTC instant. Unchanged repeated times retain
+the current occurrence. There is no timezone override.
+An explicit **Use UTC instead** action retains the full simulation date range;
+UTC editing is the fallback when the current instant has no supported local rules.
 
 Offline tests cover US spring gaps/autumn folds, European and southern-hemisphere
 DST, fractional offsets, local date rollover, instant preservation, invalid

@@ -171,6 +171,51 @@ void main() {
     },
   );
 
+  test('local input resolves ordinary, fractional and repeated clocks without shifting gaps', () {
+    List<DateTime> candidates(
+      DateTime wall, [
+      double latitude = 37.744,
+      double longitude = -119.59,
+    ]) => localTimeCandidates(
+      wallTime: wall,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    expect(candidates(DateTime.utc(2026, 6, 21, 20)), [
+      DateTime.utc(2026, 6, 22, 3),
+    ]);
+    expect(candidates(DateTime.utc(2026, 1, 1, 0, 15), 27.7172, 85.324), [
+      DateTime.utc(2025, 12, 31, 18, 30),
+    ]);
+    expect(candidates(DateTime.utc(2026, 3, 8, 2, 30)), isEmpty);
+    expect(candidates(DateTime.utc(2026, 3, 8, 3, 30)), [
+      DateTime.utc(2026, 3, 8, 10, 30),
+    ]);
+    expect(candidates(DateTime.utc(2026, 11, 1, 1, 30)), [
+      DateTime.utc(2026, 11, 1, 8, 30),
+      DateTime.utc(2026, 11, 1, 9, 30),
+    ]);
+    expect(candidates(DateTime.utc(2026, 4, 5, 1, 45), -31.55, 159.08), [
+      DateTime.utc(2026, 4, 4, 14, 45),
+      DateTime.utc(2026, 4, 4, 15, 15),
+    ]);
+    expect(
+      candidates(DateTime.utc(2026, 10, 4, 2, 15), -31.55, 159.08),
+      isEmpty,
+    );
+    expect(
+      candidates(DateTime.utc(2011, 12, 30, 12), -13.83, -171.75),
+      isEmpty,
+    );
+    expect(candidates(DateTime.utc(1969, 12, 31, 16)), [DateTime.utc(1970)]);
+    expect(candidates(DateTime.utc(2038, 1, 1)), isEmpty);
+    expect(candidates(DateTime.utc(2100)), isEmpty);
+    expect(
+      () => candidates(DateTime.utc(2026), double.nan),
+      throwsArgumentError,
+    );
+  });
+
   test('offset formatting includes fractional and historical seconds', () {
     expect(formatUtcOffset(Duration.zero), 'UTC+00:00');
     expect(formatUtcOffset(const Duration(hours: -7)), 'UTC-07:00');
