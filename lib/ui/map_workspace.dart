@@ -44,6 +44,9 @@ class _MapWorkspaceState extends State<MapWorkspace> {
     final state = widget.state;
     final handle = destination(state.location, state.azimuth, 450);
     final sky = state.sky;
+    final compact =
+        MediaQuery.sizeOf(context).width < 600 ||
+        MediaQuery.sizeOf(context).height < 600;
     final bodies = [
       ('Sun', sky.sun, const Color(0xFFFFC857)),
       ('Moon', sky.moon, const Color(0xFFADD8FF)),
@@ -156,8 +159,8 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                   ),
                 Marker(
                   point: state.location,
-                  width: 44,
-                  height: 44,
+                  width: 48,
+                  height: 48,
                   child: Semantics(
                     label: 'Camera location. Drag to move.',
                     child: GestureDetector(
@@ -175,8 +178,8 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                 ),
                 Marker(
                   point: handle,
-                  width: 36,
-                  height: 36,
+                  width: 48,
+                  height: 48,
                   child: Semantics(
                     label: 'Camera direction. Drag to rotate.',
                     child: GestureDetector(
@@ -197,9 +200,17 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                 ),
               ],
             ),
-            const SimpleAttributionWidget(
-              source: Text(
-                '© OpenStreetMap contributors · openstreetmap.org/copyright',
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Text(
+                    '© OpenStreetMap contributors · openstreetmap.org/copyright',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               ),
             ),
           ],
@@ -221,14 +232,20 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                       Text(
                         tileError
                             ? 'Map tiles unavailable. Check your connection.\nCamera controls still work; switch workspaces to retry.'
+                            : compact ||
+                                  Theme.of(context).platform ==
+                                      TargetPlatform.android
+                            ? 'Tap to place camera · Drag camera to move · Drag green handle to aim'
                             : 'Click to place camera · Drag camera to move · Drag green handle to aim',
                       ),
-                      const Text(
-                        'Amber: Sun · Blue: Moon · Violet: Galactic center · Dashed: below horizontal',
-                      ),
-                      const Text(
-                        'Bearing guides only · Not rise/set or terrain visibility predictions',
-                      ),
+                      if (!compact)
+                        const Text(
+                          'Amber: Sun · Blue: Moon · Violet: Galactic center · Dashed: below horizontal',
+                        ),
+                      if (!compact)
+                        const Text(
+                          'Bearing guides only · Not rise/set or terrain visibility predictions',
+                        ),
                     ],
                   ),
                 ),
@@ -236,15 +253,42 @@ class _MapWorkspaceState extends State<MapWorkspace> {
             ),
           ),
         ),
+        if (compact)
+          Positioned(
+            top: 100,
+            right: 16,
+            child: IconButton.filledTonal(
+              tooltip: 'Map guide',
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  scrollable: true,
+                  title: const Text('Map guide'),
+                  content: const Text(
+                    'Tap to place the camera. Drag the camera to move; drag its green handle to aim.\n\n'
+                    'Amber: Sun · Blue: Moon · Violet: Galactic center. Dashed lines mean below horizontal.\n\n'
+                    'Bearing guides only, not rise/set or terrain visibility predictions.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              ),
+              icon: const Icon(Icons.info_outline),
+            ),
+          ),
         Positioned(
-          bottom: 36,
+          bottom: 64,
           right: 16,
-          child: FloatingActionButton.small(
-            heroTag: 'recenter',
+          child: IconButton.filledTonal(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             tooltip: 'Center map on camera',
             onPressed: () =>
                 controller.move(state.location, controller.camera.zoom),
-            child: const Icon(Icons.my_location),
+            icon: const Icon(Icons.my_location),
           ),
         ),
       ],

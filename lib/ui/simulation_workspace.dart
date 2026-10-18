@@ -33,6 +33,8 @@ import '../data/raster_cache.dart';
 import 'rain_overlay.dart';
 import 'photography_overlays.dart';
 import 'wasd_navigation.dart';
+import 'camera_gestures.dart';
+import 'preview_tools.dart';
 import '../core/camera_movement.dart';
 import '../data/terrain/terrain_patch.dart';
 import '../render/night_sky.dart';
@@ -555,6 +557,21 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       } finally {
         image.dispose();
       }
+      if (Platform.isAndroid) {
+        await const MethodChannel('photosim/export').invokeMethod<String>(
+          'savePng',
+          {
+            'bytes': bytes,
+            'name':
+                'photosim-${DateTime.now().toUtc().microsecondsSinceEpoch}.png',
+          },
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Saved PNG to Pictures/PhotoSim.')),
+        );
+        return;
+      }
       final directory =
           await getDownloadsDirectory() ??
           await getApplicationDocumentsDirectory();
@@ -567,21 +584,23 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           title: const Text('Export PNG'),
           content: SizedBox(
             width: 560,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Exports the framed photo region with weather, depth of field and source credits; no frame, lens label, crosshair or controls. Maximum 4096 px / 12 MP. Existing files are never overwritten.',
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  initialValue: path,
-                  onChanged: (value) => path = value,
-                  decoration: const InputDecoration(
-                    labelText: 'Absolute PNG path',
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Exports the framed photo region with weather, depth of field and source credits; no frame, lens label, crosshair or controls. Maximum 4096 px / 12 MP. Existing files are never overwritten.',
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    initialValue: path,
+                    onChanged: (value) => path = value,
+                    decoration: const InputDecoration(
+                      labelText: 'Absolute PNG path',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -822,13 +841,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                       cameraGroundField != null &&
                       cameraGroundTile?.key == TileId.at(state.location).key,
                   onMove: navigate,
-                  child: GestureDetector(
-                    onPanUpdate: (details) => widget.onChanged(
-                      state.copyWith(
-                        azimuth: state.azimuth + details.delta.dx * 0.2,
-                        pitch: state.pitch - details.delta.dy * 0.2,
-                      ),
-                    ),
+                  child: CameraGestures(
+                    state: state,
+                    onChanged: widget.onChanged,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         // shortcut: stream for the photo frustum; add viewport-aware prefetch for outer context if needed.
@@ -892,161 +907,195 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           if (!widget.cleanPreview)
             Align(
               alignment: Alignment.topRight,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 540,
-                  maxHeight: bounds.maxHeight * 0.4,
-                ),
-                child: Card(
-                  key: const ValueKey('preview-actions'),
-                  elevation: 4,
-                  color: Theme.of(context).colorScheme.surfaceContainer
-                      .withValues(alpha: 0.9),
-                  margin: const EdgeInsets.all(12),
-                  clipBehavior: Clip.antiAlias,
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DefaultTextStyle.merge(
-                            style: Theme.of(context).textTheme.bodySmall,
-                            child: Wrap(
-                              spacing: 16,
-                              runSpacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
+              child: bounds.maxHeight < 400
+                  ? Card(
+                      key: const ValueKey('preview-actions'),
+                      margin: const EdgeInsets.all(12),
+                      child: PreviewTools(
+                        onTerrain: showTerrainRange,
+                        constellations: state.showConstellations,
+                        onConstellations: () => widget.onChanged(
+                          state.copyWith(
+                            showConstellations: !state.showConstellations,
+                          ),
+                        ),
+                        onExport:
+                            ground == null ||
+                                loading ||
+                                imageryLoading ||
+                                exporting
+                            ? null
+                            : exportImage,
+                      ),
+                    )
+                  : ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 540,
+                        maxHeight: bounds.maxHeight * 0.4,
+                      ),
+                      child: Card(
+                        key: const ValueKey('preview-actions'),
+                        elevation: 4,
+                        color: Theme.of(context).colorScheme.surfaceContainer
+                            .withValues(alpha: 0.9),
+                        margin: const EdgeInsets.all(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Tooltip(
-                                  key: const ValueKey('terrain-cache-count'),
-                                  message:
-                                      '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
-                                  child: Text(
-                                    'Terrain $loaded/$total${loading ? ' · loading' : ''}',
-                                    key: const ValueKey('terrain-status'),
+                                DefaultTextStyle.merge(
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                  child: Wrap(
+                                    spacing: 16,
+                                    runSpacing: 4,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      Tooltip(
+                                        key: const ValueKey(
+                                          'terrain-cache-count',
+                                        ),
+                                        message:
+                                            '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
+                                        child: Text(
+                                          'Terrain $loaded/$total${loading ? ' · loading' : ''}',
+                                          key: const ValueKey('terrain-status'),
+                                        ),
+                                      ),
+                                      Tooltip(
+                                        key: const ValueKey(
+                                          'imagery-cache-count',
+                                        ),
+                                        message:
+                                            '${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
+                                        child: Text(
+                                          'Imagery ${textures.length}/$loaded${imageryLoading ? ' · loading' : ''}',
+                                          key: const ValueKey('imagery-status'),
+                                        ),
+                                      ),
+                                      if (textures.length < loaded ||
+                                          partialImagery.isNotEmpty)
+                                        const Tooltip(
+                                          message: 'Fallback surface where imagery is missing',
+                                          child: Text('Partial imagery'),
+                                        ),
+                                      Tooltip(
+                                        message: Platform.isAndroid
+                                            ? 'Drag to aim · Pinch to zoom · Place the camera on the map to move'
+                                            : 'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
+                                        child: const Icon(
+                                          Icons.help_outline,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Tooltip(
-                                  key: const ValueKey('imagery-cache-count'),
-                                  message:
-                                      '${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
-                                  child: Text(
-                                    'Imagery ${textures.length}/$loaded${imageryLoading ? ' · loading' : ''}',
-                                    key: const ValueKey('imagery-status'),
-                                  ),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: showTerrainRange,
+                                      icon: const Icon(Icons.straighten),
+                                      label: const Text('Terrain range'),
+                                    ),
+                                    FilterChip(
+                                      label: const Text('Constellations'),
+                                      showCheckmark: false,
+                                      avatar: const Icon(
+                                        Icons.auto_awesome,
+                                        size: 18,
+                                      ),
+                                      tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
+                                      selected: state.showConstellations,
+                                      onSelected: (value) => widget.onChanged(
+                                        state.copyWith(
+                                          showConstellations: value,
+                                        ),
+                                      ),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed:
+                                          ground == null ||
+                                              loading ||
+                                              imageryLoading ||
+                                              exporting
+                                          ? null
+                                          : exportImage,
+                                      icon: const Icon(Icons.image_outlined),
+                                      label: Text(
+                                        exporting ? 'Exporting…' : 'Export PNG',
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                if (textures.length < loaded ||
-                                    partialImagery.isNotEmpty)
-                                  const Tooltip(
-                                    message: 'Fallback surface where imagery is missing',
-                                    child: Text('Partial imagery'),
+                                if (!widget.cleanPreview &&
+                                    (failed > 0 ||
+                                        repository!.cacheWarning != null))
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            failed > 0
+                                                ? '$failed terrain tiles unavailable. ${tileFailure ?? ''}'
+                                                : repository!.cacheWarning!,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: loading || imageryLoading
+                                              ? null
+                                              : () => loadTerrain(retry: true),
+                                          child: const Text('Retry terrain'),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                const Tooltip(
-                                  message: 'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
-                                  child: Icon(Icons.help_outline, size: 16),
-                                ),
+                                if (!widget.cleanPreview &&
+                                    (imageryFailures > 0 ||
+                                        imagery!.cacheWarning != null))
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            imageryFailures > 0
+                                                ? 'Imagery unavailable or incomplete: $imageryFailure. Terrain remains usable.'
+                                                : imagery!.cacheWarning!,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: loading || imageryLoading
+                                              ? null
+                                              : () => loadImagery(
+                                                  generation,
+                                                  cancellation!,
+                                                  retry: true,
+                                                ),
+                                          child: const Text('Retry imagery'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 8,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: showTerrainRange,
-                                icon: const Icon(Icons.straighten),
-                                label: const Text('Terrain range'),
-                              ),
-                              FilterChip(
-                                label: const Text('Constellations'),
-                                showCheckmark: false,
-                                avatar: const Icon(
-                                  Icons.auto_awesome,
-                                  size: 18,
-                                ),
-                                tooltip: 'Show constellation names and connecting figures (planning guides, not IAU boundaries)',
-                                selected: state.showConstellations,
-                                onSelected: (value) => widget.onChanged(
-                                  state.copyWith(showConstellations: value),
-                                ),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed:
-                                    ground == null ||
-                                        loading ||
-                                        imageryLoading ||
-                                        exporting
-                                    ? null
-                                    : exportImage,
-                                icon: const Icon(Icons.image_outlined),
-                                label: Text(
-                                  exporting ? 'Exporting…' : 'Export PNG',
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (!widget.cleanPreview &&
-                              (failed > 0 || repository!.cacheWarning != null))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      failed > 0
-                                          ? '$failed terrain tiles unavailable. ${tileFailure ?? ''}'
-                                          : repository!.cacheWarning!,
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: loading || imageryLoading
-                                        ? null
-                                        : () => loadTerrain(retry: true),
-                                    child: const Text('Retry terrain'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (!widget.cleanPreview &&
-                              (imageryFailures > 0 ||
-                                  imagery!.cacheWarning != null))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      imageryFailures > 0
-                                          ? 'Imagery unavailable or incomplete: $imageryFailure. Terrain remains usable.'
-                                          : imagery!.cacheWarning!,
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: loading || imageryLoading
-                                        ? null
-                                        : () => loadImagery(
-                                            generation,
-                                            cancellation!,
-                                            retry: true,
-                                          ),
-                                    child: const Text('Retry imagery'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
             ),
           if (!widget.cleanPreview)
             Positioned(

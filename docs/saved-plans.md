@@ -21,7 +21,9 @@ close-window confirmation. Save before quitting.
 Both actions pause playback. Saves are independent of terrain/imagery caches,
 so cache eviction does not erase plans. Storage is the platform application
 support directory plus `photosim/plans-v1`; the open dialog shows the full path.
-Native storage is currently **verified only on Linux**.
+Native storage is verified on Linux and Android phone/tablet emulators. Android
+keeps snapshots in app-private storage; uninstalling the app deletes them.
+Android automatic app-data backup is disabled.
 
 Each snapshot is a standalone UTF-8 JSON file containing:
 

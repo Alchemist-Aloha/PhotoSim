@@ -80,6 +80,7 @@ class CameraInspector extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SegmentedButton<bool>(
+          showSelectedIcon: false,
           segments: const [
             ButtonSegment(value: false, label: Text('Landscape')),
             ButtonSegment(value: true, label: Text('Portrait')),
@@ -401,7 +402,7 @@ class CameraInspector extends StatelessWidget {
       ]),
       section('About this preview', Icons.info_outline, [
         const Text(
-          'Linux MVP\nSun/Moon readouts are airless topocentric centers; no refraction or terrain-horizon prediction. Relighting is approximate; photographic shadows remain in the imagery.',
+          'PhotoSim\nSun/Moon readouts are airless topocentric centers; no refraction or terrain-horizon prediction. Relighting is approximate; photographic shadows remain in the imagery.',
         ),
       ]),
     ],

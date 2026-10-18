@@ -8,6 +8,7 @@ analyzer:
   exclude:
     - build/**
     - linux/**
+    - android/**
 
 linter:
   rules:

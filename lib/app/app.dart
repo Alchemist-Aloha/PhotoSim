@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -23,19 +24,26 @@ class PhotoSimApp extends StatelessWidget {
   final RasterCache? rasterCache;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'PhotoSim',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      brightness: Brightness.dark,
+  Widget build(BuildContext context) {
+    ThemeData materialTheme(Brightness brightness) => ThemeData(
+      brightness: brightness,
       colorSchemeSeed: const Color(0xFF34D9B0),
       useMaterial3: true,
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(),
       ),
-    ),
-    home: WorkspaceShell(plans: plans, rasterCache: rasterCache),
-  );
+    );
+    return MaterialApp(
+      title: 'PhotoSim',
+      debugShowCheckedModeBanner: false,
+      theme: materialTheme(Brightness.light),
+      darkTheme: materialTheme(Brightness.dark),
+      themeMode: defaultTargetPlatform == TargetPlatform.android
+          ? ThemeMode.system
+          : ThemeMode.dark,
+      home: WorkspaceShell(plans: plans, rasterCache: rasterCache),
+    );
+  }
 }
 
 enum Workspace { map, simulation }
@@ -53,9 +61,15 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     with WidgetsBindingObserver {
   // Keep service cooldowns/connections alive across Map/3D workspace recreation.
   final terrainClient = http.Client();
-  SimulationState state = SimulationState();
+  SimulationState state = SimulationState(
+    renderQuality: Platform.isAndroid
+        ? RenderQuality.performance
+        : RenderQuality.balanced,
+  );
   Workspace workspace = Workspace.map;
+  final scaffoldKey = GlobalKey<ScaffoldState>();
   bool inspectorVisible = true;
+  bool timelineExpanded = false;
   bool cleanPreview = false;
   RasterCache? rasterCache;
   String? cacheError;
@@ -89,8 +103,14 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       cleanPreview = value;
     });
     try {
-      await const MethodChannel('photosim/window')
-          .invokeMethod<void>('fullscreen', value);
+      if (Platform.isAndroid) {
+        await SystemChrome.setEnabledSystemUIMode(
+          value ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+        );
+      } else {
+        await const MethodChannel('photosim/window')
+            .invokeMethod<void>('fullscreen', value);
+      }
     } on MissingPluginException {
       // Unit-test/embedded hosts can still show the clean content viewport.
     } on PlatformException catch (error) {
@@ -553,25 +573,222 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final sky = state.sky;
+  void aimAtTarget() {
     final target = state.targetPosition;
+    if (target != null) {
+      update(state.copyWith(azimuth: target.azimuth, pitch: target.altitude));
+    }
+  }
+
+  Widget timeline(bool compact) {
     final clock = localClock(
       timestamp: state.timestamp,
       latitude: state.latitude,
       longitude: state.longitude,
     );
     final editingTime = clock.time ?? state.timestamp;
+    final target = state.targetPosition;
+    final sky = state.sky;
+    final readouts = Wrap(
+      spacing: 16,
+      runSpacing: 4,
+      children: [
+        if (target != null)
+          Tooltip(
+            message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
+            child: Text(
+              '${state.target.label}: ${state.containsDirection(target.direction) ? 'inside' : 'outside'} FOV · alt ${target.altitude.toStringAsFixed(1)}° · offset ${state.targetAngularOffset!.toStringAsFixed(1)}°',
+            ),
+          ),
+        Text(
+          'Sun az ${sky.sun.azimuth.toStringAsFixed(1)}° · alt ${sky.sun.altitude.toStringAsFixed(1)}°',
+        ),
+        Text(
+          'Moon az ${sky.moon.azimuth.toStringAsFixed(1)}° · alt ${sky.moon.altitude.toStringAsFixed(1)}° · ${(sky.moonIllumination * 100).toStringAsFixed(0)}% ${sky.moonWaxing ? 'waxing' : 'waning'}',
+        ),
+      ],
+    );
+    final edit = TextButton(
+      onPressed: chooseTime,
+      child: Text(
+        compact
+            ? 'Edit ${clock.time == null ? 'UTC' : 'local (${clock.time!.timeZoneName})'}\n${editingTime.toIso8601String().substring(0, 16).replaceAll('T', ' ')}'
+            : 'Edit ${clock.time == null ? 'UTC' : 'local'}: ${editingTime.toIso8601String().substring(0, 16).replaceAll('T', ' ')}',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+    final play = IconButton(
+      tooltip: playback == null
+          ? 'Play time ($playbackSpeed simulated minutes per second)'
+          : 'Pause time',
+      icon: Icon(playback == null ? Icons.play_arrow : Icons.pause),
+      onPressed: playback == null && nextPlaybackTime.year > 2100
+          ? null
+          : togglePlayback,
+    );
+    final speed = PopupMenuButton<int>(
+      tooltip: 'Playback speed',
+      icon: const Icon(Icons.speed),
+      initialValue: playbackSpeed,
+      itemBuilder: (_) => [
+        for (final value in [1, 5, 30, 60])
+          PopupMenuItem(value: value, child: Text('$value min/s')),
+      ],
+      onSelected: (value) => setState(() => playbackSpeed = value),
+    );
+    final slider = TimeSlider(state: state, onChanged: update);
+    final controls = Wrap(
+      spacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Icon(Icons.schedule, size: 20),
+        edit,
+        timeStep(-1),
+        timeStep(1),
+        play,
+        speed,
+      ],
+    );
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 16,
+          vertical: 4,
+        ),
+        child: compact
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: edit),
+                      play,
+                      IconButton(
+                        tooltip: timelineExpanded
+                            ? 'Collapse timeline details'
+                            : 'Expand timeline details',
+                        onPressed: () => setState(
+                          () => timelineExpanded = !timelineExpanded,
+                        ),
+                        icon: Icon(
+                          timelineExpanded
+                              ? Icons.expand_more
+                              : Icons.expand_less,
+                        ),
+                      ),
+                    ],
+                  ),
+                  slider,
+                  if (timelineExpanded)
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(context).height * 0.25,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localTimeLabel(state.timestamp),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            Wrap(children: [timeStep(-1), timeStep(1), speed]),
+                            DefaultTextStyle.merge(
+                              style: Theme.of(context).textTheme.bodySmall,
+                              child: readouts,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DefaultTextStyle.merge(
+                    style: Theme.of(context).textTheme.bodySmall,
+                    child: readouts,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    localTimeLabel(state.timestamp),
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  Text(
+                    clock.time == null
+                        ? 'Local time unavailable · Edit UTC instead'
+                        : 'Scrub the local day · Edit local date and time',
+                  ),
+                  LayoutBuilder(
+                    builder: (context, bounds) =>
+                        bounds.maxWidth >=
+                            1000 *
+                                MediaQuery.textScalerOf(context).scale(16) /
+                                16
+                        ? Row(
+                            children: [
+                              controls,
+                              const SizedBox(width: 16),
+                              Expanded(child: slider),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [controls, slider],
+                          ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final compact = size.width < 600;
+    final dockedInspector = size.width >= 1000;
+    final compactTimeline = compact || size.height < 600;
     final inspector = CameraInspector(
       state: state,
       onChanged: update,
       rasterCache: rasterCache,
       cacheError: cacheError,
     );
+    void changeWorkspace(int index) =>
+        setState(() => workspace = Workspace.values[index]);
+    void showInspector() {
+      if (dockedInspector) {
+        setState(() => inspectorVisible = !inspectorVisible);
+      } else {
+        scaffoldKey.currentState?.openEndDrawer();
+      }
+    }
+
+    final viewport = workspace == Workspace.map
+        ? MapWorkspace(
+            key: ValueKey(openedPlan),
+            state: state,
+            onChanged: update,
+          )
+        : rasterCache == null
+        ? Center(child: Text(cacheError ?? 'Loading disk cache settings…'))
+        : SimulationWorkspace(
+            rasterCache: rasterCache,
+            httpClient: terrainClient,
+            state: state,
+            cleanPreview: cleanPreview,
+            onChanged: update,
+            onPausePlayback: () => setState(stopPlayback),
+          );
     final scaffold = Scaffold(
+      key: scaffoldKey,
       floatingActionButton: cleanPreview
-          ? FloatingActionButton.small(
+          ? FloatingActionButton(
               tooltip: 'Exit fullscreen preview (Esc)',
               onPressed: () => setCleanPreview(false),
               child: const Icon(Icons.fullscreen_exit),
@@ -580,10 +797,15 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       appBar: cleanPreview
           ? null
           : AppBar(
+              automaticallyImplyLeading: false,
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('PhotoSim'),
+                  const Text(
+                    'PhotoSim',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   Text(
                     hasUnsavedChanges
                         ? 'Unsaved changes'
@@ -607,244 +829,192 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   ],
                   onSelected: managePlans,
                 ),
-                PopupMenuButton<CelestialTarget>(
-                  tooltip: 'Select astronomical target',
-                  icon: const Icon(Icons.track_changes),
-                  initialValue: state.target,
-                  itemBuilder: (_) => [
-                    for (final target in CelestialTarget.values)
-                      PopupMenuItem(value: target, child: Text(target.label)),
-                  ],
-                  onSelected: (value) => update(state.copyWith(target: value)),
-                ),
+                if (!compact) ...[
+                  PopupMenuButton<CelestialTarget>(
+                    tooltip: 'Select astronomical target',
+                    icon: const Icon(Icons.track_changes),
+                    initialValue: state.target,
+                    itemBuilder: (_) => [
+                      for (final target in CelestialTarget.values)
+                        PopupMenuItem(value: target, child: Text(target.label)),
+                    ],
+                    onSelected: (value) =>
+                        update(state.copyWith(target: value)),
+                  ),
+                  IconButton(
+                    tooltip: 'Aim at selected target',
+                    icon: const Icon(Icons.gps_fixed),
+                    onPressed: state.targetPosition == null
+                        ? null
+                        : aimAtTarget,
+                  ),
+                  IconButton(
+                    tooltip: 'Fullscreen preview',
+                    icon: const Icon(Icons.fullscreen),
+                    onPressed: workspace == Workspace.simulation
+                        ? () => setCleanPreview(true)
+                        : null,
+                  ),
+                ],
                 IconButton(
-                  tooltip: 'Aim at selected target',
-                  icon: const Icon(Icons.gps_fixed),
-                  onPressed: target == null
-                      ? null
-                      : () => update(
-                          state.copyWith(
-                            azimuth: target.azimuth,
-                            pitch: target.altitude,
-                          ),
-                        ),
-                ),
-                IconButton(
-                  tooltip: 'Fullscreen preview',
-                  icon: const Icon(Icons.fullscreen),
-                  onPressed: workspace != Workspace.simulation
-                      ? null
-                      : () => setCleanPreview(true),
-                ),
-                IconButton(
-                  tooltip: 'Toggle camera inspector',
-                  onPressed: () =>
-                      setState(() => inspectorVisible = !inspectorVisible),
+                  tooltip: dockedInspector
+                      ? 'Toggle camera inspector'
+                      : 'Camera controls',
+                  onPressed: showInspector,
                   icon: const Icon(Icons.tune),
                 ),
-                const SizedBox(width: 12),
-              ],
-            ),
-      body: Row(
-        children: [
-          if (!cleanPreview) ...[
-            NavigationRail(
-              selectedIndex: workspace.index,
-              labelType: NavigationRailLabelType.all,
-              onDestinationSelected: (index) =>
-                  setState(() => workspace = Workspace.values[index]),
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.map_outlined),
-                  selectedIcon: Icon(Icons.map),
-                  label: Text('Map'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.landscape_outlined),
-                  selectedIcon: Icon(Icons.landscape),
-                  label: Text('3D Preview'),
-                ),
-              ],
-            ),
-            const VerticalDivider(width: 1),
-          ],
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final viewport = workspace == Workspace.map
-                    ? MapWorkspace(
-                        key: ValueKey(openedPlan),
-                        state: state,
-                        onChanged: update,
-                      )
-                    : rasterCache == null
-                    ? Center(
-                        child: Text(
-                          cacheError ?? 'Loading disk cache settings…',
+                if (compact)
+                  PopupMenuButton<Object>(
+                    tooltip: 'More options',
+                    itemBuilder: (_) => [
+                      for (final target in CelestialTarget.values)
+                        CheckedPopupMenuItem<Object>(
+                          value: target,
+                          checked: state.target == target,
+                          child: Text(target.label),
                         ),
-                      )
-                    : SimulationWorkspace(
-                        rasterCache: rasterCache,
-                        httpClient: terrainClient,
-                        state: state,
-                        cleanPreview: cleanPreview,
-                        onChanged: update,
-                        onPausePlayback: () => setState(stopPlayback),
-                      );
-                return Column(
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'aim',
+                        enabled: state.targetPosition != null,
+                        child: const Text('Aim at selected target'),
+                      ),
+                      PopupMenuItem(
+                        value: 'fullscreen',
+                        enabled: workspace == Workspace.simulation,
+                        child: const Text('Fullscreen preview'),
+                      ),
+                    ],
+                    onSelected: (value) {
+                      if (value is CelestialTarget) {
+                        update(state.copyWith(target: value));
+                      } else if (value == 'aim') {
+                        aimAtTarget();
+                      } else if (value == 'fullscreen') {
+                        unawaited(setCleanPreview(true));
+                      }
+                    },
+                  ),
+              ],
+            ),
+      endDrawer: dockedInspector || cleanPreview
+          ? null
+          : Drawer(
+              width: size.width < 400 ? size.width : 400,
+              child: SafeArea(
+                child: Column(
                   children: [
-                    Expanded(
+                    Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        16,
+                        8,
+                        8,
+                        8,
+                      ),
                       child: Row(
                         children: [
-                          Expanded(child: viewport),
-                          if (!cleanPreview &&
-                              inspectorVisible &&
-                              constraints.maxWidth >= 900) ...[
-                            const VerticalDivider(width: 1),
-                            SizedBox(width: 310, child: inspector),
-                          ],
+                          Expanded(
+                            child: Text(
+                              'Camera controls',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Close camera controls',
+                            icon: const Icon(Icons.close),
+                            onPressed: () =>
+                                scaffoldKey.currentState?.closeEndDrawer(),
+                          ),
                         ],
                       ),
                     ),
-                    if (!cleanPreview &&
-                        inspectorVisible &&
-                        constraints.maxWidth < 900)
-                      SizedBox(height: 240, child: inspector),
-                    if (!cleanPreview) ...[
-                      const Divider(height: 1),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                        child: DefaultTextStyle.merge(
-                          style: Theme.of(context).textTheme.bodySmall,
-                          child: Wrap(
-                            spacing: 16,
-                            runSpacing: 4,
-                            children: [
-                              if (target != null)
-                                Tooltip(
-                                  message: 'Center inside the rectangular lens frustum; terrain visibility unknown. Target does not lock camera orientation.',
-                                  child: Text(
-                                    '${state.target.label}: ${state.containsDirection(target.direction) ? 'inside' : 'outside'} FOV · alt ${target.altitude.toStringAsFixed(1)}° · offset ${state.targetAngularOffset!.toStringAsFixed(1)}°',
-                                  ),
-                                ),
-
-                              Text(
-                                'Sun az ${sky.sun.azimuth.toStringAsFixed(1)}° · alt ${sky.sun.altitude.toStringAsFixed(1)}°',
-                              ),
-                              Text(
-                                'Moon az ${sky.moon.azimuth.toStringAsFixed(1)}° · alt ${sky.moon.altitude.toStringAsFixed(1)}° · '
-                                '${(sky.moonIllumination * 100).toStringAsFixed(0)}% ${sky.moonWaxing ? 'waxing' : 'waning'}',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        child: LayoutBuilder(
-                          builder: (context, timelineBounds) {
-                            final controls = Wrap(
-                              spacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                const Icon(Icons.schedule, size: 20),
-                                TextButton(
-                                  onPressed: chooseTime,
-                                  child: Text(
-                                    'Edit ${clock.time == null ? 'UTC' : 'local'}: ${editingTime.toIso8601String().substring(0, 16).replaceAll('T', ' ')}',
-                                  ),
-                                ),
-                                timeStep(-1),
-                                timeStep(1),
-                                IconButton(
-                                  tooltip: playback == null
-                                      ? 'Play time ($playbackSpeed simulated minutes per second)'
-                                      : 'Pause time',
-                                  icon: Icon(
-                                    playback == null
-                                        ? Icons.play_arrow
-                                        : Icons.pause,
-                                  ),
-                                  onPressed:
-                                      playback == null &&
-                                          nextPlaybackTime.year > 2100
-                                      ? null
-                                      : togglePlayback,
-                                ),
-                                PopupMenuButton<int>(
-                                  tooltip: 'Playback speed',
-                                  icon: const Icon(Icons.speed),
-                                  initialValue: playbackSpeed,
-                                  itemBuilder: (_) => [
-                                    for (final speed in [1, 5, 30, 60])
-                                      PopupMenuItem(
-                                        value: speed,
-                                        child: Text('$speed min/s'),
-                                      ),
-                                  ],
-                                  onSelected: (value) =>
-                                      setState(() => playbackSpeed = value),
-                                ),
-                              ],
-                            );
-                            final slider = TimeSlider(
-                              state: state,
-                              onChanged: update,
-                            );
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    localTimeLabel(state.timestamp),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall,
-                                  ),
-                                ),
-                                Text(
-                                  clock.time == null
-                                      ? 'Local time unavailable · Edit UTC instead'
-                                      : 'Scrub the local day · Edit local date and time',
-                                ),
-                                timelineBounds.maxWidth >= 800
-                                    ? Row(
-                                        children: [
-                                          controls,
-                                          const SizedBox(width: 16),
-                                          Expanded(child: slider),
-                                        ],
-                                      )
-                                    : Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [controls, slider],
-                                      ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                    Expanded(child: inspector),
                   ],
-                );
-              },
+                ),
+              ),
             ),
-          ),
-        ],
+      bottomNavigationBar: cleanPreview || !compact
+          ? null
+          : NavigationBar(
+              selectedIndex: workspace.index,
+              onDestinationSelected: changeWorkspace,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.map_outlined),
+                  selectedIcon: Icon(Icons.map),
+                  label: 'Map',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.landscape_outlined),
+                  selectedIcon: Icon(Icons.landscape),
+                  label: '3D Preview',
+                ),
+              ],
+            ),
+      body: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            if (!cleanPreview && !compact) ...[
+              NavigationRail(
+                selectedIndex: workspace.index,
+                labelType: NavigationRailLabelType.all,
+                onDestinationSelected: changeWorkspace,
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.map_outlined),
+                    selectedIcon: Icon(Icons.map),
+                    label: Text('Map'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.landscape_outlined),
+                    selectedIcon: Icon(Icons.landscape),
+                    label: Text('3D Preview'),
+                  ),
+                ],
+              ),
+              const VerticalDivider(width: 1),
+            ],
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(child: viewport),
+                        if (!cleanPreview &&
+                            dockedInspector &&
+                            inspectorVisible) ...[
+                          const VerticalDivider(width: 1),
+                          SizedBox(width: 310, child: inspector),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (!cleanPreview) ...[
+                    const Divider(height: 1),
+                    timeline(compactTimeline),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (cleanPreview) unawaited(setCleanPreview(false));
-        },
+    return PopScope(
+      canPop: !cleanPreview,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && cleanPreview) unawaited(setCleanPreview(false));
       },
-      child: Focus(autofocus: true, child: scaffold),
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            if (cleanPreview) unawaited(setCleanPreview(false));
+          },
+        },
+        child: Focus(autofocus: true, child: scaffold),
+      ),
     );
   }
 }

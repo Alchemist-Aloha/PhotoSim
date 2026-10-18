@@ -1,8 +1,10 @@
 # PhotoSim
 
-Linux landscape photography simulator built with Flutter. **The Linux MVP is complete**
-under the revised [Linux release scope](docs/linux-mvp.md). Other platforms are future
-work; the full long-term specification is not a claim of implemented features.
+Landscape photography simulator for **Linux and Android phones/tablets**, built
+with Flutter and Material 3. **The Linux MVP is complete** under the revised
+[Linux release scope](docs/linux-mvp.md). Android setup and validation are recorded
+in [Android support](docs/android.md); the long-term specification is not a claim
+of implemented features.
 Implementation beyond that baseline is underway; see the [full Linux spec progress](docs/linux-spec-progress.md)
 for delivered features and the explicitly unfinished backlog.
 
@@ -19,10 +21,32 @@ flutter run -d linux
 The Linux runner enables Flutter GPU permanently; no extra rendering flags
 are needed. Direct dependencies are pinned and `pubspec.lock` is included.
 
+## Run on Android
+
+Requires Android **10 / API 29 or newer**, a compatible Impeller graphics driver,
+Flutter 3.47.1+, and the Android SDK.
+
+```sh
+flutter pub get
+flutter run -d <android-device-id>
+flutter build apk --release
+```
+
+Install `build/app/outputs/flutter-apk/app-release.apk`. The current release
+configuration uses a development signing key; configure your own before publishing.
+Flutter GPU and internet access are enabled in the release manifest.
+
+Phones use bottom navigation and a controls drawer; larger windows use a
+navigation rail and docked controls when there is enough space. Both orientations,
+split-window resizing, system light/dark theme, and larger text are supported.
+Drag the 3D view to aim and pinch to change focal length. **Export PNG** saves to
+**Pictures/PhotoSim** through MediaStore without broad storage permission.
+See [Android support](docs/android.md) for tests and device limitations.
+
 ## Available now
 
 - Interactive OpenStreetMap map centered on Yosemite.
-- Click to place a camera; drag its marker to move it and its green handle to aim.
+- Tap/click to place a camera; drag its marker to move it and its green handle to aim.
 - Geographic field-of-view wedge calculated from physical sensor and focal length.
 - Full-frame / APS-C sensor pills and a single 8–600 mm focal-length slider.
 - Shared camera position, azimuth, pitch, height, focal length, and UTC timestamp.
@@ -152,5 +176,7 @@ tile service with attribution and an identifying user agent; it does not bulk
 download or prefetch regions. Review [OSM's usage policy](https://operations.osmfoundation.org/policies/tiles/)
 before distribution or scaling. No paid API or credentials are required.
 
-Linux is the completed MVP target. Android, Web, Windows and macOS are deferred
-future releases, with no current support or build/render claim.
+Linux remains the completed MVP baseline. The Android phone/tablet version
+shares its planning/rendering core and has emulator workflow coverage; physical
+Android hardware performance is not yet characterized. Web, Windows, macOS and
+iOS remain outside the supported build claims.

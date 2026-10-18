@@ -4,11 +4,9 @@
 
 ## Platform
 
-Linux desktop (native Flutter).
+android
 
-Mobile is a future extension of the same product and design language, not a currently supported release. Improve the Linux desktop experience first, while keeping the design extensible to mobile.
-
-Tooling note: Impeccable's current platform schema lists only `web`, `ios`, `android`, and `adaptive`; none accurately describes this Linux-only release. Do not treat this application as a website or claim native mobile support to satisfy that schema.
+Native Flutter on Android phones/tablets and Linux desktop. Android follows Material 3, with size-based phone/tablet layouts and system light/dark theme. Linux retains its established desktop workflow. Android currently targets API 29+; emulator coverage does not establish performance on physical hardware.
 
 ## Users
 
@@ -26,7 +24,7 @@ A Linux-first photography planning tool combining synchronized geographic and 3D
 
 ## Operating Context
 
-- Flutter/Dart Linux desktop application; launch with `flutter run -d linux`. See `README.md` for system requirements.
+- Shared Flutter/Dart application; launch with `flutter run -d linux` or an Android device ID. See `README.md` and `docs/android.md` for requirements and validation.
 - Two primary workspaces: Map and 3D Preview. Camera, optics, location and simulation time remain synchronized when switching.
 - Secondary tools include photography controls, astronomy readouts, weather/rendering settings, terrain coverage, storage, saved plans and PNG export.
 - Network access supplies map tiles and uncached terrain/imagery. Local raster caching supports reuse, not complete offline-region downloading.
@@ -40,14 +38,13 @@ A Linux-first photography planning tool combining synchronized geographic and 3D
 - Explicitly distinguish calculated geometry from approximate lighting, weather, exposure, terrain visibility and night-sky appearance. Do not present the preview as calibrated photography, a forecast or survey-grade horizon prediction.
 - Date/time editing defaults to the camera location's estimated local timezone, not the computer's timezone. Convert to UTC internally; reject nonexistent local times and explicitly disambiguate repeated hours. UTC is authoritative; supported simulation dates are 1900–2100. Estimated local time is limited to 1970–2037, with approximate timezone boundaries and explicit UTC editing outside supported local rules.
 - Imagery may be old, downsampled and already shadowed; acquisition dates do not follow simulation time. Terrain resolution and vertical datums limit precision.
-- Linux desktop improvements are the current priority. Carry a similar design language to future mobile layouts without merely shrinking desktop controls. Mobile target OS and implementation scope remain undecided.
-- Android, Web, Windows and macOS are not currently supported releases.
+- Android phones and tablets use Material 3: compact bottom navigation, a navigation rail in larger windows, modal controls below docking width and side-by-side controls on expanded windows. Preserve Linux desktop behavior.
+- Android PNG export uses MediaStore Pictures/PhotoSim, with no broad storage permission. App-private saved plans and cache remain local; Android automatic app-data backup is disabled.
+- Web, Windows, macOS and iOS remain outside supported build claims.
 
 ## Brand Commitments
 
-Preserve the PhotoSim name and photography-planning terminology. The interface should serve photographic planning rather than expose the complexity of a general 3D modeling application. Future mobile work should extend the desktop's design language.
-
-No new visual direction is established by this product record.
+Preserve the PhotoSim name and photography-planning terminology. The interface should serve photographic planning rather than expose the complexity of a general 3D modeling application. Android extends the desktop's design language through Material 3 components, semantic color roles and touch-appropriate layouts.
 
 ## Evidence on Hand
 
@@ -67,4 +64,4 @@ These are repository records, not fresh verification performed during initializa
 2. Preserve one coherent camera and time state across every workspace.
 3. Use real geographic data and calculated camera/astronomical geometry; identify approximations plainly.
 4. Keep the core workflow independent of paid services and retain required source credits.
-5. Improve Linux desktop usability now while making future mobile interaction a considered extension of the same product.
+5. Keep Linux desktop and Android phone/tablet interactions coherent while adapting layout and navigation to the actual window size.
