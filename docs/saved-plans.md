@@ -15,8 +15,9 @@ an existing one. Changes made while a save is in flight remain marked unsaved;
 the pending open is canceled rather than discarding those newer changes.
 Derived terrain elevation does not count as a composition edit.
 
-This protects plan switching, not application exit: there is no autosave or
-close-window confirmation. Save before quitting.
+[Automatic session recovery](session-recovery.md) preserves the current workspace,
+settings and unsaved composition across exit, without overwriting named plans.
+Manual snapshots remain separate; recovered edits retain their unsaved indicator.
 
 Both actions pause playback. Saves are independent of terrain/imagery caches,
 so cache eviction does not erase plans. Storage is the platform application
@@ -68,7 +69,7 @@ accessible; older app builds may not support version-2 files.
 Ground elevation, downloaded data, playback state and derived sky positions
 are not stored. Elevation is recalculated when terrain loads. Copy JSON files
 to the displayed storage folder to share or reopen them; no file-picker import,
-export, deletion, rename, autosave or cloud account is implemented.
+export, deletion, rename, automatic named-plan saving or cloud account is implemented.
 
 The loader caps files at **32 KiB**, checks the version, types, UTC date syntax,
 enum identifiers and camera/date bounds. It does not silently clamp invalid

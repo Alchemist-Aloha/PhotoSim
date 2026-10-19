@@ -54,13 +54,24 @@ One shared Flutter UI and simulation state, not a separate mobile codebase:
 Plans and bounded raster caches use app-private native directories. The shared
 cache limit and corruption recovery are unchanged. Plans are unencrypted and
 survive normal app restarts, but not uninstallation. Automatic Android backup
-is disabled. Save before quitting; unsaved work is not autosaved.
+is disabled. [Session recovery](session-recovery.md) automatically restores the
+last location, unsaved composition and UI preferences; playback restarts paused.
+Named plans remain manual snapshots, separate from the recovery checkpoint.
 
 Export PNG retains the framed photo, attribution and existing resolution limits.
 On Android it inserts a pending image into MediaStore, writes on a background
 task queue, and publishes only after the write succeeds. Failed writes remove
 their pending entry. Images appear in **Pictures/PhotoSim** without requesting
 broad storage access. Linux retains its existing destination-path dialog.
+
+## Session recovery validation
+
+The release APK preserved a changed camera location, full composition and
+Calendar/week preferences through Back, force-stop and a cold launch on a Pixel 7
+API 36 emulator. Unit tests additionally cover all serialized settings and failure
+handling. See [session recovery](session-recovery.md) and
+`build/validation/session-android-check.log`. The emulator later disconnected
+after teardown; physical devices and tablet cold-start persistence are unverified.
 
 ## Validation
 

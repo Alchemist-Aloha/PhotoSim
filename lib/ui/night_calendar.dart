@@ -16,11 +16,15 @@ class NightCalendar extends StatefulWidget {
     required this.weekView,
     required this.repository,
     required this.onPreview,
+    this.initialDate,
+    this.onDateChanged,
   });
   final SimulationState state;
   final bool weekView;
   final NightConditionsRepository repository;
   final ValueChanged<DateTime> onPreview;
+  final DateTime? initialDate;
+  final ValueChanged<DateTime>? onDateChanged;
 
   @override
   State<NightCalendar> createState() => _NightCalendarState();
@@ -72,6 +76,7 @@ class _NightCalendarState extends State<NightCalendar> {
     if (local != null && local.hour < 1) {
       selected = selected.subtract(const Duration(days: 1));
     }
+    selected = widget.initialDate ?? selected;
     anchor = selected;
     unawaited(reload());
     unawaited(loadBrightness());
@@ -232,6 +237,7 @@ class _NightCalendarState extends State<NightCalendar> {
       selected = date;
       anchor = date;
     });
+    widget.onDateChanged?.call(selected);
     if (firstDate != oldFirst) unawaited(reload());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -284,6 +290,7 @@ class _NightCalendarState extends State<NightCalendar> {
       selected = next;
       anchor = next;
     });
+    widget.onDateChanged?.call(selected);
     unawaited(reload());
   }
 
@@ -727,6 +734,7 @@ class _NightCalendarState extends State<NightCalendar> {
                       selected = dateOf(time);
                       anchor = selected;
                     });
+                    widget.onDateChanged?.call(selected);
                     unawaited(reload());
                   }
                 },

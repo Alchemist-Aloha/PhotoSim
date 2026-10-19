@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../core/geo.dart';
 import '../models/simulation_state.dart';
 
 class MapWorkspace extends StatefulWidget {
-  const MapWorkspace({super.key, required this.state, required this.onChanged});
+  const MapWorkspace({
+    super.key,
+    required this.state,
+    required this.onChanged,
+    this.initialCenter,
+    this.initialZoom = 14,
+    this.onViewChanged,
+  });
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
+  final LatLng? initialCenter;
+  final double initialZoom;
+  final void Function(LatLng center, double zoom)? onViewChanged;
 
   @override
   State<MapWorkspace> createState() => _MapWorkspaceState();
@@ -58,8 +69,10 @@ class _MapWorkspaceState extends State<MapWorkspace> {
           key: mapKey,
           mapController: controller,
           options: MapOptions(
-            initialCenter: state.location,
-            initialZoom: 14,
+            initialCenter: widget.initialCenter ?? state.location,
+            initialZoom: widget.initialZoom,
+            onPositionChanged: (camera, _) =>
+                widget.onViewChanged?.call(camera.center, camera.zoom),
             minZoom: 3,
             maxZoom: 18,
             interactionOptions: const InteractionOptions(

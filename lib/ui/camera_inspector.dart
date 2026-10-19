@@ -14,9 +14,13 @@ class CameraInspector extends StatelessWidget {
     required this.onChanged,
     this.rasterCache,
     this.cacheError,
+    this.expandedSections = const {},
+    this.onSectionChanged,
   });
   final RasterCache? rasterCache;
   final String? cacheError;
+  final Map<String, bool> expandedSections;
+  final void Function(String title, bool expanded)? onSectionChanged;
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
 
@@ -51,7 +55,8 @@ class CameraInspector extends StatelessWidget {
     bool expanded = false,
   }) => ExpansionTile(
     key: PageStorageKey('inspector-$title'),
-    initiallyExpanded: expanded,
+    initiallyExpanded: expandedSections[title] ?? expanded,
+    onExpansionChanged: (value) => onSectionChanged?.call(title, value),
     leading: Icon(icon, size: 20),
     title: Text(title),
     tilePadding: const EdgeInsets.symmetric(horizontal: 12),

@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 import '../data/saved_plans.dart';
+import '../data/app_session.dart';
 import '../data/raster_cache.dart';
 import '../data/night_conditions.dart';
 import '../ui/night_calendar.dart';
@@ -22,9 +25,19 @@ import '../ui/simulation_workspace.dart';
 import '../ui/time_slider.dart';
 
 class PhotoSimApp extends StatelessWidget {
-  const PhotoSimApp({super.key, this.plans, this.rasterCache});
+  const PhotoSimApp({
+    super.key,
+    this.plans,
+    this.rasterCache,
+    this.sessionStore,
+    this.initialSession,
+    this.sessionWarning,
+  });
   final PlanRepository? plans;
   final RasterCache? rasterCache;
+  final SessionStore? sessionStore;
+  final AppSession? initialSession;
+  final String? sessionWarning;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +57,13 @@ class PhotoSimApp extends StatelessWidget {
       themeMode: defaultTargetPlatform == TargetPlatform.android
           ? ThemeMode.system
           : ThemeMode.dark,
-      home: WorkspaceShell(plans: plans, rasterCache: rasterCache),
+      home: WorkspaceShell(
+        plans: plans,
+        rasterCache: rasterCache,
+        sessionStore: sessionStore,
+        initialSession: initialSession,
+        sessionWarning: sessionWarning,
+      ),
     );
   }
 }
@@ -52,9 +71,19 @@ class PhotoSimApp extends StatelessWidget {
 enum Workspace { map, simulation, calendar }
 
 class WorkspaceShell extends StatefulWidget {
-  const WorkspaceShell({super.key, this.plans, this.rasterCache});
+  const WorkspaceShell({
+    super.key,
+    this.plans,
+    this.rasterCache,
+    this.sessionStore,
+    this.initialSession,
+    this.sessionWarning,
+  });
   final PlanRepository? plans;
   final RasterCache? rasterCache;
+  final SessionStore? sessionStore;
+  final AppSession? initialSession;
+  final String? sessionWarning;
 
   @override
   State<WorkspaceShell> createState() => _WorkspaceShellState();
@@ -78,6 +107,103 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   bool cleanPreview = false;
   RasterCache? rasterCache;
   String? cacheError;
+  DateTime? calendarDate;
+  LatLng? mapCenter;
+  double mapZoom = 14;
+  Map<String, bool> expandedSections = {};
+  Timer? sessionTimer;
+  AppLifecycleListener? exitListener;
+  String? lastSession, sessionWarning;
+  bool disposing = false;
+
+  AppSession get session => AppSession(
+    state: state,
+    cleanComposition: cleanComposition,
+    planName: currentPlanName,
+    workspace: workspace.name,
+    inspectorVisible: inspectorVisible,
+    timelineExpanded: timelineExpanded,
+    calendarWeekView: calendarWeekView,
+    cleanPreview: cleanPreview,
+    playbackSpeed: playbackSpeed,
+    calendarDate: calendarDate,
+    mapCenter: mapCenter,
+    mapZoom: mapZoom,
+    expandedSections: expandedSections,
+  );
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    scheduleSessionSave();
+  }
+
+  void scheduleSessionSave() {
+    if (widget.sessionStore == null || disposing || sessionTimer != null) {
+      return;
+    }
+    sessionTimer = Timer(const Duration(milliseconds: 500), () {
+      sessionTimer = null;
+      saveSession();
+    });
+  }
+
+  bool saveSession() {
+    sessionTimer?.cancel();
+    sessionTimer = null;
+    final store = widget.sessionStore;
+    if (store == null) return sessionWarning == null;
+    try {
+      final source = session.encode();
+      if (source != lastSession) store.save(source);
+      lastSession = source;
+      if (!disposing && mounted && sessionWarning != null) {
+        super.setState(() => sessionWarning = null);
+      }
+      return true;
+    } on Object {
+      const warning =
+          'Session could not be saved. Check storage space and permissions; your previous checkpoint is unchanged.';
+      if (!disposing && mounted && sessionWarning != warning) {
+        super.setState(() => sessionWarning = warning);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(warning),
+              action: SnackBarAction(label: 'Retry', onPressed: saveSession),
+            ),
+          );
+        });
+      }
+      return false;
+    }
+  }
+
+  Future<AppExitResponse> requestExit() async {
+    if (saveSession()) return AppExitResponse.exit;
+    if (!mounted) return AppExitResponse.cancel;
+    final exit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Session could not be saved'),
+        content: const Text(
+          'Check storage space and permissions. Exit without preserving the latest changes?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Exit without saving'),
+          ),
+        ],
+      ),
+    );
+    return exit == true ? AppExitResponse.exit : AppExitResponse.cancel;
+  }
 
   Future<void> initializeCache() async {
     try {
@@ -288,6 +414,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             cleanComposition = composition;
             currentPlanName = selected.name;
             workspace = Workspace.map;
+            calendarDate = null;
+            mapCenter = null;
+            mapZoom = 14;
             openedPlan++;
           });
         }
@@ -311,7 +440,34 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    cleanComposition = composition;
+    final saved = widget.initialSession;
+    if (saved != null) {
+      state = saved.state;
+      workspace = Workspace.values.byName(saved.workspace);
+      inspectorVisible = saved.inspectorVisible;
+      timelineExpanded = saved.timelineExpanded;
+      calendarWeekView = saved.calendarWeekView;
+      playbackSpeed = saved.playbackSpeed;
+      currentPlanName = saved.planName;
+      calendarDate = saved.calendarDate;
+      mapCenter = saved.mapCenter;
+      mapZoom = saved.mapZoom;
+      expandedSections = Map.of(saved.expandedSections);
+    }
+    cleanComposition = saved?.cleanComposition ?? composition;
+    sessionWarning = widget.sessionWarning;
+    if (widget.sessionStore != null || widget.sessionWarning != null) {
+      exitListener = AppLifecycleListener(onExitRequested: requestExit);
+      scheduleSessionSave();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (saved?.cleanPreview == true) unawaited(setCleanPreview(true));
+      if (widget.sessionWarning != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(widget.sessionWarning!)));
+      }
+    });
     unawaited(initializeCache());
   }
 
@@ -337,13 +493,17 @@ class _WorkspaceShellState extends State<WorkspaceShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
-    if (lifecycle != AppLifecycleState.resumed && playback != null) {
-      setState(stopPlayback);
+    if (lifecycle != AppLifecycleState.resumed) {
+      if (playback != null) setState(stopPlayback);
+      saveSession();
     }
   }
 
   @override
   void dispose() {
+    disposing = true;
+    saveSession();
+    exitListener?.dispose();
     terrainClient.close();
     stopPlayback();
     WidgetsBinding.instance.removeObserver(this);
@@ -763,6 +923,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       onChanged: update,
       rasterCache: rasterCache,
       cacheError: cacheError,
+      expandedSections: expandedSections,
+      onSectionChanged: (title, expanded) =>
+          setState(() => expandedSections[title] = expanded),
     );
     void changeWorkspace(int index) => setState(() {
       if (Workspace.values[index] == Workspace.calendar) stopPlayback();
@@ -781,6 +944,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             state: state,
             weekView: calendarWeekView,
             repository: nightConditions,
+            initialDate: calendarDate,
+            onDateChanged: (date) => setState(() => calendarDate = date),
             onPreview: (utc) {
               final next = state.copyWith(
                 timestamp: utc,
@@ -805,6 +970,16 @@ class _WorkspaceShellState extends State<WorkspaceShell>
         ? MapWorkspace(
             key: ValueKey(openedPlan),
             state: state,
+            initialCenter: mapCenter,
+            initialZoom: mapZoom,
+            onViewChanged: (center, zoom) {
+              mapCenter = LatLng(
+                center.latitude.clamp(-85.05112878, 85.05112878),
+                (center.longitude + 180) % 360 - 180,
+              );
+              mapZoom = zoom.clamp(3, 18);
+              scheduleSessionSave();
+            },
             onChanged: update,
           )
         : rasterCache == null
@@ -853,6 +1028,22 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                 ],
               ),
               actions: [
+                if (sessionWarning != null)
+                  IconButton(
+                    tooltip: 'Session recovery warning',
+                    icon: const Icon(Icons.warning_amber),
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(sessionWarning!),
+                        action: widget.sessionStore == null
+                            ? null
+                            : SnackBarAction(
+                                label: 'Retry',
+                                onPressed: saveSession,
+                              ),
+                      ),
+                    ),
+                  ),
                 PopupMenuButton<bool>(
                   tooltip: 'Photography plans',
                   enabled: !planBusy,
