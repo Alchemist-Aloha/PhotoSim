@@ -20,6 +20,9 @@ Future<void> main() async {
     yield LicenseEntryWithLineBreaks([
       'D3-Celestial sky data',
     ], await rootBundle.loadString('assets/sky/LICENSE.txt'));
+    yield LicenseEntryWithLineBreaks([
+      'NASA SVS / LRO Moon surface',
+    ], await rootBundle.loadString('assets/moon/LICENSE.txt'));
   });
   SessionStore? store;
   AppSession? session;

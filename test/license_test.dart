@@ -10,5 +10,11 @@ void main() {
     final sky = await rootBundle.loadString('assets/sky/LICENSE.txt');
     expect(sky, contains('Copyright (c) 2015, Olaf Frohn'));
     expect(sky, contains('Redistribution and use in source and binary forms'));
+    final moon = await rootBundle.loadString('assets/moon/LICENSE.txt');
+    expect(moon, contains("NASA's Scientific Visualization Studio"));
+    expect(
+      moon,
+      contains('https://www.nasa.gov/nasa-brand-center/images-and-media/'),
+    );
   });
 }

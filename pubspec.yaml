@@ -35,4 +35,5 @@ flutter:
     - flutter_scene_generated/
     - LICENSE
     - assets/sky/
+    - assets/moon/
     - assets/terrain/

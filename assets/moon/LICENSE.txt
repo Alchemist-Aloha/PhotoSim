@@ -1,0 +1,19 @@
+Lunar surface color texture
+
+Credit: NASA's Scientific Visualization Studio.
+Lunar Reconnaissance Orbiter (LRO), LROC Wide Angle Camera and LOLA teams.
+Visualization: Ernie Wright (USRA); scientist: Noah Petro (NASA/GSFC).
+
+Source: NASA CGI Moon Kit, 2025 color map, 2048 x 1024 JPEG.
+https://svs.gsfc.nasa.gov/4720/
+https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg
+
+NASA-provided imagery and texture-map content generally is not subject to
+copyright in the United States. Use is subject to NASA's Images and Media
+Usage Guidelines, including acknowledgment of the source and no implied NASA
+endorsement. No NASA logos or identifiable persons are included in this asset.
+https://www.nasa.gov/nasa-brand-center/images-and-media/
+
+The texture is bundled unchanged. It is a visual color/albedo map optimized
+for aesthetics, not a scientific reflectance measurement. Its polar gaps are
+filled from lower-resolution LOLA albedo data. NASA does not endorse PhotoSim.

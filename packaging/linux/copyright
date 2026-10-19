@@ -17,3 +17,9 @@ Sky data attribution/license: sky-data-LICENSE.txt in this folder.
 Flutter dependency notices: /usr/lib/photosim/data/flutter_assets/NOTICES.Z.
 Original sky-data license and provenance are also included under
 /usr/lib/photosim/data/flutter_assets/assets/sky/.
+
+Lunar surface texture: NASA's Scientific Visualization Studio / LRO LROC and LOLA.
+NASA CGI Moon Kit: https://svs.gsfc.nasa.gov/4720/
+NASA media usage guidelines and original asset provenance are bundled under
+/usr/lib/photosim/data/flutter_assets/assets/moon/.
+NASA does not endorse PhotoSim.

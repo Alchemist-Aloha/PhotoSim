@@ -173,7 +173,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       cameraLightNode = scene.Node(name: 'Camera light')
         ..addComponent(scene.PointLightComponent(cameraLight!));
       world!.add(cameraLightNode!);
-      moonRenderer = MoonRenderer();
+      final lunarAlbedo = await scene.Texture2D.fromAsset(
+        'assets/moon/lroc_color_2k.jpg',
+        maxSize: 2048,
+      );
+      if (!mounted) return;
+      moonRenderer = MoonRenderer(lunarAlbedo);
       world!.add(moonRenderer!.node);
       final stars = parseStarCatalog(
         await rootBundle.loadString('assets/sky/stars.json'),
@@ -744,7 +749,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'Missing regional pixels fall back to the global mosaic. If all sources fail, '
             'the green surface remains a labeled fallback material. '
             'Solar direction is calculated locally with Astronomia (Meeus, MIT); brightness and sky appearance are approximate. '
-            'Sun/Moon readouts omit atmospheric refraction. The Moon is an untextured phase-lit sphere; '
+            'Sun/Moon readouts omit atmospheric refraction. The Moon uses NASA SVS/LRO surface color with approximate pole orientation, no libration or crater relief; '
             'moonlight brightness is an artistic approximation, not calibrated exposure. '
             'Stars: XHIP (Anderson & Francis, 2012); Milky Way outlines: Jose R. Vieira, '
             'via D3-Celestial (Olaf Frohn, BSD-3-Clause). Constellation names and illustrative connecting figures '
@@ -796,7 +801,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           .map((provider) => provider.attribution),
     }.join(' · ');
     final active = world;
-    if (active == null) return const Center(child: CircularProgressIndicator());
+    if (active == null || moonRenderer == null || nightRenderer == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final state = widget.state;
     final frame = state.cameraFrame;
     final eye = vm.Vector3(
@@ -833,7 +840,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     // shortcut: Auto meters the whole context canvas; add backend ROI metering for photo-only Auto.
     configurePhotography(active, state);
     final sun = sky.sun;
-    moonRenderer!.update(sky, eye);
+    // Mean J2000 lunar pole; the texture's near side stays Earth-facing without libration.
+    final lunarPole = ObserverSkyFrame(
+      timestamp: state.timestamp,
+      latitude: state.latitude,
+      longitude: state.longitude,
+    ).direction(269.9949 * math.pi / 180, 66.5392 * math.pi / 180);
+    moonRenderer!.update(sky, eye, lunarPole);
     nightRenderer?.update(skyLayerState, eye);
     final sunDirection = vm.Vector3(
       sun.direction.x,

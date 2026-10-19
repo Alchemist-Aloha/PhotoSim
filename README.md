@@ -70,7 +70,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Drag the 3D preview to look around; change focal length to zoom optically.
 - Click the 3D preview and hold WASD to move at 30 m/s; the camera climbs/descends with terrain while keeping its height offset.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
-- Phase-lit Moon at its calculated position and angular size, with terrain occlusion.
+- NASA SVS/LRO surface-textured, phase-lit Moon at its calculated position and angular size, with terrain occlusion (offline 2K albedo; no libration or crater relief).
 - UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain.
 - Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
 - Blended terrain shadow cascades; High quality adds PCSS/contact shadows and denser 256/128/64 terrain meshes while retaining imagery.

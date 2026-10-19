@@ -1,0 +1,14 @@
+{
+  "source": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg",
+  "page": "https://svs.gsfc.nasa.gov/4720/",
+  "credit": "NASA's Scientific Visualization Studio / LRO LROC and LOLA teams",
+  "edition": "2025 color map",
+  "sha256": "f7130a1822681fa7512d7dcfd40db8c10b9ba4f06777910348698260ed7a2170",
+  "width": 2048,
+  "height": 1024,
+  "projection": "Equirectangular; 0 degrees longitude at image center, north at top",
+  "colorSpace": "sRGB",
+  "changes": "None; original NASA JPEG",
+  "usageGuidelines": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+  "limitations": "Aesthetic color product, not scientific reflectance; polar infill from lower-resolution LOLA albedo. Renderer omits libration and displacement."
+}

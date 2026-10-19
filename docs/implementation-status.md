@@ -59,7 +59,7 @@ requirements separately from excluded platform work.
   fog without bypassing exposure or terrain occlusion. Astronomy/geometry remain unchanged.
 - Explicit FXAA (default), MSAA 4× with capability fallback, Off and quality-driven
   Auto controls in Rendering; persisted in plans without geographic reloads.
-- Resolved untextured Moon sphere with correct apparent size, phase and limb
+- NASA SVS/LRO-textured Moon sphere with near-side/pole orientation, correct apparent size, phase and limb
   orientation, depth-tested against terrain; phase-dependent approximate moonlight.
 - Corrected east/west viewport handedness, with a GPU bright-limb regression test.
 - Sun/Moon geodesic map bearing guides with altitude labels, dashed below
@@ -244,7 +244,8 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
 - Native-only cache; other platform builds and browser storage remain open.
 - Scene warns about depth precision inside ground patches. Shadow accuracy, frame
   time targets, release-mode interaction and long-run GPU-memory stability are unmeasured.
-- No lunar albedo/detail, libration, earthshine or atmospheric lunar scattering.
+- Lunar surface color is bundled, but crater displacement, libration, earthshine
+  and calibrated lunar photometry are not modeled.
   Moonlight is artistically scaled, not calibrated; daytime moonlight is omitted.
 - Night-sky intensity and point sizes are artistic; no calibrated PSF/exposure,
   proper motion, annual aberration/parallax, extinction, light pollution or individual star labels.

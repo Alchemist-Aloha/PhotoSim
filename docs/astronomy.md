@@ -206,21 +206,33 @@ host-GPU emulator. Local SwiftShader/lavapipe emulator processes crashed
 (SIGSEGV/SIGILL); software-emulator compatibility and physical-device performance
 remain unverified.
 
-`lib/render/moon.dart` renders a 128-segment, 64-ring untextured lunar sphere,
+`lib/render/moon.dart` renders a 128-segment, 64-ring lunar sphere with NASA SVS's
+2025 LRO/LROC/LOLA 2048×1024 surface color map bundled for offline use,
 rescaled to 30 km with radius `distance × sin(angularRadius)` to preserve its
 apparent size. Observer-derived Moon-to-Sun direction drives Lambertian vertex
 alpha coverage on white vertices, so the terminator and bright-limb orientation
 follow astronomical geometry while the unlit hemisphere reveals the sky instead
 of drawing a black disk.
-Only colors update when illumination changes; geometry stays resident. It is unlit
-by scene lights and does not cast an artificial nearby-object shadow.
+The equirectangular albedo shows maria, crater markings and rays rather than a
+plain white disk. Sphere U is reversed to match east-positive lunar longitude.
+The mean J2000 lunar north pole is projected into the observer sky frame and the
+near side stays observer-facing; phase lighting is transformed into that local
+frame so texture rotation cannot rotate the terminator incorrectly. Optical and
+physical libration are omitted. Only vertex colors and node pose update with time;
+the geometry and texture stay resident. It is unlit by scene lights (including the
+camera fill) and does not cast an artificial nearby-object shadow.
+
+Source: [NASA CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/). The original 2K JPEG
+is bundled unchanged, with credits, NASA media guidelines and SHA-256 provenance
+under `assets/moon/`. This is an aesthetic color product, not scientific reflectance;
+polar gaps use lower-resolution LOLA albedo. NASA does not endorse PhotoSim.
 
 The sphere depth-tests against terrain. The geographic viewport corrects Flutter
 Scene's +Z-forward camera handedness with a horizontal flip, preserving east/west
 and the Moon's bright-limb orientation. Camera/terrain coordinates remain unchanged.
 Occlusion is limited to loaded terrain, not a complete Earth/terrain horizon model.
-No albedo map, craters, libration, earthshine or atmospheric lunar scattering is
-modeled. This transparent-phase approximation also reveals background stars
+No crater displacement/self-shadowing, libration, earthshine or calibrated lunar
+photometry is modeled. This transparent-phase approximation also reveals background stars
 through the unlit hemisphere rather than modeling lunar occultation.
 
 Below solar center altitude 0°, the existing shadow-casting light switches to
