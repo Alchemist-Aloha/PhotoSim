@@ -10,6 +10,8 @@ import 'package:http/testing.dart';
 import 'package:photosim/core/night_rating.dart';
 import 'package:photosim/data/night_conditions.dart';
 
+import 'night_rating_test.dart' show sample;
+
 String forecastFixture(
   DateTime first, {
   List<Object?> clouds = const [20, 40, 60],
@@ -40,12 +42,73 @@ void main() {
     moonSeparation: 90,
     moonIllumination: 0.1,
   );
+  test('forecast selects the clear subwindow and moves recommended time', () {
+    final night = rateNight(
+      first,
+      List.generate(19, (i) => sample(first.add(Duration(minutes: i * 10)))),
+    );
+    final forecast = parseNightForecast(
+      forecastFixture(first, clouds: [100, 0, 0]),
+      first,
+    );
+    final rated = rateNightWithForecast(night, forecast);
+    expect(rated.weatherScore, 100);
+    expect(rated.window!.start, first.add(const Duration(hours: 1)));
+    expect(rated.window!.end, first.add(const Duration(hours: 3)));
+    expect(rated.window!.bestTime, first.add(const Duration(hours: 1)));
+    expect(rated.window!.bestTime.isUtc, isTrue);
+    final cloudy = rateNightWithForecast(
+      night,
+      parseNightForecast(
+        forecastFixture(first, clouds: [100, 100, 100]),
+        first,
+      ),
+    );
+    expect(cloudy.weatherScore, 0);
+    final partial = rateNightWithForecast(
+      night,
+      parseNightForecast(forecastFixture(first, clouds: [100, null, 0]), first),
+    );
+    expect(partial.weatherScore, isNull);
+    expect(partial.window!.start, night.window!.start);
+    expect(partial.window!.end, night.window!.end);
+    final absent = rateNightWithForecast(night, NightForecast([], first));
+    expect(absent.weatherScore, isNull);
+    expect(absent.score, night.score);
+  });
+  test('weather weights band geometry at the same time as clear sky', () {
+    final night = rateNight(
+      first,
+      List.generate(
+        19,
+        (i) => sample(
+          first.add(Duration(minutes: i * 10)),
+          lowBand: i < 6 ? 1 : 1 / 3,
+        ),
+      ),
+    );
+    final forecast = parseNightForecast(
+      forecastFixture(first, clouds: [100, 0, 0]),
+      first,
+    );
+    final rated = rateNightWithForecast(night, forecast);
+    expect(rated.weatherScore, 67);
+    expect(rated.window!.start, first.add(const Duration(hours: 1)));
+    expect(rated.window!.lowMilkyWayFraction, closeTo(1 / 3, 1e-10));
+    final clear = rateNightWithForecast(
+      night,
+      parseNightForecast(forecastFixture(first, clouds: [0, 0, 0]), first),
+    );
+    expect(clear.score, night.score);
+    expect(clear.weatherScore, night.score);
+    expect(clear.window!.start, night.window!.start);
+    expect(clear.window!.end, night.window!.end);
+  });
   test('forecast joins the actual cross-midnight UTC window and preserves unknowns', () {
     final forecast = parseNightForecast(forecastFixture(first), first);
     final result = windowWeather(window.start, window.end, forecast);
     expect(result.complete, isTrue);
     expect(result.cloud, 40);
-    expect(result.adjustedScore(100), 60);
     expect(result.dewMargin, 2);
     expect(result.visibility, 25000);
     final partial = windowWeather(
@@ -54,7 +117,7 @@ void main() {
       parseNightForecast(forecastFixture(first, clouds: [20, null, 60]), first),
     );
     expect(partial.coverage, 0.5);
-    expect(partial.adjustedScore(100), isNull);
+    expect(partial.complete, isFalse);
     final none = windowWeather(
       window.start,
       window.end,
@@ -83,8 +146,8 @@ void main() {
           forecastFixture(first, clouds: [100, 100, 100]),
           first,
         ),
-      ).adjustedScore(100),
-      0,
+      ).cloud,
+      100,
     );
   });
   test(

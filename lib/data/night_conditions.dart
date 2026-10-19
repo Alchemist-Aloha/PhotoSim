@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../core/night_rating.dart';
 import 'http_bytes.dart';
 
 class ForecastHour {
@@ -109,9 +110,6 @@ class WindowWeather {
   final double coverage;
   final double? cloud, highCloud, visibility, gusts, dewMargin, rainProbability;
   bool get complete => coverage >= 0.999 && cloud != null;
-  int? adjustedScore(int? astronomy) => complete && astronomy != null
-      ? (astronomy * (1 - cloud! / 100)).round()
-      : null;
 }
 
 /// Sample the actual shooting/dark interval, not a calendar-day cloud average.
@@ -156,6 +154,35 @@ WindowWeather windowWeather(
     gusts: gusts,
     dewMargin: dew,
     rainProbability: rain,
+  );
+}
+
+/// Reuse astronomy samples; scan forecast hours once rather than once per candidate.
+NightRating rateNightWithForecast(NightRating night, NightForecast forecast) {
+  if (night.samples.isEmpty || night.window == null) return night;
+  var cursor = 0;
+  return rateNight(
+    night.date,
+    night.samples,
+    clearFraction: (start, end) {
+      while (cursor < forecast.hours.length &&
+          !forecast.hours[cursor].utc
+              .add(const Duration(hours: 1))
+              .isAfter(start)) {
+        cursor++;
+      }
+      var next = cursor;
+      while (next < forecast.hours.length &&
+          forecast.hours[next].utc.isBefore(end)) {
+        next++;
+      }
+      final weather = windowWeather(
+        start,
+        end,
+        NightForecast(forecast.hours.sublist(cursor, next), forecast.fetchedAt),
+      );
+      return weather.complete ? 1 - weather.cloud! / 100 : null;
+    },
   );
 }
 

@@ -13,6 +13,7 @@ import '../data/night_conditions.dart';
 import '../ui/night_calendar.dart';
 
 import '../core/local_time.dart';
+import '../core/night_sky.dart';
 
 import '../models/simulation_state.dart';
 import '../ui/camera_inspector.dart';
@@ -783,14 +784,18 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             onPreview: (utc) {
               final next = state.copyWith(
                 timestamp: utc,
-                target: CelestialTarget.galacticCenter,
+                target: CelestialTarget.none,
               );
-              final core = next.galacticCenter;
+              final aim = ObserverSkyFrame(
+                timestamp: utc,
+                latitude: next.latitude,
+                longitude: next.longitude,
+              ).lowMilkyWayAim(next.azimuth);
               setState(() {
                 stopPlayback();
                 state = next.copyWith(
-                  azimuth: core.azimuth,
-                  pitch: core.altitude,
+                  azimuth: aim.azimuth,
+                  pitch: aim.altitude,
                 );
                 workspace = Workspace.simulation;
               });

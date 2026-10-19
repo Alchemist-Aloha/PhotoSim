@@ -30,6 +30,7 @@ class _NightCalendarState extends State<NightCalendar> {
   late DateTime selected;
   late DateTime anchor;
   List<NightRating> nights = [];
+  final weatherRatings = <DateTime, NightRating>{};
   bool calculating = true, weatherLoading = false, brightnessLoading = true;
   bool weatherRequested = false;
   String? calculationError, weatherError, brightnessError;
@@ -85,6 +86,7 @@ class _NightCalendarState extends State<NightCalendar> {
       stop = Completer<void>();
       siteGeneration++;
       forecast = null;
+      weatherRatings.clear();
       brightness = null;
       weatherRequested = false;
       weatherLoading = false;
@@ -124,6 +126,7 @@ class _NightCalendarState extends State<NightCalendar> {
       if (mounted && generation == id) {
         setState(() {
           nights = result;
+          weatherRatings.clear();
           calculating = false;
         });
       }
@@ -168,6 +171,7 @@ class _NightCalendarState extends State<NightCalendar> {
       if (mounted && id == siteGeneration) {
         setState(() {
           forecast = result;
+          weatherRatings.clear();
           weatherLoading = false;
         });
       }
@@ -295,13 +299,20 @@ class _NightCalendarState extends State<NightCalendar> {
 
   NightRating? rating(DateTime date) {
     for (final night in nights) {
-      if (night.date == date) return night;
+      if (night.date == date) {
+        return forecast == null
+            ? night
+            : weatherRatings.putIfAbsent(
+                date,
+                () => rateNightWithForecast(night, forecast!),
+              );
+      }
     }
     return null;
   }
 
   String scoreLabel(NightRating? night) {
-    final adjusted = weather(night)?.adjustedScore(night?.score);
+    final adjusted = night?.weatherScore;
     return adjusted != null
         ? '$adjusted W'
         : night?.score == null
@@ -513,8 +524,9 @@ class _NightCalendarState extends State<NightCalendar> {
   Widget details() {
     final night = rating(selected);
     final window = night?.window;
+    final previewTime = night?.geometryPreviewTime;
     final conditions = weather(night);
-    final adjusted = conditions?.adjustedScore(night?.score);
+    final adjusted = night?.weatherScore;
     final textTheme = Theme.of(context).textTheme;
     return Padding(
       key: detailsKey,
@@ -542,28 +554,31 @@ class _NightCalendarState extends State<NightCalendar> {
           const SizedBox(height: 16),
           if (window != null) ...[
             Text(
-              'Best joint window · ${window.minutes} minutes',
+              '${adjusted == null ? 'Best astronomy window' : 'Best weather-adjusted window'} · ${window.minutes} minutes',
               style: textTheme.titleMedium,
             ),
             Text('${localTime(window.start)}\nto ${localTime(window.end)}'),
+            Text('Recommended time: ${localTime(window.bestTime)}'),
             const SizedBox(height: 8),
             Text(
-              'Visible Milky Way at 0–30°: ${(window.lowMilkyWayFraction * 100).toStringAsFixed(1)}%\nCore altitude at that time: ${window.coreAltitude.toStringAsFixed(1)}°\nMoon below horizontal · ${(window.moonIllumination * 100).round()}% illuminated\nMinimum Moon–core separation ${window.moonSeparation.toStringAsFixed(1)}°',
+              'Mean visible Milky Way at 0–30°: ${(window.lowMilkyWayFraction * 100).toStringAsFixed(1)}%\nCore altitude at that time: ${window.coreAltitude.toStringAsFixed(1)}°\nMoon below horizontal · ${(window.moonIllumination * 100).round()}% illuminated\nMinimum Moon–core separation ${window.moonSeparation.toStringAsFixed(1)}° (not limiting while Moon is below horizon)',
             ),
             const SizedBox(height: 8),
             Text(
-              'Calculator: duration ${window.durationPoints}/50 + low Milky Way ${window.lowBandPoints}/50. A two-hour window with all the visible band at 0–30° reaches 100. Band percentage uses Galactic-equator arc length, not brightness or camera framing.',
+              'Calculator: duration ${window.durationPoints}/50 + mean low Milky Way ${window.lowBandPoints}/50. A two-hour window with all the visible band at 0–30° reaches 100. Band percentage averages the interval endpoints by arc length, not brightness or camera framing.',
             ),
+          ],
+          if (previewTime != null) ...[
             const SizedBox(height: 12),
-            if (window.coreAltitude > 0)
-              FilledButton.icon(
-                onPressed: () => widget.onPreview(window.bestTime),
-                icon: const Icon(Icons.landscape),
-                label: const Text('Preview Galactic core'),
-              )
-            else
+            Text('Geometry preview time: ${localTime(previewTime)}'),
+            FilledButton.icon(
+              onPressed: () => widget.onPreview(previewTime),
+              icon: const Icon(Icons.landscape),
+              label: const Text('Preview best geometry'),
+            ),
+            if (night?.score == 0 || adjusted == 0)
               const Text(
-                'Galactic core below horizon; the visible Milky Way band is still rated.',
+                'Geometry preview only; this night still has a zero rating.',
               ),
           ],
           if (window != null || night?.darkness != null) ...[
@@ -617,7 +632,7 @@ class _NightCalendarState extends State<NightCalendar> {
               style: textTheme.bodySmall,
             ),
             const Text(
-              'Hourly predictions, not certainty. Long-range forecasts are tentative. W = astronomy × clear-sky fraction; it is not a probability.',
+              'Hourly predictions, not certainty. Long-range forecasts are tentative. W weights duration by mean clear-sky fraction and band geometry by simultaneous clear-sky fraction; it is not a probability.',
             ),
           ],
           if (weatherError != null)
@@ -671,9 +686,9 @@ class _NightCalendarState extends State<NightCalendar> {
       scrollable: true,
       title: const Text('Night rating & sources'),
       content: const SelectableText(
-        'Each date means that local evening through 01:00 the next day, not the following morning’s entire night.\n\n'
-        'At the same time: Sun ≤ −18°, some visible Milky Way at 0–30°, Moon center ≤ 0°, and Moon–core separation ≥ 30°. The separation threshold and score weights are planning heuristics, not calibrated visibility predictions. Moon phase is shown but not penalized again when the Moon is down.\n\n'
-        'Ten-minute sampling conservatively finds continuous qualifying windows. The longest window wins. A larger percentage of the visible Milky Way at 0–30° elevation and longer duration improve the astronomy score. The percentage uses the Galactic equator as a zero-width band, measured by arc length, not brightness or camera framing. The best sampled time maximizes this percentage before the window endpoint; core altitude neither earns points nor blocks a rating when the core is below the horizon. A means astronomy only; W includes cloud cover for the complete window. Missing data never becomes clear weather or pristine darkness.\n\n'
+        'Each date means that local evening through 01:00 the next day, not the following morning’s entire night. Preview best geometry aims at the visible Galactic equator near 15° elevation (or lower when the band stays low), on the branch nearest your current bearing. It preserves location and lens. Rated windows use their recommended time. Without a qualifying window, preview uses the strongest low band in darkness, then below-horizon Sun, then the sampled evening; it does not change the rating or override sky lighting.\n\n'
+        'At the same time: Sun ≤ −18°, some visible Milky Way at 0–30°, and Moon center ≤ 0°. A below-horizon Moon is not penalized for phase or Moon–core separation; separation is informational only. Moon-above-horizon periods are conservatively excluded, not graded by phase. This uses the airless Moon center, not terrain or refracted upper-limb setting. Score weights are planning heuristics, not calibrated visibility predictions.\n\n'
+        'Ten-minute sampling finds continuous qualifying intervals. All subwindows compete by score, with longer duration breaking ties, then earlier start. Band points use the mean of interval-endpoint percentages, not a single peak. The band is the zero-width Galactic equator measured by arc length, not brightness or camera framing. The recommended time starts the interval with the highest band percentage, weighted by clear sky when weather is complete. Core altitude neither earns points nor blocks ratings. A means astronomy only. W requires cloud data for every eligible interval that night, so unknown intervals are not silently discarded. Missing or partial forecasts keep astronomy-only selection.\n\n'
         'Airless geometric positions: no refraction, terrain horizon, tree/building obstruction, smoke or directional light-dome prediction. Prefer a core above 20–30°, dry transparent air, low wind, no thin cloud, and adequate dew protection.\n\n'
         'Weather: Open-Meteo, CC BY 4.0, free non-commercial API; up to 16 days including today, subject to returned data coverage. https://open-meteo.com/\n\n'
         'Sky brightness: David Lorenz’s 2025 numerical atlas tiles, approximately 1/120° resolution, 65°S–75°N. Modeled annual zenith brightness, not live readings or Bortle classes. https://djlorenz.github.io/astronomy/lp/\n\n'

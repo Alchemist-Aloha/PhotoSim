@@ -9,28 +9,41 @@ beside it. Large text can make the month grid horizontally scrollable.
 Each date means **that local evening until 01:00 the following local day**,
 using the camera location's estimated timezone, not the device timezone.
 Browsing does not change the saved composition or simulation clock. **Preview
-Galactic core** explicitly applies a UTC time inside the selected window, aims
-at the core and opens 3D, preserving the location and lens.
+best geometry** opens 3D for every calculated night, including zero-rated nights.
+It aims at the visible Galactic equator near 15° elevation (or its lower peak
+when the whole arc stays below 15°), choosing the branch nearest the current
+camera bearing. It preserves location and lens and clears the old celestial
+target rather than pointing at the core. Framing the entire arch still depends
+on the chosen lens and foreground.
+
+With an observing window, preview uses its recommended UTC time, including
+weather-aware selection when available. Without a qualifying window, it chooses
+the highest low-band percentage before the cutoff: first among astronomically
+dark samples, then samples with the Sun below the horizon, otherwise the sampled
+last seven hours of the evening. This fallback ignores Moon/weather eligibility
+only for preview and **does not improve the rating or override sky lighting**.
+The preview time and a zero-rating warning are shown. Unsupported local dates or
+failed calculations have no valid geometry preview.
 
 ## Astronomy and scoring
 
 Calculations run locally in an isolate, sampling every ten minutes from local
-noon to the next 01:00. A joint observing window requires all four conditions:
+noon to the next 01:00. A joint observing window requires all three conditions:
 
 - Sun center at or below −18° (astronomical darkness).
 - A nonzero percentage of the visible Milky Way between 0° and 30° elevation.
 - Moon center at or below the horizontal plane.
-- Moon–core angular separation at least 30°.
 
-The longest continuous qualifying window wins; ties prefer a higher low-band
-percentage, then the earlier window. At least two adjacent samples are needed.
-The best sampled time maximizes the percentage of the **visible Milky Way between
-0° and 30° elevation**, before the window endpoint rather than at the 01:00 cutoff.
-The astronomy score is duration / 120 minutes × 50, capped at 50, plus that
-low-band fraction × 50. Both components and the percentage are displayed.
+Every contiguous subwindow competes by score, with longer duration breaking ties,
+then earlier start. At least two adjacent samples are needed. The astronomy score
+is duration / 120 minutes × 50, capped at 50, plus **mean visible Milky Way percentage
+between 0° and 30° × 50**. The mean uses trapezoidal integration: each ten-minute
+interval averages its two endpoint percentages, then intervals are averaged over
+the window. One brief peak no longer earns full band points for a whole night.
+Both components and the mean percentage are displayed. The recommended time starts
+the strongest ten-minute interval, always before the window endpoint.
 Core altitude is diagnostic only: a core below the horizon does not force a zero
-rating. The core-preview button is offered only when the core is above the horizon
-at the best sampled time; otherwise the report explains that the band is still rated.
+rating or disable the geometry preview.
 
 The band is approximated by the zero-width IAU Galactic equator, weighted by arc
 length, not brightness, band area or camera framing. The denominator is its
@@ -41,8 +54,13 @@ when `A > 0.5`, otherwise 1. This analytic calculation avoids discretization
 along the band; time is still sampled every ten minutes. The labels describe
 geometry, not a calibrated probability of a good photograph.
 
-Moon illumination is shown, but receives no extra penalty in a moon-below-horizon
-window. Separation is normally much less important once the Moon has set.
+Moon illumination and minimum Moon–core separation are informational: neither
+reduces the score or rejects a window when the Moon is below the horizon. The
+old 30° separation veto has been removed. Moon-above-horizon samples remain
+conservatively excluded regardless of phase, rather than receiving a graded
+moonlight penalty. The horizon test uses the **airless Moon center at ≤0°**;
+it does not model refraction, upper-limb setting, terrain shielding or lingering
+near-horizon atmospheric glow.
 A long continuous window and darkness help; terrain,
 refraction, smoke, transparency, directional light domes and real sky conditions
 still matter. This is an approximate ten-minute planner, not exact rise/set or
@@ -61,9 +79,18 @@ Celsius and km/h. Hourly cloud cover is interval-weighted over the selected wind
 if no joint window exists, available darkness is used for the weather readout.
 High cloud, visibility, gusts, dew margin and rain probability add context.
 
-**A** means astronomy only. **W** means astronomy × (1 − mean cloud fraction),
-only when cloud values cover the entire interval. Missing/partial weather is
-unknown, never assumed clear. Forecasts do not change illustrative 3D weather
+**A** means astronomy only. **W** uses `clear = 1 − cloud / 100` and scores
+`durationPoints × mean(clear) + 50 × mean(bandFraction × clear)`. Band and clear-sky
+fractions are paired in the same ten-minute intervals, so good geometry during
+cloudy periods cannot borrow clear skies from a different time.
+
+When cloud data covers **every eligible interval that night**, all subwindows are
+ranked by W and the recommended time starts the interval with the highest
+`bandFraction × clear`. The window's astronomy score is shown separately. Missing
+or partial forecasts keep astronomy-only window/time selection and an A label;
+unknown intervals are never discarded to manufacture a weather recommendation.
+Weather summaries still show available coverage. Hourly clouds are weighted by
+their actual overlap with each ten-minute interval. Forecasts do not change illustrative 3D weather
 presets. Long-range predictions are tentative; check again before travelling.
 
 The free endpoint is for **non-commercial use**, subject to its usage limits and
@@ -120,3 +147,23 @@ Removing the core-visibility gate passed 197 tests and static analysis, includin
 real winter nights with below-horizon cores and positive band ratings. The APK
 was rebuilt; native workflows were not rerun for this change. Evidence is under
 `build/validation/band-only-*.log`.
+
+The below-horizon Moon correction passed 199 tests and static analysis; its APK
+was rebuilt. Tests cover all lunar phases, close core separations and sampled
+moonrise/moonset boundaries. Native workflows were not rerun. Evidence is under
+`build/validation/moon-rating-*.log`.
+
+Score-first window selection, interval-averaged band geometry and forecast-aware
+recommendations passed 202 tests, static analysis and the live Linux calendar
+workflow. Desktop month/detail captures were inspected, and the release APK was
+rebuilt. Android native workflows were not rerun. Regressions cover shorter but
+higher-scoring windows, brief geometry peaks, cloudy versus clear subwindows,
+fully cloudy forecasts, partial/missing forecasts and all-clear equivalence.
+Evidence is under `build/validation/window-ranking-*.log`.
+
+The all-night geometry preview passed 207 tests, static analysis and the live
+Linux calendar workflow; the zero-rated desktop view was visually inspected and
+the release APK rebuilt. Tests cover moon-blocked and polar-day zero ratings,
+UTC fallback times, flat/horizon band aiming, root navigation and unchanged
+location/lens. Android native workflows were not rerun. Evidence is under
+`build/validation/geometry-preview-*.log`.

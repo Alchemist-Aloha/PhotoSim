@@ -15,6 +15,7 @@ NightSample sample(
   double lowBand = 1,
   double moon = -10,
   double separation = 90,
+  double illumination = 0.2,
 }) => NightSample(
   utc: utc,
   sunAltitude: sun,
@@ -22,7 +23,7 @@ NightSample sample(
   lowMilkyWayFraction: lowBand,
   moonAltitude: moon,
   moonSeparation: separation,
-  moonIllumination: 0.2,
+  moonIllumination: illumination,
 );
 
 void main() {
@@ -78,8 +79,9 @@ void main() {
     ]);
     expect(night.window!.bestTime, date.add(const Duration(minutes: 10)));
     expect(night.window!.coreAltitude, 5);
-    expect(night.window!.lowMilkyWayFraction, 0.8);
-    expect(night.window!.lowBandPoints, 40);
+    expect(night.window!.lowMilkyWayFraction, 0.9);
+    expect(night.window!.lowBandPoints, 45);
+    expect(night.window!.minutes, 10);
     final tied = rateNight(date, [
       sample(date, core: 80, lowBand: 0.4),
       sample(date.add(const Duration(minutes: 10)), core: 80, lowBand: 0.4),
@@ -88,6 +90,153 @@ void main() {
       sample(date.add(const Duration(minutes: 40)), core: 5, lowBand: 0.8),
     ]);
     expect(tied.window!.start, date.add(const Duration(minutes: 30)));
+  });
+  test(
+    'higher score beats a longer window and band points use interval averages',
+    () {
+      final long = List.generate(
+        19,
+        (i) => sample(date.add(Duration(minutes: i * 10)), lowBand: 1 / 3),
+      );
+      final short = List.generate(
+        13,
+        (i) => sample(date.add(Duration(minutes: 200 + i * 10))),
+      );
+      final chosen = rateNight(date, [
+        ...long,
+        sample(date.add(const Duration(minutes: 190)), moon: 10),
+        ...short,
+      ]);
+      expect(chosen.score, 100);
+      expect(chosen.window!.start, short.first.utc);
+      expect(chosen.window!.minutes, 120);
+      final briefPeak = rateNight(
+        date,
+        List.generate(
+          13,
+          (i) => sample(
+            date.add(Duration(minutes: i * 10)),
+            lowBand: i == 0 ? 1 : 1 / 3,
+          ),
+        ),
+      );
+      expect(briefPeak.score, 68);
+      expect(briefPeak.window!.lowMilkyWayFraction, closeTo(13 / 36, 1e-10));
+      final middlePeak = rateNight(date, [
+        sample(date, lowBand: 0.5),
+        sample(date.add(const Duration(minutes: 10)), lowBand: 1),
+        sample(date.add(const Duration(minutes: 20)), lowBand: 0.5),
+      ]);
+      expect(middlePeak.window!.lowMilkyWayFraction, 0.75);
+      expect(middlePeak.window!.lowBandPoints, 38);
+    },
+  );
+  test(
+    'zero-rated nights retain geometry previews without relaxing the rating',
+    () {
+      for (final sun in [-20.0, -12.0]) {
+        final night = rateNight(date, [
+          sample(date, moon: 20, sun: sun, lowBand: 0.4),
+          sample(
+            date.add(const Duration(minutes: 10)),
+            moon: 20,
+            sun: sun,
+            lowBand: 0.8,
+          ),
+          sample(date.add(const Duration(minutes: 20)), moon: 20, sun: sun),
+        ]);
+        expect(night.score, 0);
+        expect(night.window, isNull);
+        expect(
+          night.geometryPreviewTime,
+          date.add(const Duration(minutes: 10)),
+        );
+        expect(night.geometryPreviewTime!.isUtc, isTrue);
+      }
+      final daylight = rateNight(
+        date,
+        List.generate(
+          79,
+          (i) => sample(
+            date.add(Duration(minutes: i * 10)),
+            sun: 10,
+            lowBand: i < 6 ? 1 : 0.5,
+          ),
+        ),
+      );
+      expect(daylight.score, 0);
+      expect(daylight.geometryPreviewTime, date.add(const Duration(hours: 6)));
+      expect(rateNight(date, []).geometryPreviewTime, isNull);
+      final rated = rateNight(
+        date,
+        List.generate(13, (i) => sample(date.add(Duration(minutes: i * 10)))),
+      );
+      expect(rated.geometryPreviewTime, rated.window!.bestTime);
+    },
+  );
+  test('Milky Way preview aim stays on the visible low band, not the core', () {
+    for (final site in [(37.744, -119.59), (0.0, 0.0), (-60.0, 90.0)]) {
+      for (final hour in [0, 6, 12, 18]) {
+        final frame = ObserverSkyFrame(
+          timestamp: date.add(Duration(hours: hour)),
+          latitude: site.$1,
+          longitude: site.$2,
+        );
+        final pole = frame.direction(192.85948 * radians, 27.12825 * radians);
+        for (final bearing in [0.0, 90.0, 180.0, 270.0]) {
+          final aim = frame.lowMilkyWayAim(bearing);
+          expect(aim.altitude, inInclusiveRange(0, 15.000001));
+          expect(aim.azimuth, inInclusiveRange(0, 360));
+          final vector = Vector3(
+            math.sin(aim.azimuth * radians) * math.cos(aim.altitude * radians),
+            math.sin(aim.altitude * radians),
+            -math.cos(aim.azimuth * radians) * math.cos(aim.altitude * radians),
+          );
+          expect(vector.dot(pole), closeTo(0, 1e-7));
+          final opposite = frame.lowMilkyWayAim((bearing + 180) % 360);
+          final facing = Vector3(
+            math.sin(bearing * radians),
+            0,
+            -math.cos(bearing * radians),
+          );
+          final other = Vector3(
+            math.sin(opposite.azimuth * radians) *
+                math.cos(opposite.altitude * radians),
+            math.sin(opposite.altitude * radians),
+            -math.cos(opposite.azimuth * radians) *
+                math.cos(opposite.altitude * radians),
+          );
+          expect(
+            vector.dot(facing) + 1e-10,
+            greaterThanOrEqualTo(other.dot(facing)),
+          );
+        }
+      }
+    }
+  });
+  test('flat-band preview stays on the horizon or below 15 degrees', () {
+    final polarFrame = ObserverSkyFrame(
+      timestamp: date,
+      latitude: 90,
+      longitude: 0,
+    );
+    final pole = polarFrame.position(192.85948 * radians, 27.12825 * radians);
+    final longitude = (360 - pole.azimuth) % 360 - 180;
+    final horizontal = ObserverSkyFrame(
+      timestamp: date,
+      latitude: pole.altitude,
+      longitude: longitude,
+    );
+    final onHorizon = horizontal.lowMilkyWayAim(123);
+    expect(onHorizon.altitude, closeTo(0, 1e-6));
+    expect(onHorizon.azimuth, closeTo(123, 1e-6));
+    final shallow = ObserverSkyFrame(
+      timestamp: date,
+      latitude: pole.altitude - 5,
+      longitude: longitude,
+    );
+    expect(shallow.lowMilkyWayAim(90).altitude, closeTo(5, 1e-6));
+    expect(() => shallow.lowMilkyWayAim(double.nan), throwsArgumentError);
   });
   test('joint criteria reject independently favorable but non-overlapping conditions', () {
     final night = rateNight(date, [
@@ -109,14 +258,66 @@ void main() {
         sample(date, moon: 1),
         sample(date.add(const Duration(minutes: 10)), moon: 1),
       ],
-      [
-        sample(date, separation: 29),
-        sample(date.add(const Duration(minutes: 10)), separation: 29),
-      ],
     ]) {
       expect(rateNight(date, samples).window, isNull);
     }
   });
+  test(
+    'below-horizon Moon never loses points for phase or core separation',
+    () {
+      for (final moon in [-80.0, -1.0, 0.0]) {
+        for (final separation in [0.0, 29.0, 180.0]) {
+          for (final illumination in [0.0, 0.5, 1.0]) {
+            final night = rateNight(
+              date,
+              List.generate(
+                13,
+                (i) => sample(
+                  date.add(Duration(minutes: i * 10)),
+                  moon: moon,
+                  separation: separation,
+                  illumination: illumination,
+                ),
+              ),
+            );
+            expect(night.score, 100);
+            expect(night.window!.minutes, 120);
+            expect(night.window!.moonSeparation, separation);
+            expect(night.window!.moonIllumination, illumination);
+          }
+        }
+      }
+    },
+  );
+  test(
+    'Moon rise and set bound the window; above-horizon Moon remains excluded',
+    () {
+      final night = rateNight(date, [
+        sample(date, moon: 0.01, separation: 0),
+        sample(date.add(const Duration(minutes: 10)), moon: 0, separation: 0),
+        sample(date.add(const Duration(minutes: 20)), moon: -1, separation: 0),
+        sample(
+          date.add(const Duration(minutes: 30)),
+          moon: 0.01,
+          separation: 0,
+        ),
+      ]);
+      expect(night.window!.start, date.add(const Duration(minutes: 10)));
+      expect(night.window!.end, date.add(const Duration(minutes: 20)));
+      for (final illumination in [0.0, 0.5, 1.0]) {
+        final above = rateNight(date, [
+          sample(date, moon: 0.01, illumination: illumination),
+          sample(
+            date.add(const Duration(minutes: 10)),
+            moon: 0.01,
+            illumination: illumination,
+          ),
+        ]);
+        expect(above.score, 0);
+        expect(above.reason, contains('Moon above the horizon'));
+      }
+    },
+  );
   test('duration and low-band points are bounded and missing intervals never bridge', () {
     final samples = List.generate(
       13,
@@ -188,8 +389,20 @@ void main() {
         latitude: 37.744,
         longitude: -119.59,
       ).time!;
-      expect(end.day, night.date.day + 1);
-      expect(end.hour, 1);
+      final cutoff = DateTime.utc(
+        night.date.year,
+        night.date.month,
+        night.date.day + 1,
+        1,
+      );
+      final wallEnd = DateTime.utc(
+        end.year,
+        end.month,
+        end.day,
+        end.hour,
+        end.minute,
+      );
+      expect(wallEnd.isAfter(cutoff), isFalse);
       for (
         var utc = window.start;
         utc.isBefore(window.end);

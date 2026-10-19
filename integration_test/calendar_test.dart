@@ -112,7 +112,7 @@ void main() {
       ) {
         await tester.pump(const Duration(milliseconds: 200));
       }
-      expect(find.text('Preview Galactic core'), findsOneWidget);
+      expect(find.text('Preview best geometry'), findsOneWidget);
       await capture('linux-calendar-detail');
       await tester.tap(find.text('Map'));
       await settle();

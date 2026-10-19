@@ -144,6 +144,34 @@ class ObserverSkyFrame {
     return amplitude <= 0.5 ? 1 : 2 * math.asin(0.5 / amplitude) / math.pi;
   }
 
+  /// Aim at the Galactic equator near 15° elevation, choosing the nearer bearing.
+  ({double azimuth, double altitude}) lowMilkyWayAim(double preferredAzimuth) {
+    if (!preferredAzimuth.isFinite) {
+      throw ArgumentError('Invalid preview bearing');
+    }
+    final pole = direction(192.85948 * radians, 27.12825 * radians);
+    final amplitude = math.sqrt(pole.x * pole.x + pole.z * pole.z);
+    final forward = Vector3(
+      math.sin(preferredAzimuth * radians),
+      0,
+      -math.cos(preferredAzimuth * radians),
+    );
+    var aim = forward;
+    if (amplitude > 1e-12) {
+      final up = math.min(math.sin(15 * radians), amplitude);
+      final along = -pole.y * up / amplitude;
+      final across = math.sqrt(math.max(0.0, 1 - up * up - along * along));
+      final x = pole.x / amplitude, z = pole.z / amplitude;
+      final a = Vector3(along * x + across * z, up, along * z - across * x);
+      final b = Vector3(along * x - across * z, up, along * z + across * x);
+      aim = a.dot(forward) >= b.dot(forward) ? a : b;
+    }
+    return (
+      azimuth: math.atan2(aim.x, -aim.z) / radians % 360,
+      altitude: math.asin(aim.y.clamp(-1.0, 1.0)) / radians,
+    );
+  }
+
   /// ICRS position of Sgr A*; not exactly the IAU Galactic-coordinate origin.
   CelestialPosition get galacticCenter =>
       position(266.4051 * radians, -28.936175 * radians);

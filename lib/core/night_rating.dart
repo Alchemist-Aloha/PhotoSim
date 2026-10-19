@@ -8,7 +8,6 @@ import 'local_time.dart';
 import 'night_sky.dart';
 
 const nightSampleMinutes = 10;
-const minimumMoonCoreSeparation = 30.0;
 
 class NightSample {
   const NightSample({
@@ -29,8 +28,7 @@ class NightSample {
       moonIllumination;
   bool get dark => sunAltitude <= -18;
   bool get lowBandVisible => dark && lowMilkyWayFraction > 0;
-  bool get moonDown => lowBandVisible && moonAltitude <= 0;
-  bool get usable => moonDown && moonSeparation >= minimumMoonCoreSeparation;
+  bool get usable => lowBandVisible && moonAltitude <= 0;
 }
 
 class NightWindow {
@@ -60,84 +58,149 @@ class NightRating {
     this.reason, {
     this.window,
     this.darkness,
+    this.samples = const [],
+    this.weatherScore,
   });
   final DateTime date;
   final int? score;
   final String reason;
   final NightWindow? window;
   final ({DateTime start, DateTime end})? darkness;
+  final List<NightSample> samples;
+  final int? weatherScore;
+
+  DateTime? get geometryPreviewTime {
+    if (window != null) return window!.bestTime;
+    final beforeCutoff = samples.take(math.max(0, samples.length - 1)).toList();
+    if (beforeCutoff.isEmpty) return null;
+    var candidates = beforeCutoff.where((s) => s.dark).toList();
+    if (candidates.isEmpty) {
+      candidates = beforeCutoff.where((s) => s.sunAltitude <= 0).toList();
+    }
+    if (candidates.isEmpty) {
+      final evening = samples.last.utc.subtract(const Duration(hours: 7));
+      candidates = beforeCutoff.where((s) => !s.utc.isBefore(evening)).toList();
+      if (candidates.isEmpty) candidates = [beforeCutoff.last];
+    }
+    return candidates
+        .reduce(
+          (a, b) => a.lowMilkyWayFraction >= b.lowMilkyWayFraction ? a : b,
+        )
+        .utc;
+  }
 }
 
-/// A conservative joint window: both ends of each 10-minute interval must qualify.
-NightRating rateNight(DateTime date, List<NightSample> samples) {
-  NightWindow? best;
-  var run = <NightSample>[];
-  void finishRun() {
-    if (run.length >= 2) {
-      final peak = run
-          .take(run.length - 1)
-          .reduce(
-            (a, b) => a.lowMilkyWayFraction >= b.lowMilkyWayFraction ? a : b,
-          );
-      final window = NightWindow(
-        start: run.first.utc,
-        end: run.last.utc,
-        bestTime: peak.utc,
-        coreAltitude: peak.coreAltitude,
-        lowMilkyWayFraction: peak.lowMilkyWayFraction,
-        moonSeparation: run.map((s) => s.moonSeparation).reduce(math.min),
-        moonIllumination: peak.moonIllumination,
-      );
-      if (best == null ||
-          window.minutes > best!.minutes ||
-          (window.minutes == best!.minutes &&
-              window.lowMilkyWayFraction > best!.lowMilkyWayFraction)) {
-        best = window;
-      }
-    }
-    run = [];
+/// Compare all contiguous sampled intervals; incomplete weather stays astronomy-only.
+NightRating rateNight(
+  DateTime date,
+  List<NightSample> samples, {
+  double? Function(DateTime start, DateTime end)? clearFraction,
+}) {
+  final bands = <double>[], clears = <double>[];
+  var completeWeather = clearFraction != null;
+  for (var i = 0; i + 1 < samples.length; i++) {
+    final a = samples[i], b = samples[i + 1];
+    final usable =
+        a.usable &&
+        b.usable &&
+        b.utc.difference(a.utc) == const Duration(minutes: nightSampleMinutes);
+    bands.add(
+      usable
+          ? ((a.lowMilkyWayFraction + b.lowMilkyWayFraction) / 2).clamp(
+              0.0,
+              1.0,
+            )
+          : -1,
+    );
+    final clear = usable ? clearFraction?.call(a.utc, b.utc) : null;
+    if (usable && clear == null) completeWeather = false;
+    clears.add(clear?.clamp(0.0, 1.0) ?? 0);
   }
 
-  for (final sample in samples) {
-    if (!sample.usable ||
-        (run.isNotEmpty &&
-            sample.utc.difference(run.last.utc) !=
-                const Duration(minutes: nightSampleMinutes))) {
-      finishRun();
+  var bestStart = -1, bestEnd = -1, bestTime = -1;
+  var bestScore = -1, bestMinutes = -1, bestAstronomy = 0;
+  var bestBand = 0.0;
+  for (var i = 0; i < bands.length; i++) {
+    var sumBand = 0.0, sumClear = 0.0, sumBandClear = 0.0;
+    var peak = -1.0, peakIndex = i;
+    for (var j = i; j < bands.length && bands[j] >= 0; j++) {
+      sumBand += bands[j];
+      sumClear += clears[j];
+      sumBandClear += bands[j] * clears[j];
+      final quality = bands[j] * (completeWeather ? clears[j] : 1);
+      if (quality > peak) {
+        peak = quality;
+        peakIndex = j;
+      }
+      final count = j - i + 1;
+      final minutes = count * nightSampleMinutes;
+      final durationPoints = (50 * (minutes / 120).clamp(0, 1)).round();
+      final meanBand = sumBand / count;
+      final astronomy = durationPoints + (50 * meanBand).round();
+      final score = completeWeather
+          ? (durationPoints * sumClear / count + 50 * sumBandClear / count)
+                .round()
+          : astronomy;
+      if (score > bestScore || (score == bestScore && minutes > bestMinutes)) {
+        bestStart = i;
+        bestEnd = j + 1;
+        bestTime = peakIndex;
+        bestScore = score;
+        bestMinutes = minutes;
+        bestAstronomy = astronomy;
+        bestBand = meanBand;
+      }
     }
-    if (sample.usable) run.add(sample);
   }
-  finishRun();
-  final window = best;
+
   final dark = samples.where((sample) => sample.dark).toList();
   final darkness = dark.length >= 2
       ? (start: dark.first.utc, end: dark.last.utc)
       : null;
-  if (window == null) {
+  final savedSamples = List<NightSample>.unmodifiable(samples);
+  if (bestStart < 0) {
     final reason = !samples.any((s) => s.dark)
         ? 'No astronomical darkness before 01:00'
         : !samples.any((s) => s.lowBandVisible)
         ? 'No visible Milky Way between 0° and 30°'
-        : !samples.any((s) => s.moonDown)
-        ? 'Moon above the horizon during low Milky Way visibility'
         : !samples.any((s) => s.usable)
-        ? 'Moon less than 30° from the Galactic core'
+        ? 'Moon above the horizon during low Milky Way visibility'
         : 'No continuous 10-minute observing window';
-    return NightRating(date, 0, reason, darkness: darkness);
+    return NightRating(
+      date,
+      0,
+      reason,
+      darkness: darkness,
+      samples: savedSamples,
+    );
   }
-  final score = window.durationPoints + window.lowBandPoints;
+  final peak = samples[bestTime];
+  final window = NightWindow(
+    start: samples[bestStart].utc,
+    end: samples[bestEnd].utc,
+    bestTime: peak.utc,
+    coreAltitude: peak.coreAltitude,
+    lowMilkyWayFraction: bestBand,
+    moonSeparation: samples
+        .sublist(bestStart, bestEnd + 1)
+        .map((s) => s.moonSeparation)
+        .reduce(math.min),
+    moonIllumination: peak.moonIllumination,
+  );
   return NightRating(
     date,
-    score,
-    score >= 85
+    bestAstronomy,
+    bestAstronomy >= 85
         ? 'Excellent geometry'
-        : score >= 65
+        : bestAstronomy >= 65
         ? 'Good geometry'
-        : score >= 35
+        : bestAstronomy >= 35
         ? 'Limited window'
         : 'Poor geometry',
     window: window,
     darkness: darkness,
+    samples: savedSamples,
+    weatherScore: completeWeather ? bestScore : null,
   );
 }
 

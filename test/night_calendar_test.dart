@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:photosim/app/app.dart';
+import 'package:photosim/core/night_sky.dart';
 import 'package:photosim/data/night_conditions.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
@@ -96,14 +97,14 @@ void main() {
       expect(find.byType(GridView), findsNothing);
       expect(find.byType(ListTile), findsNWidgets(7));
       expect(calls, 2);
-      await tester.ensureVisible(find.text('Preview Galactic core'));
-      await tester.tap(find.text('Preview Galactic core'));
+      await tester.ensureVisible(find.text('Preview best geometry'));
+      await tester.tap(find.text('Preview best geometry'));
       expect(preview, isNotNull);
       expect(preview!.isUtc, isTrue);
       expect(find.textContaining('Modeled zenith: 22.00'), findsOneWidget);
       expect(find.textContaining('Weather-adjusted:'), findsOneWidget);
       expect(
-        find.textContaining('Visible Milky Way at 0–30°:'),
+        find.textContaining('Mean visible Milky Way at 0–30°:'),
         findsOneWidget,
       );
       expect(find.textContaining('low Milky Way'), findsOneWidget);
@@ -173,7 +174,14 @@ void main() {
           .state;
       expect(preview.timestamp, desired);
       expect(preview.timestamp.isUtc, isTrue);
-      expect(preview.target, CelestialTarget.galacticCenter);
+      expect(preview.target, CelestialTarget.none);
+      final aim = ObserverSkyFrame(
+        timestamp: desired,
+        latitude: before.latitude,
+        longitude: before.longitude,
+      ).lowMilkyWayAim(before.azimuth);
+      expect(preview.azimuth, closeTo(aim.azimuth, 1e-8));
+      expect(preview.pitch, closeTo(aim.altitude, 1e-8));
       expect(preview.focalLength, before.focalLength);
       expect(preview.location, before.location);
       expect(
@@ -186,6 +194,53 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final state in [
+    SimulationState(timestamp: DateTime.utc(2026, 10, 20, 5)),
+    SimulationState(
+      timestamp: DateTime.utc(2026, 6, 15, 20),
+      latitude: 69.65,
+      longitude: 18.95,
+    ),
+  ]) {
+    testWidgets(
+      'zero-rated night has an actionable geometry preview at ${state.latitude}',
+      (tester) async {
+        final client = MockClient(
+          (_) async => http.Response('Unavailable', 404),
+        );
+        addTearDown(client.close);
+        DateTime? preview;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: NightCalendar(
+                state: state,
+                weekView: true,
+                repository: NightConditionsRepository(
+                  client,
+                  now: () => DateTime.utc(2030),
+                ),
+                onPreview: (utc) => preview = utc,
+              ),
+            ),
+          ),
+        );
+        await settleCalendar(tester);
+        expect(find.textContaining('Astronomy: 0/100'), findsOneWidget);
+        expect(
+          find.textContaining('this night still has a zero rating'),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(find.text('Preview best geometry'));
+        await tester.tap(find.text('Preview best geometry'));
+        expect(preview, isNotNull);
+        expect(preview!.isUtc, isTrue);
+        await tester.pumpWidget(const SizedBox());
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'below-horizon core keeps a band rating; distant weather and failed atlas remain unknown',
@@ -213,13 +268,9 @@ void main() {
       );
       await settleCalendar(tester);
       expect(weatherCalls, 0);
+      expect(find.text('Preview best geometry'), findsOneWidget);
       expect(
-        find.textContaining('the visible Milky Way band is still rated'),
-        findsOneWidget,
-      );
-      expect(find.text('Preview Galactic core'), findsNothing);
-      expect(
-        find.textContaining('Visible Milky Way at 0–30°:'),
+        find.textContaining('Mean visible Milky Way at 0–30°:'),
         findsOneWidget,
       );
       expect(find.textContaining('Astronomy: 0/100'), findsNothing);
