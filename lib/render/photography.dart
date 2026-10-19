@@ -53,7 +53,10 @@ void configurePhotography(scene.Scene world, SimulationState state) {
   final brightness = ((state.sky.sun.altitude + 18) / 33).clamp(0.02, 1.0);
   world.fog
     ..enabled =
-        state.weather != Weather.clear || state.weatherVisibilityKm < 100
+        state.relitImagery ||
+        state.weather != Weather.clear ||
+        state.weatherVisibilityKm < 100
+    ..skyColorInfluence = state.relitImagery ? 1 : 0
     ..mode = scene.FogMode.exponential
     ..density = scene.Fog.visibilityDensity(state.weatherVisibilityKm * 1000)
     ..color = vm.Vector3(0.42, 0.46, 0.50) * brightness;

@@ -358,10 +358,12 @@ void main() {
       world.directionalLight!.direction.y,
       closeTo(-camera().sky.moon.direction.y, 1e-6),
     );
-    expect(world.environmentIntensity, closeTo(0.04, 1e-12));
+    expect(world.environmentIntensity, 1);
+    expect(world.skyEnvironment!.source, same(skySource));
+    expect(world.fog.skyColorInfluence, 1);
     expect(skySource.sunDirection.y, lessThan(0));
     await capture('linux-solar-night');
-    // Isolate ambient fill from moonlight: it lifts terrain, not the sky.
+    // A black night sky supplies no invented ambient floor; moonlight is separate.
     final ambient = world.environmentIntensity;
     final lunarIntensity = world.directionalLight!.intensity;
     world.directionalLight!.intensity = 0;
@@ -370,7 +372,7 @@ void main() {
     world.environmentIntensity = 0;
     await tester.pump(const Duration(milliseconds: 300));
     final unfilledTerrain = await viewportBrightness(tester, captureKey);
-    expect(filledTerrain, greaterThan(unfilledTerrain + 1));
+    expect(filledTerrain, closeTo(unfilledTerrain, 0.2));
     expect(filledTerrain, lessThan(dayBrightness * 0.25));
     for (final node in texturedMeshes) {
       node.visible = false;

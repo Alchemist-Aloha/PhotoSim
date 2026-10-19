@@ -7,6 +7,7 @@ import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 import '../core/astronomy.dart';
 import '../core/geo.dart';
+import 'celestial_material.dart';
 
 /// Approximate appearance, deliberately not calibrated irradiance/exposure.
 double moonlightIntensity(SkyState sky) =>
@@ -24,8 +25,9 @@ Float32List moonColors(Float32List normals, Vector3 lightDirection) {
           normals[i * 3 + 1] * lightDirection.y +
           normals[i * 3 + 2] * lightDirection.z,
     );
-    colors[i * 4] = colors[i * 4 + 1] = colors[i * 4 + 2] = light;
-    colors[i * 4 + 3] = 1;
+    // Fade into the sky instead of painting the unlit hemisphere black.
+    colors[i * 4] = colors[i * 4 + 1] = colors[i * 4 + 2] = 1;
+    colors[i * 4 + 3] = light;
   }
   return colors;
 }
@@ -44,7 +46,10 @@ class MoonRenderer {
     normals = data.normals!;
     node = scene.Node(
       name: 'Moon',
-      mesh: scene.Mesh(geometry, scene.UnlitMaterial()),
+      mesh: scene.Mesh(
+        geometry,
+        CelestialMaterial()..alphaMode = scene.AlphaMode.blend,
+      ),
     )..shadowCastingMode = scene.ShadowCastingMode.off;
   }
 

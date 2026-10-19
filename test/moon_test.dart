@@ -19,7 +19,7 @@ SkyState sky(
 
 void main() {
   test(
-    'Lambert normals give illuminated and dark hemispheres with opaque alpha',
+    'Lambert illumination masks the dark hemisphere without black shading',
     () {
       final normals = Float32List.fromList([
         0,
@@ -40,25 +40,25 @@ void main() {
         1,
         1,
         1,
-        0,
-        0,
-        0,
+        1,
+        1,
         1,
         0,
-        0,
-        0,
+        1,
+        1,
         1,
         0,
-        0,
-        0,
         1,
+        1,
+        1,
+        0,
       ]);
       final crescent = moonColors(normals, Vector3(1, 0, -1).normalized());
-      expect(crescent[0], 0);
-      expect(crescent[4], closeTo(1 / math.sqrt(2), 1e-7));
+      expect(crescent[3], 0);
+      expect(crescent[7], closeTo(1 / math.sqrt(2), 1e-7));
       final tilted = moonColors(normals, Vector3(0, 1, 0));
-      expect(tilted[4], 0);
-      expect(tilted[8], 1);
+      expect(tilted[7], 0);
+      expect(tilted[11], 1);
     },
   );
 
@@ -86,7 +86,7 @@ void main() {
               yy,
               math.sqrt(1 - xx * xx - yy * yy),
             ]);
-            if (moonColors(normal, light)[0] > 1e-6) lit++;
+            if (moonColors(normal, light)[3] > 1e-6) lit++;
             count++;
           }
         }

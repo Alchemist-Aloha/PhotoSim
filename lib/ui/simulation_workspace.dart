@@ -197,6 +197,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   void didUpdateWidget(covariant SimulationWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
     final old = oldWidget.state, next = widget.state;
+    if (old.timestamp != next.timestamp ||
+        old.location != next.location ||
+        old.weather != next.weather ||
+        old.weatherLightTransmission != next.weatherLightTransmission ||
+        old.renderQuality != next.renderQuality) {
+      world?.skyEnvironment?.invalidate();
+    }
     if (old.latitude != next.latitude ||
         old.longitude != next.longitude ||
         old.terrainRings != next.terrainRings ||
@@ -776,13 +783,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       sun.direction.z,
     );
     final solarLight = sunlight(sun.altitude);
-    final twilight = ((sun.altitude + 18) / 18).clamp(0.0, 1.0);
+    // Do not retain baked daylight after jumping across the solar horizon.
+    if ((skySource!.sunDirection.y > 0) != (sunDirection.y > 0)) {
+      active.skyEnvironment = null;
+    }
     skySource!
       ..sunDirection = sunDirection
-      ..sunAngularRadius = sun.angularRadius;
-    // shortcut: artistic ambient fill, use calibrated radiometry for exposure simulation.
-    // Keep night terrain distinguishable from the sky without adding directional shadows.
-    active.environmentIntensity = 0.04 + 0.21 * twilight;
+      ..sunAngularRadius = sun.angularRadius
+      ..energy = state.weatherLightTransmission;
+    active.environmentIntensity = 1;
     final transmission = state.weatherLightTransmission;
     moonRenderer!.node.visible = state.weather == Weather.clear;
     if (state.weather == Weather.clear) {
@@ -790,16 +799,29 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         active.skybox = scene.Skybox(skySource!);
       }
     } else {
-      final brightness = ((sun.altitude + 18) / 33).clamp(0.02, 1.0);
+      final brightness =
+          ((sun.altitude + 18) / 33).clamp(0.0, 1.0) * transmission;
       overcastSky!
         ..sunColor = vm.Vector3.zero()
         ..zenithColor = vm.Vector3(0.22, 0.25, 0.29) * brightness
-        ..horizonColor = active.fog.color
-        ..groundColor = active.fog.color;
+        ..horizonColor = vm.Vector3(0.42, 0.46, 0.50) * brightness
+        ..groundColor = vm.Vector3(0.12, 0.13, 0.14) * brightness;
       if (active.skybox?.source != overcastSky) {
         active.skybox = scene.Skybox(overcastSky!);
       }
     }
+    final lightingSky = active.skybox!.source as scene.ShaderSkySource;
+    if (!identical(active.skyEnvironment?.source, lightingSky)) {
+      active.skyEnvironment = scene.SkyEnvironment(lightingSky);
+    }
+    final faceResolution = switch (state.renderQuality) {
+      RenderQuality.performance => 32,
+      RenderQuality.balanced => 64,
+      RenderQuality.high => 128,
+    };
+    active.skyEnvironment!
+      ..faceResolution = faceResolution
+      ..equirectWidth = faceResolution * 4;
     final moon = sky.moon.direction;
     // The one shadow-casting light follows the Moon once the Sun is below horizontal.
     active.directionalLight!

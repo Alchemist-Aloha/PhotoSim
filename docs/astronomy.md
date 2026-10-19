@@ -139,14 +139,27 @@ This gives a bluer clear sky with less washed-out aerosol glow. The built-in sky
 shader applies view-path extinction to the actual angular-size solar disk.
 Sun/Moon positions, geometry and geographic resources are unchanged.
 
-Ambient intensity ramps between 0.04 at −18°
-and 0.25 at 0°. The dim, shadowless night floor keeps lit/fallback and approximately
-relit terrain distinguishable from the dark sky, even without moonlight. It does
-not brighten the sky or unlit celestial objects; natural imagery still retains
-its captured lighting. These are approximate clear-sky appearance controls, **not
-calibrated irradiance, exposure or weather simulation**. The built-in sky
-model goes black below the solar horizon; only ambient terrain lighting has
-a twilight ramp. Stars and a simplified Milky Way brightness map are rendered
+The visible sky also drives diffuse irradiance and rough specular lighting through
+Flutter Scene's `SkyEnvironment`, replacing the uniform ambient fill. The sky is
+baked once, then invalidated by time, location, weather, transmission or quality
+changes; subsequent bakes advance one GPU pass per frame. Cube faces are 32/64/128
+pixels for performance/balanced/high quality. Lighting can lag the visible sky by
+a bake cycle during scrubbing; crossing the solar horizon resets the binding
+immediately to avoid stale daylight at night. The environment intensity stays at 1 so horizon
+radiance used for haze matches the visible sky.
+
+Approximately relit terrain receives exponential aerial perspective, including in
+clear weather, using the existing visibility setting (100 km by default). Its fog
+color samples the sky in the view direction, so distant ridges converge toward the
+actual horizon rather than uniform gray. Natural imagery retains its captured
+lighting and original clear-weather colors; its explicit weather fog still uses
+the flat fallback color. Celestial proxy meshes exclude terrestrial distance fog
+but retain exposure, tone mapping and terrain occlusion.
+
+These are approximate appearance controls, **not calibrated irradiance, exposure
+or weather simulation**. The built-in clear sky goes black below the solar horizon;
+there is no artificial ambient night floor or physically modeled twilight scattering.
+Moonlight remains a separate directional light. Stars and a simplified Milky Way brightness map are rendered
 by the separate [night-sky module](data-sources/night-sky.md), with their own
 solar/lunar visibility approximation.
 
@@ -157,10 +170,19 @@ geographic reloads. Captures: `linux-{sunrise,sunset,sun-day,blue-sky}.png` and
 `linux-aa-{off,fxaa}.png` in `build/validation/`. These are isolated rendering
 fixtures, not photometric reference measurements.
 
+`integration_test/atmosphere_test.dart` checks actual GPU pixel differences with
+haze and sky lighting enabled/disabled, celestial fog exclusion, sky rebaking,
+quality changes and unchanged terrain resources. It passed on Linux and an Android
+host-GPU emulator. Local SwiftShader/lavapipe emulator processes crashed
+(SIGSEGV/SIGILL); software-emulator compatibility and physical-device performance
+remain unverified.
+
 `lib/render/moon.dart` renders a 128-segment, 64-ring untextured lunar sphere,
 rescaled to 30 km with radius `distance × sin(angularRadius)` to preserve its
 apparent size. Observer-derived Moon-to-Sun direction drives Lambertian vertex
-colors, so the terminator and bright-limb orientation follow astronomical geometry.
+alpha coverage on white vertices, so the terminator and bright-limb orientation
+follow astronomical geometry while the unlit hemisphere reveals the sky instead
+of drawing a black disk.
 Only colors update when illumination changes; geometry stays resident. It is unlit
 by scene lights and does not cast an artificial nearby-object shadow.
 
@@ -169,7 +191,8 @@ Scene's +Z-forward camera handedness with a horizontal flip, preserving east/wes
 and the Moon's bright-limb orientation. Camera/terrain coordinates remain unchanged.
 Occlusion is limited to loaded terrain, not a complete Earth/terrain horizon model.
 No albedo map, craters, libration, earthshine or atmospheric lunar scattering is
-modeled; especially near the Sun, the dark hemisphere can appear too conspicuous.
+modeled. This transparent-phase approximation also reveals background stars
+through the unlit hemisphere rather than modeling lunar occultation.
 
 Below solar center altitude 0°, the existing shadow-casting light switches to
 lunar direction. Its intensity is `0.03 × illumination² × max(0, sin(moonAltitude))`

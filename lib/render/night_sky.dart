@@ -12,6 +12,7 @@ import 'package:vector_math/vector_math_64.dart' show Vector3;
 import '../core/geo.dart';
 import '../core/night_sky.dart';
 import '../models/simulation_state.dart';
+import 'celestial_material.dart';
 
 ({Float32List positions, Float32List colors, List<int> indices}) starMesh(
   List<Star> stars,
@@ -90,8 +91,8 @@ class NightSkyRenderer {
       colors: data.colors,
       indices: data.indices,
     );
-    starMaterial = scene.UnlitMaterial();
-    bandMaterial = scene.UnlitMaterial(colorTexture: milkyWay)
+    starMaterial = CelestialMaterial();
+    bandMaterial = CelestialMaterial(colorTexture: milkyWay)
       ..alphaMode = scene.AlphaMode.blend;
     starNode = scene.Node(
       name: 'Stars',
@@ -105,7 +106,7 @@ class NightSkyRenderer {
       name: 'Galactic center',
       mesh: scene.Mesh(
         scene.SphereGeometry(radius: 100, segments: 16, rings: 8),
-        scene.UnlitMaterial()..baseColorFactor = vm.Vector4(0.65, 0.3, 1, 1),
+        CelestialMaterial()..baseColorFactor = vm.Vector4(0.65, 0.3, 1, 1),
       ),
     )..shadowCastingMode = scene.ShadowCastingMode.off;
     final center = Star(

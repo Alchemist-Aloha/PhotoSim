@@ -71,7 +71,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Click the 3D preview and hold WASD to move at 30 m/s; the camera climbs/descends with terrain while keeping its height offset.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
 - Phase-lit Moon at its calculated position and angular size, with terrain occlusion.
-- UTC-driven Sun/Moon lighting, cascaded terrain shadows and approximate clear sky.
+- UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain.
 - Bluer clear skies and air-mass extinction for dimmer, redder sunrise/sunset.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.

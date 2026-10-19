@@ -54,7 +54,9 @@ requirements separately from excluded platform work.
   illumination and waxing/waning readouts shared by both workspaces.
 - UTC-driven directional sunlight and shadows, clear-air RGB air-mass extinction
   for dimmer/redder low Sun, bluer Rayleigh clear sky with reduced aerosol glow,
-  and approximate ambient fill. Astronomy/geometry remain unchanged.
+  sky-driven indirect lighting and sky-colored distance haze on approximately
+  relit terrain. Natural imagery is preserved; celestial proxies bypass terrestrial
+  fog without bypassing exposure or terrain occlusion. Astronomy/geometry remain unchanged.
 - Explicit FXAA (default), MSAA 4× with capability fallback, Off and quality-driven
   Auto controls in Rendering; persisted in plans without geographic reloads.
 - Resolved untextured Moon sphere with correct apparent size, phase and limb

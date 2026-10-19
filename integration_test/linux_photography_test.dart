@@ -154,6 +154,8 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
         expect(state.weather, weather);
         expect(world.fog.enabled, weather != Weather.clear);
+        expect(world.skyEnvironment!.source, same(world.skybox!.source));
+        expect(world.fog.skyColorInfluence, 0);
         expect(
           find.byType(RainOverlay),
           weather == Weather.rain ? findsOneWidget : findsNothing,

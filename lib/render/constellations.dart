@@ -7,6 +7,7 @@ import 'package:vector_math/vector_math.dart' as vm;
 
 import '../core/constellations.dart';
 import '../models/simulation_state.dart';
+import 'celestial_material.dart';
 
 class ConstellationRenderer {
   ConstellationRenderer._(this.catalog, scene.Texture2D atlas) {
@@ -18,7 +19,7 @@ class ConstellationRenderer {
           positions: data.positions,
           indices: data.indices,
         ),
-        scene.UnlitMaterial()
+        CelestialMaterial()
           ..alphaMode = scene.AlphaMode.blend
           ..baseColorFactor = vm.Vector4(0.3, 0.65, 1, 0.45),
       ),
