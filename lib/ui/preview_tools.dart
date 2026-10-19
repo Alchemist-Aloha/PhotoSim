@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 class PreviewTools extends StatelessWidget {
   const PreviewTools({
     super.key,
-    required this.onTerrain,
     required this.onConstellations,
     required this.constellations,
     this.onExport,
   });
-  final VoidCallback onTerrain, onConstellations;
+  final VoidCallback onConstellations;
   final VoidCallback? onExport;
   final bool constellations;
 
@@ -18,7 +17,6 @@ class PreviewTools extends StatelessWidget {
     tooltip: 'Preview tools',
     icon: const Icon(Icons.more_horiz),
     itemBuilder: (_) => [
-      const PopupMenuItem(value: 0, child: Text('Terrain range')),
       CheckedPopupMenuItem(
         value: 1,
         checked: constellations,
@@ -32,8 +30,6 @@ class PreviewTools extends StatelessWidget {
     ],
     onSelected: (value) {
       switch (value) {
-        case 0:
-          onTerrain();
         case 1:
           onConstellations();
         case 2:

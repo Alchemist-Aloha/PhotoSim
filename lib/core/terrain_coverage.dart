@@ -8,6 +8,33 @@ import 'terrain_geo.dart';
 
 const terrainTileBudget = 256;
 
+/// Nominal circular envelope: nearby tile corners or the requested forward reach.
+/// Coarse forward tiles can extend beyond it; this is not an exact fetch boundary.
+double approximateTerrainLoadingRadius(SimulationState state) {
+  final camera = TileId.coordinates(state.location, 13);
+  final x = camera.x - camera.x.floor(), y = camera.y - camera.y.floor();
+  final dx = state.terrainRings + math.max(x, 1 - x);
+  final dy = state.terrainRings + math.max(y, 1 - y);
+  final tileMeters =
+      2 * math.pi * 6378137 / 8192 * math.cos(state.latitude * radians);
+  return math.max(
+    math.sqrt(dx * dx + dy * dy) * tileMeters,
+    state.terrainForwardKm * 1000,
+  );
+}
+
+List<LatLng> terrainLoadingCircle(SimulationState state) {
+  final radius = approximateTerrainLoadingRadius(state);
+  final points = List.generate(96, (i) {
+    final point = destination(state.location, i * 360 / 96, radius);
+    // Keep the circle continuous when it crosses the date line.
+    final longitude =
+        state.longitude + (point.longitude - state.longitude + 540) % 360 - 180;
+    return LatLng(point.latitude, longitude);
+  });
+  return [...points, points.first];
+}
+
 /// Nearby z13 rings plus the horizontal envelope of the pitched optical frustum.
 List<TileId> terrainCoverage(SimulationState state) {
   final center = TileId.at(state.location);

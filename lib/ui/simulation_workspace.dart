@@ -18,7 +18,6 @@ import '../render/constellations.dart';
 import '../core/night_sky.dart';
 import '../core/terrain_geo.dart';
 import '../core/terrain_coverage.dart';
-import 'terrain_range_dialog.dart';
 import '../data/imagery/imagery_provider.dart';
 import '../data/imagery/imagery_sources.dart';
 import '../data/terrain/terrain_provider.dart';
@@ -216,7 +215,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         }
       } else {
         coverageDebounce?.cancel();
-        if (nightRenderer != null) unawaited(loadTerrain());
+        if (old.location == next.location) {
+          coverageDebounce = Timer(const Duration(milliseconds: 400), () {
+            if (mounted && nightRenderer != null) unawaited(loadTerrain());
+          });
+        } else if (nightRenderer != null) {
+          unawaited(loadTerrain());
+        }
       }
     } else if (next.terrainForwardKm > 0 &&
         (old.azimuth != next.azimuth ||
@@ -269,22 +274,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           terrainDistance(patch.id, widget.state.location) <=
           widget.state.terrainRenderKm * 1000;
     }
-  }
-
-  Future<void> showTerrainRange() async {
-    final range =
-        await showDialog<({int rings, double forwardKm, double renderKm})>(
-          context: context,
-          builder: (_) => TerrainRangeDialog(state: widget.state),
-        );
-    if (!mounted || range == null) return;
-    widget.onChanged(
-      widget.state.copyWith(
-        terrainRings: range.rings,
-        terrainForwardKm: range.forwardKm,
-        terrainRenderKm: range.renderKm,
-      ),
-    );
   }
 
   Future<void> loadTerrain({bool retry = false}) async {
@@ -912,7 +901,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                       key: const ValueKey('preview-actions'),
                       margin: const EdgeInsets.all(12),
                       child: PreviewTools(
-                        onTerrain: showTerrainRange,
                         constellations: state.showConstellations,
                         onConstellations: () => widget.onChanged(
                           state.copyWith(
@@ -1001,11 +989,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                   runSpacing: 8,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    OutlinedButton.icon(
-                                      onPressed: showTerrainRange,
-                                      icon: const Icon(Icons.straighten),
-                                      label: const Text('Terrain range'),
-                                    ),
                                     FilterChip(
                                       label: const Text('Constellations'),
                                       showCheckmark: false,

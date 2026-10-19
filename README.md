@@ -60,7 +60,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Account-free Mapterhorn terrain: Copernicus GLO-30 plus finer open regional
   DEMs, with Mapzen fallback, rendered in a camera-relative WGS84 frame.
 - Terrain-derived camera height, progressive loading, distance/FOV quadtree LOD, and tile skirts.
-- **Terrain range** button: surrounding radius, FOV-aware forward fetching, and render distance.
+- **Terrain range** inspector section: live surrounding radius, FOV-aware forward fetching and render distance; the map shows a dashed approximate requested-range circle.
 - Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
   a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile.
 - Approximate relighting enabled by default; optional natural imagery, without rebuilding terrain.
@@ -176,12 +176,16 @@ relighting is approximate and may double those shadows. Imagery dates do not
 follow simulation time; source acquisition dates are not queried yet. See
 [imagery data notes](docs/data-sources/imagery.md).
 
-Terrain defaults to the original 3×3 zoom-13 region. **Terrain range** adjusts
+Terrain defaults to the original 3×3 zoom-13 region. The **Terrain range** section
+in the right inspector (controls drawer on phones) adjusts
 surrounding coverage (1–3 tile rings), forward reach (0–40 km, off by default),
 and terrain rendering (2–40 km, whole-tile cutoff plus view-frustum culling).
 Forward coverage follows sensor/focal length, pitch and azimuth after a 400 ms
 pause; long lenses prefer finer tiles, subject to a 256-tile budget. Overlapping
-meshes/textures stay resident. Settings persist in saved plans.
+meshes/textures stay resident. Settings apply live and persist in saved plans/session recovery.
+The map's dashed circle approximates the nearby tile envelope or forward reach,
+whichever is larger. Zoom out to see its full extent. It is not an exact tile
+boundary or download-status indicator; render distance does not shrink the fetch circle.
 
 Terrain and imagery share a persistent LRU disk budget configured under **Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
 loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,

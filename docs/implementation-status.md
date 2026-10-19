@@ -33,7 +33,7 @@ requirements separately from excluded platform work.
   natural-color processing, bounded/cancellable requests and visible source credits.
 - Regional errors/no-data fall through; transparent coverage composites over lower
   priority sources. No newer non-commercial EOX layers or paid accounts required.
-- **Terrain range** dialog: 1–3 surrounding tile rings, 0–40 km FOV-aware forward
+- **Terrain range** inspector section (live controls): 1–3 surrounding tile rings, 0–40 km FOV-aware forward
   fetching and 2–40 km whole-tile render cutoff plus actual 3D frustum culling.
   Pitch/aim/optics changes debounce 400 ms; non-overlapping distant tiles coarsen
   within a 256-patch budget, long lenses prefer finer tiles, retained patches reuse
@@ -155,7 +155,7 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   dialog, GPU pixel diversity and geography/cache reuse after optics/time edits,
   and captures `linux-imagery-{swiss,ign,eox,beijing}.png`. The Swiss case also
   checks forward fetching, FOV/aim replanning, nearby mesh reuse, frustum rejection,
-  render-only changes without downloads, and UTC changes while the range dialog is open.
+  render-only changes without downloads, and UTC preservation while editing live range controls.
 - Native workflow loads nine real Yosemite terrain patches and nine NAIP textures;
   the camera patch receives an additional higher-resolution image.
 - Returning to 3D reports **9 cached / 0 downloaded** elevation patches and

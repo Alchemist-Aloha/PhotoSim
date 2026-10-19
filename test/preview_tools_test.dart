@@ -6,12 +6,11 @@ void main() {
   testWidgets('short-window preview menu keeps every action reachable', (
     tester,
   ) async {
-    var terrain = 0, guides = 0, exports = 0;
+    var guides = 0, exports = 0;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: PreviewTools(
-            onTerrain: () => terrain++,
             onConstellations: () => guides++,
             onExport: () => exports++,
             constellations: true,
@@ -19,7 +18,7 @@ void main() {
         ),
       ),
     );
-    for (final label in ['Terrain range', 'Constellations', 'Export PNG']) {
+    for (final label in ['Constellations', 'Export PNG']) {
       await tester.tap(find.byTooltip('Preview tools'));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -29,15 +28,12 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
-    expect([terrain, guides, exports], [1, 1, 1]);
+    expect([guides, exports], [1, 1]);
+    expect(find.text('Terrain range'), findsNothing);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: PreviewTools(
-            onTerrain: () {},
-            onConstellations: () {},
-            constellations: false,
-          ),
+          body: PreviewTools(onConstellations: () {}, constellations: false),
         ),
       ),
     );

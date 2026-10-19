@@ -6,6 +6,7 @@ import '../core/geo.dart';
 import '../models/simulation_state.dart';
 import '../data/raster_cache.dart';
 import 'cache_settings_panel.dart';
+import 'terrain_range_controls.dart';
 
 class CameraInspector extends StatelessWidget {
   const CameraInspector({
@@ -166,6 +167,9 @@ class CameraInspector extends StatelessWidget {
           (value) => onChanged(state.copyWith(height: value)),
           ' m',
         ),
+      ]),
+      section('Terrain range', Icons.landscape_outlined, [
+        TerrainRangeControls(state: state, onChanged: onChanged),
       ]),
       section('Exposure', Icons.exposure, [
         DropdownButtonFormField<ExposureMode>(

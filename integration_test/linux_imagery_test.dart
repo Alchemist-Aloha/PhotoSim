@@ -9,6 +9,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:photosim/core/terrain_coverage.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
+import 'package:photosim/ui/camera_inspector.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -40,9 +41,22 @@ void main() {
                 child: StatefulBuilder(
                   builder: (context, setState) {
                     rebuild = setState;
-                    return SimulationWorkspace(
-                      state: state,
-                      onChanged: (value) => setState(() => state = value),
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: SimulationWorkspace(
+                            state: state,
+                            onChanged: (value) => setState(() => state = value),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 310,
+                          child: CameraInspector(
+                            state: state,
+                            onChanged: (value) => setState(() => state = value),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -195,13 +209,13 @@ void main() {
 
           rebuild(() => state = state.copyWith(pitch: 0));
           await tester.pump();
+          await tester.ensureVisible(find.text('Terrain range'));
           await tester.tap(find.text('Terrain range'));
           await tester.pump(const Duration(milliseconds: 300));
           tester
               .widget<Slider>(find.byKey(const ValueKey('terrain-forward')))
               .onChanged!(20);
           await tester.pump();
-          await tester.tap(find.text('Apply'));
           await waitForCoverage();
           final narrowCount = terrainNodes().length;
           expect(narrowCount, greaterThan(9));
@@ -222,12 +236,7 @@ void main() {
               node.name: node.mesh!.primitives.single.geometry,
           };
           final beforeRender = counts();
-          await tester.tap(find.text('Terrain range'));
-          await tester.pump(const Duration(milliseconds: 300));
-          tester
-              .widget<Slider>(find.byKey(const ValueKey('terrain-render')))
-              .onChanged!(2);
-          // Applying range preferences must not rewind playback/other state changed behind the dialog.
+          // Live inspector changes retain the latest simulation time.
           rebuild(
             () => state = state.copyWith(
               timestamp: state.timestamp.add(const Duration(hours: 1)),
@@ -235,7 +244,9 @@ void main() {
           );
           await tester.pump();
           final latestUtc = state.timestamp;
-          await tester.tap(find.text('Apply'));
+          tester
+              .widget<Slider>(find.byKey(const ValueKey('terrain-render')))
+              .onChanged!(2);
           await tester.pump(const Duration(seconds: 1));
           expect(state.timestamp, latestUtc);
           expect(counts(), beforeRender);

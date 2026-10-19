@@ -330,7 +330,7 @@ void main() {
         final lines = tester
             .widget<PolylineLayer>(find.byType(PolylineLayer))
             .polylines;
-        expect(lines.length, 4);
+        expect(lines.length, 5);
         final bodies = [state.sky.sun, state.sky.moon, state.galacticCenter];
         final markers = tester
             .widget<MarkerLayer>(find.byType(MarkerLayer))

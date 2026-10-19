@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/geo.dart';
+import '../core/terrain_coverage.dart';
 import '../models/simulation_state.dart';
 
 class MapWorkspace extends StatefulWidget {
@@ -53,6 +54,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
+    final loadingRadiusKm = approximateTerrainLoadingRadius(state) / 1000;
     final handle = destination(state.location, state.azimuth, 450);
     final sky = state.sky;
     final compact =
@@ -134,6 +136,14 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                         ? const StrokePattern.solid()
                         : StrokePattern.dashed(segments: [8, 5]),
                   ),
+                Polyline(
+                  points: terrainLoadingCircle(state),
+                  color: Theme.of(context).colorScheme.primary,
+                  strokeWidth: 2,
+                  borderColor: Theme.of(context).colorScheme.surface,
+                  borderStrokeWidth: 1,
+                  pattern: StrokePattern.dashed(segments: [8, 6]),
+                ),
               ],
             ),
             MarkerLayer(
@@ -251,9 +261,13 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                             ? 'Tap to place camera · Drag camera to move · Drag green handle to aim'
                             : 'Click to place camera · Drag camera to move · Drag green handle to aim',
                       ),
+                      Text(
+                        'Dashed circle: ≈${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent · Zoom out for full circle',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       if (!compact)
                         const Text(
-                          'Amber: Sun · Blue: Moon · Violet: Galactic center · Dashed: below horizontal',
+                          'Amber: Sun · Blue: Moon · Violet: Galactic center · Dashed bearings: below horizontal',
                         ),
                       if (!compact)
                         const Text(
@@ -268,7 +282,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
         ),
         if (compact)
           Positioned(
-            top: 100,
+            bottom: 128,
             right: 16,
             child: IconButton.filledTonal(
               tooltip: 'Map guide',
@@ -277,9 +291,10 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                 builder: (context) => AlertDialog(
                   scrollable: true,
                   title: const Text('Map guide'),
-                  content: const Text(
+                  content: Text(
                     'Tap to place the camera. Drag the camera to move; drag its green handle to aim.\n\n'
-                    'Amber: Sun · Blue: Moon · Violet: Galactic center. Dashed lines mean below horizontal.\n\n'
+                    'Amber: Sun · Blue: Moon · Violet: Galactic center. Dashed bearing lines mean below horizontal.\n\n'
+                    'Dashed circle: approximately ${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent. Forward fetching is directional; the circle is not an exact tile boundary or a download-status indicator. Render distance is a separate limit.\n\n'
                     'Bearing guides only, not rise/set or terrain visibility predictions.',
                   ),
                   actions: [

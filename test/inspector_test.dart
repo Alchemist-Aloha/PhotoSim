@@ -185,6 +185,7 @@ void main() {
         4,
       );
       await tester.ensureVisible(find.text('Reset weather parameters'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Reset weather parameters'));
       await tester.pumpAndSettle();
       expect(state.weatherVisibilityKm, Weather.rain.visibilityKm);

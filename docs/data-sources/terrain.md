@@ -41,7 +41,7 @@ time, so PhotoSim does not invent per-tile source identity/accuracy metadata.
 
 ### Selection and bounded loading
 
-Default coverage remains nine zoom-13 XYZ patches. The **Terrain range** dialog
+Default coverage remains nine zoom-13 XYZ patches. The inspector's **Terrain range** section
 sets 1–3 surrounding tile rings (3×3 through 7×7), 0–40 km forward reach (default
 off), and a 2–40 km horizontal render radius (default 40). Ring distances vary
 with latitude and camera position within the tile; the dialog shows approximate km.

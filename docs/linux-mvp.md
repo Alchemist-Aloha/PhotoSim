@@ -29,7 +29,7 @@ have a single home in the right panel. Open the app-bar **navigation menu** to
 switch between **Map** and **3D Preview**; its selected destination is highlighted
 and selection closes the drawer without resetting camera/time.
 
-Terrain range (ruler), Constellations (stars) and Export PNG float at the top-right
+Terrain range lives in its own inspector section. Constellations (stars) and Export PNG float at the top-right
 of the canvas. One bottom-left in-view panel groups terrain/imagery progress with
 cache/download counts, navigation help and attribution/source links. No duplicate
 loading rows remain above or below the view. Cards scroll if space is tight;
