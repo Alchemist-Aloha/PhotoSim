@@ -63,11 +63,11 @@ of repeated hours are selectable, distinguished by abbreviation. Fractional-hour
 zones/shifts work too. The local date is held during a drag so reaching 24:00
 cannot repeatedly advance the date; on release, 24:00 becomes the next local day's
 00:00. The tooltip identifies the local date and IANA zone. Date/time pickers and
-hour steps remain explicitly UTC and support 1900–2100.
+hour steps use camera-local time when supported, with an explicit UTC fallback through 1900–2100.
 
 Play/pause advances one simulated minute every 200 ms (five minutes per second).
 Playback stops on manual time edits, app backgrounding, disposal, or the upper
-date limit. Camera/appearance changes and workspace switching preserve playback.
+date limit. Camera/appearance changes and Map/3D switching preserve playback; entering Calendar stops it.
 It changes shared UTC state, not terrain geometry or geographic downloads.
 
 Widget tests check guide bearings, marker alignment, below-horizontal styling,
@@ -113,6 +113,13 @@ coordinates and the supported-year guard. Playback widget tests cover manual
 edits, disposal/backgrounding and the upper date boundary. The native Linux
 workflow verifies the local readout and actual playback with unchanged terrain
 geometry/download counters.
+
+## Night calendar
+
+The [night-planning calendar](night-calendar.md) adds locally calculated,
+explained early-night Galactic-core windows, keyless forecasts and a modeled
+light-pollution baseline. It does not change the astronomical position model
+or apply forecasts to illustrative 3D weather.
 
 ## Rendering
 

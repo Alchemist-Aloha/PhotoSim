@@ -9,6 +9,8 @@ import 'package:http/http.dart' as http;
 
 import '../data/saved_plans.dart';
 import '../data/raster_cache.dart';
+import '../data/night_conditions.dart';
+import '../ui/night_calendar.dart';
 
 import '../core/local_time.dart';
 
@@ -46,7 +48,7 @@ class PhotoSimApp extends StatelessWidget {
   }
 }
 
-enum Workspace { map, simulation }
+enum Workspace { map, simulation, calendar }
 
 class WorkspaceShell extends StatefulWidget {
   const WorkspaceShell({super.key, this.plans, this.rasterCache});
@@ -70,6 +72,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   final scaffoldKey = GlobalKey<ScaffoldState>();
   bool inspectorVisible = true;
   bool timelineExpanded = false;
+  bool calendarWeekView = false;
+  late final nightConditions = NightConditionsRepository(terrainClient);
   bool cleanPreview = false;
   RasterCache? rasterCache;
   String? cacheError;
@@ -759,8 +763,10 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       rasterCache: rasterCache,
       cacheError: cacheError,
     );
-    void changeWorkspace(int index) =>
-        setState(() => workspace = Workspace.values[index]);
+    void changeWorkspace(int index) => setState(() {
+      if (Workspace.values[index] == Workspace.calendar) stopPlayback();
+      workspace = Workspace.values[index];
+    });
     void showInspector() {
       if (dockedInspector) {
         setState(() => inspectorVisible = !inspectorVisible);
@@ -769,7 +775,28 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       }
     }
 
-    final viewport = workspace == Workspace.map
+    final viewport = workspace == Workspace.calendar
+        ? NightCalendar(
+            state: state,
+            weekView: calendarWeekView,
+            repository: nightConditions,
+            onPreview: (utc) {
+              final next = state.copyWith(
+                timestamp: utc,
+                target: CelestialTarget.galacticCenter,
+              );
+              final core = next.galacticCenter;
+              setState(() {
+                stopPlayback();
+                state = next.copyWith(
+                  azimuth: core.azimuth,
+                  pitch: core.altitude,
+                );
+                workspace = Workspace.simulation;
+              });
+            },
+          )
+        : workspace == Workspace.map
         ? MapWorkspace(
             key: ValueKey(openedPlan),
             state: state,
@@ -801,8 +828,10 @@ class _WorkspaceShellState extends State<WorkspaceShell>
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'PhotoSim',
+                  Text(
+                    workspace == Workspace.calendar
+                        ? 'Night calendar'
+                        : 'PhotoSim',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -829,7 +858,20 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   ],
                   onSelected: managePlans,
                 ),
-                if (!compact) ...[
+                if (workspace == Workspace.calendar)
+                  IconButton(
+                    tooltip: calendarWeekView
+                        ? 'Switch to month view'
+                        : 'Switch to week view',
+                    onPressed: () =>
+                        setState(() => calendarWeekView = !calendarWeekView),
+                    icon: Icon(
+                      calendarWeekView
+                          ? Icons.calendar_view_month
+                          : Icons.calendar_view_week,
+                    ),
+                  ),
+                if (!compact && workspace != Workspace.calendar) ...[
                   PopupMenuButton<CelestialTarget>(
                     tooltip: 'Select astronomical target',
                     icon: const Icon(Icons.track_changes),
@@ -856,14 +898,15 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                         : null,
                   ),
                 ],
-                IconButton(
-                  tooltip: dockedInspector
-                      ? 'Toggle camera inspector'
-                      : 'Camera controls',
-                  onPressed: showInspector,
-                  icon: const Icon(Icons.tune),
-                ),
-                if (compact)
+                if (workspace != Workspace.calendar)
+                  IconButton(
+                    tooltip: dockedInspector
+                        ? 'Toggle camera inspector'
+                        : 'Camera controls',
+                    onPressed: showInspector,
+                    icon: const Icon(Icons.tune),
+                  ),
+                if (compact && workspace != Workspace.calendar)
                   PopupMenuButton<Object>(
                     tooltip: 'More options',
                     itemBuilder: (_) => [
@@ -897,7 +940,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   ),
               ],
             ),
-      endDrawer: dockedInspector || cleanPreview
+      endDrawer:
+          dockedInspector || cleanPreview || workspace == Workspace.calendar
           ? null
           : Drawer(
               width: size.width < 400 ? size.width : 400,
@@ -949,6 +993,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   selectedIcon: Icon(Icons.landscape),
                   label: '3D Preview',
                 ),
+                NavigationDestination(
+                  icon: Icon(Icons.calendar_month_outlined),
+                  selectedIcon: Icon(Icons.calendar_month),
+                  label: 'Calendar',
+                ),
               ],
             ),
       body: SafeArea(
@@ -971,6 +1020,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                     selectedIcon: Icon(Icons.landscape),
                     label: Text('3D Preview'),
                   ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.calendar_month_outlined),
+                    selectedIcon: Icon(Icons.calendar_month),
+                    label: Text('Calendar'),
+                  ),
                 ],
               ),
               const VerticalDivider(width: 1),
@@ -983,6 +1037,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                       children: [
                         Expanded(child: viewport),
                         if (!cleanPreview &&
+                            workspace != Workspace.calendar &&
                             dockedInspector &&
                             inspectorVisible) ...[
                           const VerticalDivider(width: 1),
@@ -991,7 +1046,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                       ],
                     ),
                   ),
-                  if (!cleanPreview) ...[
+                  if (!cleanPreview && workspace != Workspace.calendar) ...[
                     const Divider(height: 1),
                     timeline(compactTimeline),
                   ],

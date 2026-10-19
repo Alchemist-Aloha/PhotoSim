@@ -45,6 +45,9 @@ See [Android support](docs/android.md) for tests and device limitations.
 
 ## Available now
 
+- **Night calendar** with month/week views, explained Galactic-core observing windows,
+  keyless Open-Meteo forecasts and a modeled light-pollution site baseline.
+  See [night planning, sources and limits](docs/night-calendar.md).
 - Interactive OpenStreetMap map centered on Yosemite.
 - Tap/click to place a camera; drag its marker to move it and its green handle to aim.
 - Geographic field-of-view wedge calculated from physical sensor and focal length.
@@ -69,7 +72,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Bluer clear skies and air-mass extinction for dimmer, redder sunrise/sunset.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
-- Persistent navigation rail for Map/3D Preview; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
+- Persistent navigation rail for Map/3D Preview/Calendar; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
 - Collapsible inspector with weather/quality/relighting in the right panel; camera-local date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.

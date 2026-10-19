@@ -117,11 +117,10 @@ Future<Uint8List> downloadBytes(
       await host.acquire(stop, uri, deadline, retry: attempt > 0);
       try {
         if (stop.isCompleted) throw http.RequestAbortedException(uri);
-        final request = http.AbortableRequest(
-          'GET',
-          uri,
-          abortTrigger: stop.future,
-        )..headers['User-Agent'] = 'PhotoSim/0.1 (Linux photography planner)';
+        final request =
+            http.AbortableRequest('GET', uri, abortTrigger: stop.future)
+              ..headers['User-Agent'] =
+                  'PhotoSim/0.1 (landscape photography planner)';
         final response = await client.send(request);
         if (response.statusCode != 200) {
           final throttled =

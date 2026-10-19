@@ -136,6 +136,14 @@ class ObserverSkyFrame {
     );
   }
 
+  /// Fraction of the visible Galactic equator at 0–30° elevation, by arc length.
+  /// A great circle's vertical component is A sin(t); its visible half spans π.
+  double get lowMilkyWayFraction {
+    final pole = direction(192.85948 * radians, 27.12825 * radians);
+    final amplitude = math.sqrt((1 - pole.y * pole.y).clamp(0.0, 1.0));
+    return amplitude <= 0.5 ? 1 : 2 * math.asin(0.5 / amplitude) / math.pi;
+  }
+
   /// ICRS position of Sgr A*; not exactly the IAU Galactic-coordinate origin.
   CelestialPosition get galacticCenter =>
       position(266.4051 * radians, -28.936175 * radians);

@@ -5,7 +5,7 @@
 Requires Flutter 3.47.1+ (developed with 3.47.6), JDK 17+, the Android SDK,
 and Android 10 / API 29 or newer. Flutter GPU and Impeller are enabled in the
 main manifest, including release builds. Internet permission is declared there
-for map/terrain/imagery; no location, broad storage or media-read permission is used.
+for map/terrain/imagery and optional calendar conditions; no location, broad storage or media-read permission is used.
 
 ```sh
 flutter pub get
@@ -26,7 +26,7 @@ Android 10 GPU can render this scene.
 
 One shared Flutter UI and simulation state, not a separate mobile codebase:
 
-- Below 600 logical pixels: bottom navigation for the two primary workspaces,
+- Below 600 logical pixels: bottom navigation for Map, 3D Preview and Calendar,
   a compact local-time timeline with expandable astronomy/playback details,
   and a modal camera-controls drawer.
 - At 600+ logical pixels: navigation rail; controls remain in a drawer until
@@ -43,6 +43,9 @@ One shared Flutter UI and simulation state, not a separate mobile codebase:
   Map to move. Hardware-keyboard WASD still works in the focused 3D preview.
 - System Back dismisses dialogs/drawers and exits clean fullscreen preview
   before exiting the application.
+- Calendar has a top-bar month/week toggle, scrollable phone details and a
+  side-by-side tablet layout; it hides camera controls and the simulation timeline.
+  Its keyless sources and approximation limits are in [night planning](night-calendar.md).
 - Android starts with the Performance render preset. Balanced and High remain
   available in the Rendering inspector.
 
@@ -64,6 +67,8 @@ broad storage access. Linux retains its existing destination-path dialog.
 ```sh
 flutter test
 flutter analyze --fatal-infos --fatal-warnings
+flutter test integration_test/calendar_test.dart -d <phone-id>
+flutter test integration_test/calendar_test.dart -d <tablet-id>
 flutter test integration_test/android_workflow_test.dart -d <phone-id>
 flutter test integration_test/android_workflow_test.dart -d <tablet-id>
 ```
@@ -80,6 +85,13 @@ Widget tests exercise 360/390 dp portrait phones, 844 dp short landscape,
 They check navigation adaptation, controls, shared state, light/dark theme,
 Back behavior and resizing. Synthesized touch tests cover aim, pinch zoom,
 focal-length bounds and cancellation recovery.
+
+The calendar workflow additionally passed on Linux and both API 36 profiles,
+including live keyless forecast/atlas requests, month/week navigation, date picking
+and unchanged shared camera/time. Calendar widget tests also cover a 360 dp phone
+at 2× text scale. The tablet again reported an uninstall warning, and both emulators
+disconnected after graphics-context teardown errors; release APK compilation passed,
+but a subsequent install attempt could not reach those disconnected emulators.
 
 Native emulator screenshots are under `build/validation/android-*.png`.
 Release APKs were also installed and rendered on both profiles, with light/dark,
