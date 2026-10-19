@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -10,6 +11,7 @@ import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/render/celestial_material.dart';
+import 'package:photosim/render/atmosphere_sky.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -44,6 +46,15 @@ void main() {
                       state: state,
                       cacheDirectory: directory,
                       onChanged: (next) => update(() => state = next),
+                      onGroundElevationChanged: (location, elevation) {
+                        if (state.location == location) {
+                          update(
+                            () => state = state.copyWith(
+                              groundElevation: elevation,
+                            ),
+                          );
+                        }
+                      },
                     );
                   },
                 ),
@@ -159,6 +170,59 @@ void main() {
         expect(b.b, closeTo(a.b, 1));
         world.remove(probe);
 
+        final source = world.skybox!.source as AtmosphereSky;
+        final visibility = {
+          for (final node in world.root.children) node: node.visible,
+        };
+        for (final node in visibility.keys) {
+          node.visible = false;
+        }
+        final horizontal = vm.Vector3(forward.x, 0, forward.z).normalized();
+        vm.Vector3 atAltitude(double altitude) =>
+            horizontal * math.cos(altitude * math.pi / 180) +
+            vm.Vector3(0, math.sin(altitude * math.pi / 180), 0);
+        num skyBrightness(Uint8List bytes) {
+          final image = img.decodePng(bytes)!;
+          final point =
+              Offset(
+                viewRect.center.dx,
+                viewRect.top + viewRect.height * 0.25,
+              ) -
+              origin;
+          final pixel = image.getPixel(point.dx.round(), point.dy.round());
+          return pixel.r + pixel.g + pixel.b;
+        }
+
+        final twilight = <int, num>{};
+        source.lunarRadiance = 0;
+        for (final altitude in [2, -2, -6, -18, -24]) {
+          source.sunDirection = atAltitude(altitude.toDouble());
+          world.skyEnvironment!.invalidate();
+          await settleLighting();
+          twilight[altitude] = skyBrightness(
+            await pixels('twilight-$altitude'),
+          );
+        }
+        expect(twilight[-2]!, greaterThan(twilight[-18]! + 3));
+        expect(twilight[-6]!, lessThan(twilight[-2]!));
+        final moonless = twilight[-24]!;
+        source
+          ..moonDirection = atAltitude(20)
+          ..lunarRadiance = 0.2;
+        world.skyEnvironment!.invalidate();
+        await settleLighting();
+        final moonlit = skyBrightness(await pixels('moonlit-sky'));
+        expect(moonlit, greaterThan(moonless + 1));
+        source.moonDirection = atAltitude(-60);
+        world.skyEnvironment!.invalidate();
+        await settleLighting();
+        expect(
+          skyBrightness(await pixels('moon-below-horizon')),
+          closeTo(moonless, 1),
+        );
+        for (final entry in visibility.entries) {
+          entry.key.visible = entry.value;
+        }
         final oldEnvironment = world.environment;
         rebuild(
           () => state = state.copyWith(
@@ -201,6 +265,196 @@ void main() {
             same(geometries[i]),
           );
         }
+        // Quality changes replace geometry in-place while keeping imagery/materials resident.
+        final originalMaterials = [
+          for (final node in nodes) node.mesh!.primitives.single.material,
+        ];
+        rebuild(
+          () => state = state.copyWith(renderQuality: RenderQuality.high),
+        );
+        for (var i = 0; i < 200; i++) {
+          if (List.generate(
+            nodes.length,
+            (j) => !identical(
+              nodes[j].mesh!.primitives.single.geometry,
+              geometries[j],
+            ),
+          ).every((v) => v)) {
+            break;
+          }
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        for (var i = 0; i < nodes.length; i++) {
+          expect(
+            nodes[i].mesh!.primitives.single.geometry,
+            isNot(same(geometries[i])),
+          );
+          expect(
+            nodes[i].mesh!.primitives.single.material,
+            same(originalMaterials[i]),
+          );
+        }
+        final highGeometry = [
+          for (final node in nodes) node.mesh!.primitives.single.geometry,
+        ];
+        rebuild(
+          () => state = state.copyWith(renderQuality: RenderQuality.balanced),
+        );
+        for (var i = 0; i < 200; i++) {
+          if (List.generate(
+            nodes.length,
+            (j) => !identical(
+              nodes[j].mesh!.primitives.single.geometry,
+              highGeometry[j],
+            ),
+          ).every((v) => v)) {
+            break;
+          }
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        for (var i = 0; i < nodes.length; i++) {
+          expect(
+            nodes[i].mesh!.primitives.single.geometry,
+            isNot(same(highGeometry[i])),
+          );
+          expect(
+            nodes[i].mesh!.primitives.single.material,
+            same(originalMaterials[i]),
+          );
+        }
+        rebuild(
+          () => state = state.copyWith(
+            renderQuality: RenderQuality.high,
+            relitImagery: true,
+          ),
+        );
+        await tester.pump(const Duration(seconds: 2));
+        await settleLighting();
+        expect(
+          world.directionalLight!.shadowFilter,
+          scene.DirectionalShadowFilter.pcss,
+        );
+        expect(world.directionalLight!.contactShadows, isTrue);
+        expect(world.directionalLight!.cascadeOverlap, 0.12);
+        final shadowed = await pixels('high-terrain-shadows');
+        world.directionalLight!
+          ..castsShadow = false
+          ..contactShadows = false;
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          await pixels('high-terrain-no-shadows'),
+          isNot(orderedEquals(shadowed)),
+        );
+        // A camera-positioned point illuminates geometry, never the sky or Auto's meter.
+        rebuild(
+          () => state = state.copyWith(
+            timestamp: DateTime.utc(2026, 6, 30, 7),
+            pitch: 85,
+            renderQuality: RenderQuality.balanced,
+            exposureMode: ExposureMode.automatic,
+            cameraLightStrength: 0,
+          ),
+        );
+        await tester.pump(const Duration(seconds: 2));
+        await settleLighting();
+        final nightCamera =
+            tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
+                as scene.PerspectiveCamera;
+        final nightForward = (nightCamera.target - nightCamera.position)
+            .normalized();
+        final fillProbe = scene.Node(
+          name: 'Camera fill probe',
+          mesh: scene.Mesh(
+            scene.SphereGeometry(radius: 30),
+            scene.PhysicallyBasedMaterial()
+              ..baseColorFactor = vm.Vector4(0.5, 0.5, 0.5, 1)
+              ..metallicFactor = 0
+              ..roughnessFactor = 1,
+          ),
+        )..position = nightCamera.position + nightForward * 300;
+        world.add(fillProbe);
+        for (var i = 0; i < 90; i++) {
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        world.autoExposure
+          ..speedUp = 0
+          ..speedDown = 0;
+        final torchOff = img.decodePng(await pixels('camera-light-off'))!;
+        final rect = tester.getRect(find.byType(scene.SceneView));
+        final skyPoint =
+            Offset(
+              rect.left + rect.width * 0.15,
+              rect.top + rect.height * 0.2,
+            ) -
+            origin;
+        final centerPoint = rect.center - origin;
+        final skyOff = torchOff.getPixel(
+          skyPoint.dx.round(),
+          skyPoint.dy.round(),
+        );
+        final probeOff = torchOff.getPixel(
+          centerPoint.dx.round(),
+          centerPoint.dy.round(),
+        );
+        num? previousFill;
+        for (final strength in [10.0, 50.0]) {
+          rebuild(() => state = state.copyWith(cameraLightStrength: strength));
+          await settleLighting();
+          final image = img.decodePng(
+            await pixels('camera-light-${strength.round()}'),
+          )!;
+          final skyOn = image.getPixel(
+            skyPoint.dx.round(),
+            skyPoint.dy.round(),
+          );
+          final probeOn = image.getPixel(
+            centerPoint.dx.round(),
+            centerPoint.dy.round(),
+          );
+          expect(world.autoExposure.enabled, isTrue);
+          expect(world.autoExposure.speedUp, 0);
+          expect(world.autoExposure.speedDown, 0);
+          expect(skyOn.r, closeTo(skyOff.r, 1));
+          expect(skyOn.g, closeTo(skyOff.g, 1));
+          expect(skyOn.b, closeTo(skyOff.b, 1));
+          final fill = probeOn.r + probeOn.g + probeOn.b;
+          expect(fill, greaterThan(probeOff.r + probeOff.g + probeOff.b + 5));
+          if (previousFill != null) expect(fill, greaterThan(previousFill));
+          previousFill = fill;
+        }
+        final lightNode = world.root.children.singleWhere(
+          (n) => n.name == 'Camera light',
+        );
+        expect(lightNode.position, nightCamera.position);
+        expect(
+          lightNode
+              .getComponent<scene.PointLightComponent>()!
+              .light
+              .castsShadow,
+          isFalse,
+        );
+        rebuild(() => state = state.copyWith(cameraLightStrength: 0));
+        await settleLighting();
+        expect(
+          lightNode.getComponent<scene.PointLightComponent>()!.light.intensity,
+          0,
+        );
+        expect(world.autoExposure.speedDown, 1);
+        world.remove(fillProbe);
+        rebuild(
+          () => state = state.copyWith(
+            pitch: -15,
+            exposureMode: ExposureMode.enhanced,
+          ),
+        );
+        await settleLighting();
+        final darkTerrain = await pixels('night-terrain-light-off');
+        rebuild(() => state = state.copyWith(cameraLightStrength: 20));
+        await settleLighting();
+        expect(
+          await pixels('night-terrain-light-on'),
+          isNot(orderedEquals(darkTerrain)),
+        );
         expect(tester.takeException(), isNull);
       } finally {
         await tester.pumpWidget(const SizedBox());

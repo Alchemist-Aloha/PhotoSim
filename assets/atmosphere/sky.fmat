@@ -1,0 +1,100 @@
+material {
+  name: "PhotoSimAtmosphere",
+  parameters: [
+    { type: vec3, name: sun_direction, default: [0, 1, 0] },
+    { type: vec3, name: moon_direction, default: [0, -1, 0] },
+    { type: vec3, name: rayleigh, default: [0.0058, 0.0135, 0.0331] },
+    { type: vec3, name: mie, default: [0.0012, 0.0013, 0.0014] },
+    { type: vec3, name: ground_color, default: [0.12, 0.12, 0.13] },
+    { type: float, name: solar_radius, default: 0.0047 },
+    { type: float, name: energy, default: 1 },
+    { type: float, name: lunar_radiance, default: 0 },
+    { type: float, name: observer_height, default: 0.002 },
+    { type: float, name: eccentricity, default: 0.76 },
+    { type: int, name: view_samples, default: 8 },
+    { type: int, name: light_samples, default: 4 }
+  ]
+}
+sky {
+  // Spherical, single-scattering atmosphere. Distances are kilometres.
+  const float ATM_R = 6371.0;
+  const float ATM_TOP = 6451.0;
+  const float ATM_PI = 3.14159265359;
+
+  float ExitAtmosphere(vec3 p, vec3 direction) {
+    float b = dot(p, direction);
+    return -b + sqrt(max(b * b + ATM_TOP * ATM_TOP - dot(p, p), 0.0));
+  }
+
+  vec2 Density(vec3 p) {
+    float height = max(length(p) - ATM_R, 0.0);
+    return exp(-height / vec2(8.4, 1.25));
+  }
+
+  vec2 LightDepth(vec3 p, vec3 light) {
+    float b = dot(p, light);
+    // The curved Earth's shadow leaves high atmosphere illuminated after sunset.
+    if (b < 0.0 && dot(p, p) - b * b < ATM_R * ATM_R) return vec2(1e6);
+    float distance = ExitAtmosphere(p, light);
+    vec2 optical = vec2(0.0);
+    float previous = 0.0;
+    for (int j = 0; j < 6; j++) {
+      if (j >= material_params.light_samples) break;
+      float fraction = float(j + 1) / float(material_params.light_samples);
+      float next = distance * fraction * fraction;
+      optical += Density(p + light * (previous + next) * 0.5) * (next - previous);
+      previous = next;
+    }
+    return optical;
+  }
+
+  vec3 Transmission(vec2 optical) {
+    return exp(-material_params.rayleigh * optical.x - material_params.mie * optical.y);
+  }
+
+  vec2 Phase(float cosine) {
+    float g = material_params.eccentricity;
+    return vec2(3.0 * (1.0 + cosine * cosine) / (16.0 * ATM_PI),
+      (1.0 - g * g) / (4.0 * ATM_PI * pow(max(1.0 + g * g - 2.0 * g * cosine, 0.001), 1.5)));
+  }
+
+  vec3 Sky(vec3 direction) {
+    vec3 horizonRay = vec3(direction.x, max(direction.y, 0.0), direction.z);
+    vec3 ray = length(horizonRay) > 0.001 ? normalize(horizonRay) : vec3(0.0, 0.0, 1.0);
+    vec3 sun = normalize(material_params.sun_direction);
+    vec3 moon = normalize(material_params.moon_direction);
+    vec3 origin = vec3(0.0, ATM_R + max(material_params.observer_height, 0.002), 0.0);
+    float distance = ExitAtmosphere(origin, ray);
+    vec2 sunPhase = Phase(dot(ray, sun));
+    vec2 moonPhase = Phase(dot(ray, moon));
+    vec2 optical = vec2(0.0);
+    vec3 scattered = vec3(0.0);
+    float previous = 0.0;
+    for (int i = 0; i < 12; i++) {
+      if (i >= material_params.view_samples) break;
+      float fraction = float(i + 1) / float(material_params.view_samples);
+      float next = distance * fraction * fraction;
+      vec3 p = origin + ray * (previous + next) * 0.5;
+      vec2 column = Density(p) * (next - previous);
+      vec2 viewDepth = optical + column * 0.5;
+      vec3 solar = Transmission(viewDepth + LightDepth(p, sun));
+      scattered += 20.0 * solar * (material_params.rayleigh * column.x * sunPhase.x
+        + material_params.mie * column.y * sunPhase.y);
+      if (material_params.lunar_radiance > 0.0) {
+        vec3 lunar = Transmission(viewDepth + LightDepth(p, moon));
+        scattered += material_params.lunar_radiance * lunar
+          * (material_params.rayleigh * column.x * moonPhase.x
+          + material_params.mie * column.y * moonPhase.y);
+      }
+      optical += column;
+      previous = next;
+    }
+    float disk = smoothstep(cos(material_params.solar_radius),
+      cos(material_params.solar_radius * 0.5), dot(direction, sun));
+    // Keep the established preview disk ramp; diffuse twilight has no horizon cutoff.
+    float diskEnergy = 60.0 * max(0.0, 1.0 - exp(-asin(clamp(sun.y, -1.0, 1.0))));
+    vec3 direct = diskEnergy * Transmission(LightDepth(origin, sun)) * disk;
+    vec3 ground = mix(material_params.ground_color, vec3(1.0), smoothstep(-0.1, 0.1, direction.y));
+    return max((scattered * ground + direct) * material_params.energy, vec3(0.0));
+  }
+}

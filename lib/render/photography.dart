@@ -1,16 +1,56 @@
+import 'dart:math' as math;
+
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:vector_math/vector_math.dart' as vm;
 
 import '../models/simulation_state.dart';
 import '../core/exposure.dart';
 
-/// Existing backend effects; no geographic resources change with these settings.
+void configureTerrainShadows(
+  scene.DirectionalLight light,
+  SimulationState state,
+) {
+  final high = state.renderQuality == RenderQuality.high;
+  final performance = state.renderQuality == RenderQuality.performance;
+  final distance = math.min(
+    state.terrainRenderKm * 1000,
+    high ? 24000.0 : 16000.0,
+  );
+  final sky = state.sky;
+  light
+    ..castsShadow = state.relitImagery && state.weather == Weather.clear
+    ..shadowMapResolution = high ? 4096 : (performance ? 1024 : 2048)
+    ..shadowCascadeCount = performance ? 2 : 4
+    ..shadowMaxDistance = distance
+    ..firstCascadeFarBound = 300
+    ..shadowCascadeSplitLambda = 0.8
+    ..cascadeOverlap = 0.12
+    ..shadowFadeRange = distance * 0.15
+    ..shadowFilter = high
+        ? scene.DirectionalShadowFilter.pcss
+        : scene.DirectionalShadowFilter.bilinearPcf
+    // Softness also feeds the backend's grazing-angle receiver bias; keep its world-space cap small.
+    ..shadowSoftness = high ? 0.15 : 0.08
+    ..shadowDepthBias = high ? 0.2 : (performance ? 0.8 : 0.4)
+    ..shadowNormalBias = high ? 0.5 : (performance ? 2 : 1.2)
+    ..contactShadows =
+        high && state.relitImagery && state.weather == Weather.clear
+    ..contactShadowDistance = 3
+    ..angularRadius = sky.sun.altitude > 0
+        ? sky.sun.angularRadius
+        : sky.moon.angularRadius;
+}
+
+/// Applies camera effects and atmosphere without downloading geographic resources.
 void configurePhotography(scene.Scene world, SimulationState state) {
   world.exposure = exposureMultiplier(state);
   world.autoExposure
     ..enabled = state.exposureMode == ExposureMode.automatic
     ..strength = 1
-    ..compensation = 0;
+    ..compensation = 0
+    // Hold the existing GPU exposure factor so terrain fill cannot remeter the sky.
+    ..speedUp = state.relitImagery && state.cameraLightStrength > 0 ? 0 : 3
+    ..speedDown = state.relitImagery && state.cameraLightStrength > 0 ? 0 : 1;
   world.postProcess.colorGrading
     ..enabled = state.whiteBalance != 6500
     // shortcut: approximate color-temperature correction, use calibrated chromatic adaptation for colorimetry.
@@ -31,13 +71,7 @@ void configurePhotography(scene.Scene world, SimulationState state) {
       RenderQuality.high => scene.RenderQualityTier.high,
     }
     ..adaptive = false;
-  world.directionalLight!.castsShadow =
-      state.relitImagery && state.weather == Weather.clear;
-  world.directionalLight!.shadowMapResolution = switch (quality) {
-    RenderQuality.performance => 1024,
-    RenderQuality.balanced => 2048,
-    RenderQuality.high => 4096,
-  };
+  configureTerrainShadows(world.directionalLight!, state);
   world.depthOfField
     ..enabled = state.depthOfField
     ..fStop = state.aperture

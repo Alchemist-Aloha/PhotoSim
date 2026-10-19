@@ -36,6 +36,15 @@ void main() {
                   return SimulationWorkspace(
                     state: state,
                     onChanged: (next) => update(() => state = next),
+                    onGroundElevationChanged: (location, elevation) {
+                      if (state.location == location) {
+                        update(
+                          () => state = state.copyWith(
+                            groundElevation: elevation,
+                          ),
+                        );
+                      }
+                    },
                   );
                 },
               ),
@@ -143,8 +152,8 @@ void main() {
       for (final name in ['sunrise', 'sunset']) {
         final low = samples[name]!;
         expect(
-          low.$1,
-          greaterThan(low.$2 * 1.5),
+          low.$1 / low.$2,
+          greaterThan(daytime.$1 / daytime.$2 * 1.15),
           reason: '$name should be red: $low',
         );
         expect(

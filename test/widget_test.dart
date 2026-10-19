@@ -1,13 +1,85 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:photosim/core/geo.dart';
+import 'package:photosim/data/raster_cache.dart';
 import 'package:photosim/core/local_time.dart';
 import 'package:photosim/app/app.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/simulation_workspace.dart';
 
 void main() {
+  testWidgets(
+    'late terrain height merges into current settings and ignores moved locations',
+    (tester) async {
+      tester.view.physicalSize = const Size(1600, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final directory = Directory.systemTemp.createTempSync('photosim-ground-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      const channel = MethodChannel('plugins.flutter.io/path_provider');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        (_) async => directory.path,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      final cache = RasterCache(directory);
+      await tester.runAsync(cache.initialize);
+      await tester.pumpWidget(PhotoSimApp(rasterCache: cache));
+      await tester.runAsync(() async {
+        await cache.initialize();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+      await tester.pump();
+      await tester.tap(find.text('3D Preview'));
+      await tester.pump();
+      final oldWorkspace = tester.widget<SimulationWorkspace>(
+        find.byType(SimulationWorkspace),
+      );
+      final inspector = tester.widget<CameraInspector>(
+        find.byType(CameraInspector),
+      );
+      final next = inspector.state.copyWith(
+        iso: 3200,
+        depthOfField: true,
+        renderQuality: RenderQuality.high,
+        timestamp: inspector.state.timestamp.add(const Duration(hours: 1)),
+      );
+      inspector.onChanged(next);
+      // Completion before the next frame must not publish a stale full state.
+      oldWorkspace.onGroundElevationChanged(next.location, 1234);
+      await tester.pump();
+      var current = tester.widget<CameraInspector>(
+        find.byType(CameraInspector),
+      );
+      expect(current.state.iso, 3200);
+      expect(current.state.depthOfField, isTrue);
+      expect(current.state.renderQuality, RenderQuality.high);
+      expect(current.state.timestamp, next.timestamp);
+      expect(current.state.groundElevation, 1234);
+      current.onChanged(
+        current.state.copyWith(latitude: current.state.latitude + 1),
+      );
+      oldWorkspace.onGroundElevationChanged(next.location, 9999);
+      await tester.pump();
+      current = tester.widget<CameraInspector>(find.byType(CameraInspector));
+      expect(current.state.latitude, next.latitude + 1);
+      expect(current.state.groundElevation, isNull);
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('navigation rail switches workspaces and preserves UTC/camera', (
     tester,
   ) async {

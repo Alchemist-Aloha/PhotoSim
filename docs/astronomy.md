@@ -124,8 +124,8 @@ or apply forecasts to illustrative 3D weather.
 ## Rendering
 
 The calculated solar direction drives the existing shadow-casting directional
-light. A built-in Flutter Scene `PhysicalSkySource` uses the same direction
-and calculated solar angular radius; the skybox draws behind terrain. The
+light. `AtmosphereSky` uses the same direction and calculated solar angular
+radius; its shader skybox draws behind terrain. The
 manual test-light slider has been removed.
 
 Direct solar light uses Kasten–Young relative air mass and RGB clear-air extinction
@@ -135,9 +135,15 @@ producing dim red/orange low-Sun lighting. A last-solar-diameter fade avoids an
 abrupt directional-light switch at 0°; it is not a refracted limb calculation.
 The sky uses matching clear-air optical depths: Rayleigh tint (0.058, 0.135,
 0.331), coefficient 1, Mie coefficient 0.002, turbidity 2 and eccentricity 0.76.
-This gives a bluer clear sky with less washed-out aerosol glow. The built-in sky
-shader applies view-path extinction to the actual angular-size solar disk.
-Sun/Moon positions, geometry and geographic resources are unchanged.
+`assets/atmosphere/sky.fmat` integrates Rayleigh/Mie single scattering through a
+spherical 80 km atmosphere with 8.4/1.25 km density scale heights. Curved-Earth
+shadowing leaves high atmosphere illuminated after sunset instead of switching the
+sky off at 0°. The same integration scatters moonlight with phase-dependent
+preview radiance. The Sun's actual-size disk receives path extinction; no second
+Moon disk is drawn. Observer elevation is included, clamped to 2–10,000 m.
+Performance/balanced/high use 4/8/12 view samples and 4/4/6 light-path samples.
+`hook/build.dart` compiles this custom sky with Flutter Scene's existing FMAT tools;
+generated shader assets are not committed. Astronomical positions are unchanged.
 
 The visible sky also drives diffuse irradiance and rough specular lighting through
 Flutter Scene's `SkyEnvironment`, replacing the uniform ambient fill. The sky is
@@ -157,9 +163,31 @@ the flat fallback color. Celestial proxy meshes exclude terrestrial distance fog
 but retain exposure, tone mapping and terrain occlusion.
 
 These are approximate appearance controls, **not calibrated irradiance, exposure
-or weather simulation**. The built-in clear sky goes black below the solar horizon;
-there is no artificial ambient night floor or physically modeled twilight scattering.
-Moonlight remains a separate directional light. Stars and a simplified Milky Way brightness map are rendered
+or weather simulation**. There is no artificial ambient night floor. Lunar sky
+radiance uses the same preview-relative scale family as direct moonlight, not
+photometric units. Multiple scattering, ozone, measured aerosol profiles and
+cloud volumes are not modeled. Direct moonlight remains a separate directional light.
+
+Terrain shadows use a 300 m near cascade, logarithmically weighted remaining
+splits, 12% overlap and a 15% far fade. Performance uses two 1024-pixel cascades;
+balanced uses four at 2048; high uses four at 4096 with PCSS and 3 m screen-space
+contact shadows. Balanced/performance use stable bilinear PCF. Bias is reduced for
+higher resolution and includes the backend's grazing-angle normal offset. The
+penumbra cap stays small because the backend also uses it in receiver bias.
+Shadow reach is bounded by render distance and 16 km (24 km high); screen-space
+contact shadows cannot represent off-screen occluders.
+
+**Rendering → Camera light** adds an optional white point source at the camera,
+0–100% strength (0 = off), in approximately relit mode. It uses inverse-square
+falloff, a 2 m emitter-radius safety floor and the terrain render range; it is a
+visibility aid, not a simulated calibrated flashlight. It casts no extra shadows
+(the emitter shares the camera's visible line of sight). Its analytic lighting
+never enters the sky/environment bake or unlit celestial materials. Auto exposure
+holds its existing adaptation factor while fill is active, preventing terrain fill
+from re-metering the sky; the two initial Auto frames are metered without fill.
+Switching it off resumes normal adaptation. Strength persists in plans and session
+recovery; old plans default to off. Explicit exposure/time/weather edits can still
+change sky appearance. Stars and a simplified Milky Way brightness map are rendered
 by the separate [night-sky module](data-sources/night-sky.md), with their own
 solar/lunar visibility approximation.
 
@@ -172,7 +200,8 @@ fixtures, not photometric reference measurements.
 
 `integration_test/atmosphere_test.dart` checks actual GPU pixel differences with
 haze and sky lighting enabled/disabled, celestial fog exclusion, sky rebaking,
-quality changes and unchanged terrain resources. It passed on Linux and an Android
+twilight dimming, moonlit/occluded-Moon skies, quality changes and imagery retention
+during high-detail remeshing. It passed on Linux and an Android
 host-GPU emulator. Local SwiftShader/lavapipe emulator processes crashed
 (SIGSEGV/SIGILL); software-emulator compatibility and physical-device performance
 remain unverified.

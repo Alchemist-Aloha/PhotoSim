@@ -24,6 +24,7 @@ import '../data/terrain/terrain_provider.dart';
 import '../data/terrain/terrain_sources.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
+import '../render/atmosphere_sky.dart';
 import '../render/photography.dart';
 import '../render/photo_framing.dart';
 import '../core/sunlight.dart';
@@ -43,6 +44,7 @@ class SimulationWorkspace extends StatefulWidget {
     super.key,
     required this.state,
     required this.onChanged,
+    required this.onGroundElevationChanged,
     this.onPausePlayback,
     this.cleanPreview = false,
     this.httpClient,
@@ -56,6 +58,8 @@ class SimulationWorkspace extends StatefulWidget {
   final VoidCallback? onPausePlayback;
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
+  final void Function(LatLng location, double elevation)
+  onGroundElevationChanged;
 
   @override
   State<SimulationWorkspace> createState() => _SimulationWorkspaceState();
@@ -70,7 +74,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   final terrainProviders = <String, TerrainProvider>{};
   String terrainCredits = '';
   ImagerySources? imagery;
-  final patches = <String, ({TileId id, scene.Node node})>{};
+  final patches = <String, ({TileId id, scene.Node node, int resolution})>{};
   final textures = <scene.Node, scene.Texture2D>{};
   final partialImagery = <String>{};
   final detailedImagery = <String>{};
@@ -94,8 +98,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   String? tileFailure;
   Object? error;
   bool loading = true;
-  scene.PhysicalSkySource? skySource;
+  AtmosphereSky? skySource;
   MoonRenderer? moonRenderer;
+  scene.PointLight? cameraLight;
+  scene.Node? cameraLightNode;
+  int? autoExposureStartFrame;
   NightSkyRenderer? nightRenderer;
 
   @override
@@ -143,17 +150,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         directory: budget.directory,
         budget: budget,
       );
-      skySource = scene.PhysicalSkySource(
-        turbidity: 2,
-        rayleighCoefficient: 1,
-        rayleighColor: vm.Vector3(
-          clearSkyRayleigh.red,
-          clearSkyRayleigh.green,
-          clearSkyRayleigh.blue,
-        ),
-        mieCoefficient: clearSkyMie,
-        mieEccentricity: 0.76,
-      );
+      skySource = await AtmosphereSky.load();
+      if (!mounted) return;
       overcastSky = scene.GradientSkySource();
       world = scene.Scene()..skybox = scene.Skybox(skySource!);
       world!.directionalLight = scene.DirectionalLight(
@@ -166,6 +164,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         shadowNormalBias: 2,
         intensity: 3,
       );
+      cameraLight = scene.PointLight(
+        intensity: 0,
+        range: 40000,
+        radius: 2,
+        castsShadow: false,
+      );
+      cameraLightNode = scene.Node(name: 'Camera light')
+        ..addComponent(scene.PointLightComponent(cameraLight!));
+      world!.add(cameraLightNode!);
       moonRenderer = MoonRenderer();
       world!.add(moonRenderer!.node);
       final stars = parseStarCatalog(
@@ -201,13 +208,17 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.location != next.location ||
         old.weather != next.weather ||
         old.weatherLightTransmission != next.weatherLightTransmission ||
-        old.renderQuality != next.renderQuality) {
+        old.renderQuality != next.renderQuality ||
+        old.cameraElevation != next.cameraElevation) {
       world?.skyEnvironment?.invalidate();
     }
     if (old.latitude != next.latitude ||
         old.longitude != next.longitude ||
         old.terrainRings != next.terrainRings ||
-        old.terrainForwardKm != next.terrainForwardKm) {
+        old.terrainForwardKm != next.terrainForwardKm ||
+        (old.renderQuality != next.renderQuality &&
+            (old.renderQuality == RenderQuality.high ||
+                next.renderQuality == RenderQuality.high))) {
       final nearbyNavigation =
           next.location == navigationLocation &&
           terrainOrigin != null &&
@@ -258,6 +269,28 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
   }
 
+  void updateCameraLight() {
+    final active = world, light = cameraLight;
+    if (active == null || light == null) return;
+    final state = widget.state;
+    if (state.exposureMode == ExposureMode.automatic) {
+      autoExposureStartFrame ??= active.renderStats.frameCount;
+    } else {
+      autoExposureStartFrame = null;
+    }
+    // The pinned backend snaps its first two Auto frames; meter them without fill.
+    final ready =
+        autoExposureStartFrame == null ||
+        active.renderStats.frameCount - autoExposureStartFrame! >= 2;
+    final strength = state.relitImagery && ready
+        ? state.cameraLightStrength / 100
+        : 0.0;
+    light
+      ..intensity = strength * strength * 100000
+      ..range = state.terrainRenderKm * 1000;
+    cameraLightNode?.visible = light.intensity > 0;
+  }
+
   void navigate(double forward, double right) {
     final next = moveCamera(widget.state, forward, right);
     if (identical(next, widget.state)) return;
@@ -294,10 +327,16 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final rebase = terrainOrigin != origin;
     final tiles = terrainCoverage(widget.state);
     final wanted = tiles.map((tile) => tile.key).toSet();
+    final center = TileId.at(origin);
+    final quality = widget.state.renderQuality;
+    int resolution(TileId tile) => terrainMeshResolution(tile, center, quality);
     if (!rebase &&
         !retry &&
         wanted.length == wantedTiles.length &&
-        wanted.containsAll(wantedTiles)) {
+        wanted.containsAll(wantedTiles) &&
+        tiles.every(
+          (tile) => patches[tile.key]?.resolution == resolution(tile),
+        )) {
       return;
     }
     wantedTiles = wanted;
@@ -307,7 +346,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
     final token = ++generation;
     final stop = cancellation = Completer<void>();
-    final center = TileId.at(origin);
     for (final key in patches.keys.toList()) {
       if (!rebase && wanted.contains(key)) continue;
       final node = patches.remove(key)!.node;
@@ -335,7 +373,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       loading = true;
     });
     final missing = tiles
-        .where((tile) => !patches.containsKey(tile.key))
+        .where((tile) => patches[tile.key]?.resolution != resolution(tile))
         .toList();
     Future<void>? nearbyImagery;
     // Near-first jobs, bounded concurrency; overlapping resident patches keep their buffers/textures.
@@ -347,7 +385,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             final result = await repository!.load(
               id,
               origin,
-              id.key == center.key ? 128 : (id.z == 13 ? 64 : 32),
+              resolution(id),
               abort: stop.future,
             );
             if (!mounted || token != generation) return;
@@ -360,18 +398,33 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               indices: patch.indices,
               retainCpuData: false,
             );
-            final material = scene.PhysicallyBasedMaterial()
-              ..baseColorFactor = vm.Vector4(0.32, 0.40, 0.25, 1)
-              ..roughnessFactor = 1
-              ..metallicFactor = 0;
+            final previous = patches[id.key]?.node;
+            final material =
+                previous?.mesh!.primitives.single.material ??
+                (scene.PhysicallyBasedMaterial()
+                  ..baseColorFactor = vm.Vector4(0.32, 0.40, 0.25, 1)
+                  ..roughnessFactor = 1
+                  ..metallicFactor = 0);
             final node =
-                scene.Node(name: id.key, mesh: scene.Mesh(geometry, material))
+                previous ??
+                      scene.Node(
+                        name: id.key,
+                        mesh: scene.Mesh(geometry, material),
+                      )
                   ..visible =
                       terrainDistance(id, widget.state.location) <=
                       widget.state.terrainRenderKm * 1000;
-            world!.add(node);
-            terrainNodes.add(node);
-            patches[id.key] = (id: id, node: node);
+            if (previous == null) {
+              world!.add(node);
+              terrainNodes.add(node);
+            } else {
+              node.mesh = scene.Mesh(geometry, material);
+            }
+            patches[id.key] = (
+              id: id,
+              node: node,
+              resolution: patch.resolution,
+            );
             if (id.key == center.key) {
               final sampled = patch.groundElevationAt(widget.state.location);
               if (sampled == null) {
@@ -380,9 +433,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               cameraGroundField = patch;
               cameraGroundTile = id;
               ground = sampled;
-              widget.onChanged(widget.state.copyWith(groundElevation: ground));
+              widget.onGroundElevationChanged(widget.state.location, sampled);
             }
-            setState(() => loaded++);
+            setState(() => loaded = patches.length);
           } catch (failure) {
             if (!mounted || token != generation) return;
             setState(() {
@@ -452,7 +505,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               a.id.key == centerKey ? 1 : 0,
             ),
           );
-    Future<void> update(({TileId id, scene.Node node}) patch, int size) async {
+    Future<void> update(
+      ({TileId id, scene.Node node, int resolution}) patch,
+      int size,
+    ) async {
       try {
         final result = await imagery!.load(patch.id, size, abort: stop.future);
         final raster = result.raster;
@@ -748,6 +804,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       state.cameraElevation ?? (ground ?? 0) + state.height,
       0,
     );
+    cameraLightNode?.position = eye;
+    updateCameraLight();
     final anchor = terrainOrigin;
     final transform = anchor == null || anchor == state.location
         ? vm.Matrix4.identity()
@@ -790,7 +848,21 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     skySource!
       ..sunDirection = sunDirection
       ..sunAngularRadius = sun.angularRadius
-      ..energy = state.weatherLightTransmission;
+      ..energy = state.weatherLightTransmission
+      ..moonDirection = vm.Vector3(
+        sky.moon.direction.x,
+        sky.moon.direction.y,
+        sky.moon.direction.z,
+      )
+      // shortcut: preview-relative lunar radiance, calibrate together with direct moonlight for photometry.
+      ..lunarRadiance = 0.2 * sky.moonIllumination * sky.moonIllumination
+      ..observerHeight = eye.y
+      ..viewSamples = switch (state.renderQuality) {
+        RenderQuality.performance => 4,
+        RenderQuality.balanced => 8,
+        RenderQuality.high => 12,
+      }
+      ..lightSamples = state.renderQuality == RenderQuality.high ? 6 : 4;
     active.environmentIntensity = 1;
     final transmission = state.weatherLightTransmission;
     moonRenderer!.node.visible = state.weather == Weather.clear;
@@ -885,6 +957,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                       flipX: true,
                                       child: scene.SceneView(
                                         active,
+                                        onTick: (_, _) => updateCameraLight(),
                                         camera: scene.PerspectiveCamera(
                                           position: eye,
                                           target: eye + direction,

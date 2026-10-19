@@ -990,6 +990,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             state: state,
             cleanPreview: cleanPreview,
             onChanged: update,
+            onGroundElevationChanged: (location, elevation) {
+              if (state.location == location) {
+                update(state.copyWith(groundElevation: elevation));
+              }
+            },
             onPausePlayback: () => setState(stopPlayback),
           );
     final scaffold = Scaffold(

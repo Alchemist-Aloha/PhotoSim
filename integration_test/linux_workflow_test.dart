@@ -363,7 +363,7 @@ void main() {
     expect(world.fog.skyColorInfluence, 1);
     expect(skySource.sunDirection.y, lessThan(0));
     await capture('linux-solar-night');
-    // A black night sky supplies no invented ambient floor; moonlight is separate.
+    // Separate sky scattering from direct moonlight.
     final ambient = world.environmentIntensity;
     final lunarIntensity = world.directionalLight!.intensity;
     world.directionalLight!.intensity = 0;
@@ -372,7 +372,7 @@ void main() {
     world.environmentIntensity = 0;
     await tester.pump(const Duration(milliseconds: 300));
     final unfilledTerrain = await viewportBrightness(tester, captureKey);
-    expect(filledTerrain, closeTo(unfilledTerrain, 0.2));
+    expect(filledTerrain, greaterThanOrEqualTo(unfilledTerrain - 0.2));
     expect(filledTerrain, lessThan(dayBrightness * 0.25));
     for (final node in texturedMeshes) {
       node.visible = false;

@@ -65,6 +65,15 @@ void main() {
                     child: SimulationWorkspace(
                       state: state,
                       onChanged: (next) => setState(() => state = next),
+                      onGroundElevationChanged: (location, elevation) {
+                        if (state.location == location) {
+                          setState(
+                            () => state = state.copyWith(
+                              groundElevation: elevation,
+                            ),
+                          );
+                        }
+                      },
                       httpClient: client,
                       rasterCache: cache,
                     ),
@@ -131,7 +140,7 @@ void main() {
           of: find.byKey(const ValueKey('preview-actions')),
           matching: find.byIcon(Icons.straighten),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(

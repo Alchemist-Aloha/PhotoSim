@@ -45,6 +45,7 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Sensor enum identifier and focal length in millimeters (8–600 mm).
 - Canonical UTC ISO-8601 simulation timestamp.
 - Selected target (`none`, `sun`, `moon`, `galacticCenter`).
+- Optional `cameraLightStrength` (0–100%, default off), the terrain-only camera fill.
 - Natural/approximate-relighting preference. New sessions enable approximate
   relighting; opening a plan preserves its stored preference.
 - Optional `showConstellations` toggle; missing in older plans defaults to off.

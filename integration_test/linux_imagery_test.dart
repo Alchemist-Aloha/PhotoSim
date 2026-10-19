@@ -47,6 +47,15 @@ void main() {
                           child: SimulationWorkspace(
                             state: state,
                             onChanged: (value) => setState(() => state = value),
+                            onGroundElevationChanged: (location, elevation) {
+                              if (state.location == location) {
+                                setState(
+                                  () => state = state.copyWith(
+                                    groundElevation: elevation,
+                                  ),
+                                );
+                              }
+                            },
                           ),
                         ),
                         SizedBox(

@@ -253,8 +253,11 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
   no rise/set event overlays or terrain visibility classification.
 - No atmospheric refraction, rise/set events or measured Earth orientation.
   Accuracy checks cover selected cases, not the entire supported date range.
-- Solar brightness/color and ambient twilight are approximate; the built-in
-  sky becomes black below the solar horizon. Natural imagery retains its lighting.
+- Twilight/lunar sky uses spherical single scattering with Earth shadowing, not
+  multiple scattering, ozone or calibrated photometry. Natural imagery retains its lighting.
+- High quality doubles terrain mesh subdivisions (256/128/64), retains native
+  256-pixel peaks and enables PCSS/contact shadows; source accuracy is unchanged
+  and physical-device performance remains unmeasured.
 - Approximate static timezone boundaries; local display only for 1970–2037.
   Local-day scrubbing converts to UTC; no arbitrary local date/time text input or
   timezone override. Civil-time rules can change.

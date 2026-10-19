@@ -375,6 +375,31 @@ class CameraInspector extends StatelessWidget {
               ? 'Illustrative weather/DOF · captured shadows remain'
               : 'Natural imagery retains captured lighting',
         ),
+        const SizedBox(height: 8),
+        Text(
+          state.cameraLightStrength == 0
+              ? 'Camera light: off'
+              : 'Camera light: ${state.cameraLightStrength.toStringAsFixed(0)}%',
+        ),
+        Semantics(
+          label: 'Camera light strength',
+          child: Slider(
+            key: const ValueKey('camera-light-strength'),
+            value: state.cameraLightStrength,
+            min: 0,
+            max: 100,
+            divisions: 100,
+            semanticFormatterCallback: (value) =>
+                value == 0 ? 'Off' : '${value.round()} percent',
+            onChanged: state.relitImagery
+                ? (value) =>
+                      onChanged(state.copyWith(cameraLightStrength: value))
+                : null,
+          ),
+        ),
+        const Text(
+          'Terrain-only preview fill from the camera. 0% is off; requires approximate relighting. Auto exposure is held while the light is on.',
+        ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Constellation guides'),

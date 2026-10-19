@@ -129,11 +129,17 @@ clients and standalone ArcticDEM/REMA providers have not been added.
 
 At zoom 13, a 512-pixel tile has ground sample spacing of approximately
 `9.55 × cos(latitude)` m, versus `19.1 × cos(latitude)` m for 256 pixels. Those are
-sampling spacings, not source detail or accuracy guarantees. Meshes use 128
-subdivisions on the camera patch, 64 on other zoom-13 patches, and 32 on coarser
-patches. Native 1–5 m source detail is not displayed; screen-error geometry
-refinement remains open. Time, relighting and sky-layer edits do not download or
-rebuild geography. With forward fetching off, optics/aim edits also preserve it;
+sampling spacings, not source detail or accuracy guarantees. Performance/balanced
+meshes use 128 subdivisions on the camera patch, 64 on other zoom-13 patches and
+32 on coarser patches. **High** doubles these to 256/128/64; full 256-pixel DEM
+meshes include the actual pixel centres so narrow source peaks are not averaged
+away. Camera vertices, conservative walking height and seam-hiding skirts remain.
+Switching into/out of High rebuilds geometry in place from cached DEMs while
+retaining nodes, imagery and materials; unavailable caching can require downloads.
+Performance↔balanced keeps geometry unchanged. High increases vertex/index memory
+and GPU work, not elevation-source accuracy. Native 1–5 m detail and screen-error
+refinement remain limited by the existing tile zoom/data. Time, relighting and
+sky-layer edits do not download or rebuild geography. With forward fetching off, optics/aim edits also preserve it;
 when enabled they can change coverage, retaining overlapping patches. Imagery
 keeps the same independent patch UVs; distant previews are correspondingly coarser.
 

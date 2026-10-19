@@ -8,6 +8,11 @@ import 'terrain_geo.dart';
 
 const terrainTileBudget = 256;
 
+int terrainMeshResolution(TileId id, TileId center, RenderQuality quality) {
+  final base = id.key == center.key ? 128 : (id.z == 13 ? 64 : 32);
+  return quality == RenderQuality.high ? base * 2 : base;
+}
+
 /// Nominal circular envelope: nearby tile corners or the requested forward reach.
 /// Coarse forward tiles can extend beyond it; this is not an exact fetch boundary.
 double approximateTerrainLoadingRadius(SimulationState state) {

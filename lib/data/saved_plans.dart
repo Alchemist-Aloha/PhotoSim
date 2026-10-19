@@ -36,6 +36,7 @@ class SavedPlan {
     'focalLength': state.focalLength,
     'target': state.target.name,
     'relitImagery': state.relitImagery,
+    'cameraLightStrength': state.cameraLightStrength,
     'showConstellations': state.showConstellations,
     'terrainRings': state.terrainRings,
     'terrainForwardKm': state.terrainForwardKm,
@@ -96,6 +97,8 @@ class SavedPlan {
           focalLength: number('focalLength'),
           target: CelestialTarget.values.byName(json['target'] as String),
           relitImagery: json['relitImagery'] as bool,
+          cameraLightStrength:
+              (json['cameraLightStrength'] as num?)?.toDouble() ?? 0,
           showConstellations: json['showConstellations'] as bool? ?? false,
           terrainRings: json['terrainRings'] as int? ?? 1,
           terrainForwardKm: (json['terrainForwardKm'] as num?)?.toDouble() ?? 0,

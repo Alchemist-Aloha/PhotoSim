@@ -51,6 +51,15 @@ void main() {
                           state: state,
                           onPausePlayback: () => paused = true,
                           onChanged: change,
+                          onGroundElevationChanged: (location, elevation) {
+                            if (state.location == location) {
+                              update(
+                                () => state = state.copyWith(
+                                  groundElevation: elevation,
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ),
                       SizedBox(
@@ -325,7 +334,10 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(counts(), initialCounts);
       for (var i = 0; i < nodes.length; i++) {
-        expect(nodes[i].mesh!.primitives.single.geometry, same(geometries[i]));
+        expect(
+          nodes[i].mesh!.primitives.single.geometry,
+          isNot(same(geometries[i])),
+        );
       }
       await tester.tap(find.text('Export PNG'));
       for (var i = 0; i < 30 && find.text('Save PNG').evaluate().isEmpty; i++) {

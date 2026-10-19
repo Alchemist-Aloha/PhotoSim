@@ -256,7 +256,14 @@ TerrainPatch buildTerrainPatch(
   final frame = LocalFrame(origin);
   final cameraUv = id.uv(origin);
   List<double> axis(double camera) {
-    final samples = [for (var i = 0; i <= resolution; i++) i / resolution];
+    // Full-detail meshes keep actual raster peaks instead of averaging pixel centres away.
+    final samples = resolution >= field.size
+        ? [
+            0.0,
+            for (var i = 0; i < resolution; i++) (i + 0.5) / resolution,
+            1.0,
+          ]
+        : [for (var i = 0; i <= resolution; i++) i / resolution];
     // Put the camera on an actual mesh vertex, not inside a coarsened hillside.
     if (camera > 0 &&
         camera < 1 &&

@@ -98,6 +98,7 @@ class SimulationState {
     this.groundElevation,
     this.fixedElevation,
     this.relitImagery = true,
+    this.cameraLightStrength = 0,
     this.showConstellations = false,
     this.terrainRings = 1,
     this.terrainForwardKm = 0,
@@ -142,6 +143,9 @@ class SimulationState {
         !whiteBalance.isFinite ||
         whiteBalance < 2000 ||
         whiteBalance > 12000 ||
+        !cameraLightStrength.isFinite ||
+        cameraLightStrength < 0 ||
+        cameraLightStrength > 100 ||
         !height.isFinite ||
         height < 0.1 ||
         height > 100 ||
@@ -204,6 +208,7 @@ class SimulationState {
       fixedElevation ??
       (groundElevation == null ? null : groundElevation! + height);
   final bool relitImagery, showConstellations;
+  final double cameraLightStrength;
   final int terrainRings;
   final double terrainForwardKm, terrainRenderKm;
   final Sensor sensor;
@@ -311,6 +316,7 @@ class SimulationState {
     double? fixedElevation,
     bool clearFixedElevation = false,
     bool? relitImagery,
+    double? cameraLightStrength,
     bool? showConstellations,
     int? terrainRings,
     double? terrainForwardKm,
@@ -361,6 +367,7 @@ class SimulationState {
           ? null
           : groundElevation ?? this.groundElevation,
       relitImagery: relitImagery ?? this.relitImagery,
+      cameraLightStrength: cameraLightStrength ?? this.cameraLightStrength,
       showConstellations: showConstellations ?? this.showConstellations,
       terrainRings: terrainRings ?? this.terrainRings,
       terrainForwardKm: terrainForwardKm ?? this.terrainForwardKm,

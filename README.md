@@ -72,7 +72,9 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
 - Phase-lit Moon at its calculated position and angular size, with terrain occlusion.
 - UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain.
-- Bluer clear skies and air-mass extinction for dimmer, redder sunrise/sunset.
+- Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
+- Blended terrain shadow cascades; High quality adds PCSS/contact shadows and denser 256/128/64 terrain meshes while retaining imagery.
+- **Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
 - Persistent navigation rail for Map/3D Preview/Calendar; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
