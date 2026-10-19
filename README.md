@@ -19,7 +19,10 @@ flutter run -d linux
 ```
 
 The Linux runner enables Flutter GPU permanently; no extra rendering flags
-are needed. Direct dependencies are pinned and `pubspec.lock` is included.
+are needed. Under Hyprland and niri, it automatically hides GTK's window header
+and client-side decorations using compositor/desktop environment variables;
+PhotoSim's own toolbar remains available. Other desktops keep their existing
+window-decoration behavior. Direct dependencies are pinned and `pubspec.lock` is included.
 
 ## Run on Android
 
