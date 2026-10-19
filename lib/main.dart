@@ -13,6 +13,10 @@ import 'app/app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+      ['PhotoSim'],
+      'Copyright (C) 2026 PhotoSim contributors\nLicensed under GPL-3.0-only.\n\n${await rootBundle.loadString('LICENSE')}',
+    );
     yield LicenseEntryWithLineBreaks([
       'D3-Celestial sky data',
     ], await rootBundle.loadString('assets/sky/LICENSE.txt'));

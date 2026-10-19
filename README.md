@@ -32,8 +32,8 @@ flutter run -d <android-device-id>
 flutter build apk --release
 ```
 
-Install `build/app/outputs/flutter-apk/app-release.apk`. The current release
-configuration uses a development signing key; configure your own before publishing.
+Install `build/app/outputs/flutter-apk/app-release.apk`. Local builds default to
+a development signing key; [tagged CI releases](docs/releases.md) require your persistent signing key.
 Flutter GPU and internet access are enabled in the release manifest.
 
 Phones use bottom navigation and a controls drawer; larger windows use a
@@ -94,6 +94,19 @@ See [Linux MVP photography controls and export](docs/linux-mvp.md) for usage, li
 The inset photo rectangle matches the sensor's aspect ratio and map FOV; the
 surrounding 3D context fills the available canvas. Lens/roll controls preserve
 position; WASD moves explicitly. PNG export crops to the photo rectangle.
+
+## License
+
+PhotoSim is licensed under the [GNU General Public License, version 3 only](LICENSE)
+(`GPL-3.0-only`). Copyright © 2026 PhotoSim contributors.
+Bundled third-party components and data retain their own licenses and attribution.
+
+## Automated releases
+
+[GitHub Actions](.github/workflows/build.yml) builds Linux `.deb`, pacman and
+AppImage packages plus per-ABI Android APKs. Matching `v<version>` tags upload
+`PhotoSim-<version>-<arch>.<ext>` assets and checksums to GitHub Releases.
+Configure persistent Android signing secrets first; see [release setup](docs/releases.md).
 
 ## Build and verify
 

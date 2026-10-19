@@ -15,9 +15,11 @@ flutter build apk --release
 adb -s <serial> install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
-The generated runner currently signs release builds with the development key,
-so the APK is installable for testing, **not configured for Play Store publication**.
-Use your own release signing configuration before distributing updates.
+Local builds without signing environment variables use the development key.
+[Tagged CI releases](releases.md) require a persistent keystore configured through
+GitHub secrets, so updates retain their signing identity. These are sideloadable
+APKs, **not a Play Store publication workflow**. Changing keys prevents updates
+over existing installations; uninstalling loses app-private plans/session state.
 A compatible Impeller graphics driver is required for 3D; an initialization
 failure leaves Map available. The API 29 floor is not a guarantee that every
 Android 10 GPU can render this scene.

@@ -1,0 +1,19 @@
+PhotoSim
+Copyright (C) 2026 PhotoSim contributors
+Source: https://github.com/Alchemist-Aloha/PhotoSim
+SPDX-License-Identifier: GPL-3.0-only
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License, version 3 only,
+as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See LICENSE
+in this folder or /usr/share/licenses/photosim/LICENSE for the full text.
+
+Bundled third-party components and data retain their own licenses.
+Sky data attribution/license: sky-data-LICENSE.txt in this folder.
+Flutter dependency notices: /usr/lib/photosim/data/flutter_assets/NOTICES.Z.
+Original sky-data license and provenance are also included under
+/usr/lib/photosim/data/flutter_assets/assets/sky/.

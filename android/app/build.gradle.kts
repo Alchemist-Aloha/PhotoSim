@@ -4,6 +4,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val signingNames = listOf("PHOTOSIM_KEYSTORE_FILE", "PHOTOSIM_KEYSTORE_PASSWORD", "PHOTOSIM_KEY_ALIAS", "PHOTOSIM_KEY_PASSWORD")
+val hasReleaseSigning = signingNames.all { !System.getenv(it).isNullOrBlank() }
+require(hasReleaseSigning || signingNames.all { System.getenv(it).isNullOrBlank() }) {
+    "Set all four PHOTOSIM signing environment variables, or none for local development signing."
+}
+
 android {
     namespace = "org.photosim.photosim"
     compileSdk = flutter.compileSdkVersion
@@ -29,11 +35,21 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(System.getenv("PHOTOSIM_KEYSTORE_FILE")!!)
+                storePassword = System.getenv("PHOTOSIM_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("PHOTOSIM_KEY_ALIAS")
+                keyPassword = System.getenv("PHOTOSIM_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Tagged CI releases enforce a persistent key; local builds may use the development key.
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
         }
     }
 }

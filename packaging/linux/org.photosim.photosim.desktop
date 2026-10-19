@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=PhotoSim
+Comment=Landscape and astrophotography planner
+Exec=photosim
+Icon=photosim
+Terminal=false
+Categories=Graphics;Photography;
+Keywords=landscape;astrophotography;Milky Way;photography;
+StartupWMClass=org.photosim.photosim
