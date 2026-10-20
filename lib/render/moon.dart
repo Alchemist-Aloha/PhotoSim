@@ -18,6 +18,18 @@ double moonlightIntensity(SkyState sky) =>
 
 Float32List moonColors(Float32List normals, Vector3 lightDirection) {
   final colors = Float32List(normals.length ~/ 3 * 4);
+  moonColorsInto(normals, lightDirection, colors);
+  return colors;
+}
+
+void moonColorsInto(
+  Float32List normals,
+  Vector3 lightDirection,
+  Float32List colors,
+) {
+  if (colors.length != normals.length ~/ 3 * 4) {
+    throw ArgumentError('Moon color buffer size mismatch');
+  }
   for (var i = 0; i < normals.length ~/ 3; i++) {
     final light = math.max(
       0.0,
@@ -29,7 +41,6 @@ Float32List moonColors(Float32List normals, Vector3 lightDirection) {
     colors[i * 4] = colors[i * 4 + 1] = colors[i * 4 + 2] = 1;
     colors[i * 4 + 3] = light;
   }
-  return colors;
 }
 
 /// Near-side orientation using projected lunar north; libration is not modeled.
@@ -83,12 +94,15 @@ class MoonRenderer {
   late final Float32List normals;
   late final scene.Node node;
   Vector3? lastLight;
+  late final Float32List _colorScratch = Float32List(normals.length ~/ 3 * 4);
 
   void update(SkyState sky, vm.Vector3 eye, Vector3 northPole) {
     final orientation = moonTextureOrientation(sky.moon.direction, northPole);
     final light = orientation.transposed().transformed(sky.moonToSunDirection);
-    if (lastLight != light) {
-      geometry.updateColors(moonColors(normals, light));
+    // Incremental playback steps change the phase negligibly; skip color-buffer uploads.
+    if (lastLight == null || (lastLight! - light).length2 > 1e-8) {
+      moonColorsInto(normals, light, _colorScratch);
+      geometry.updateColors(_colorScratch);
       lastLight = light;
     }
     final d = sky.moon.direction;

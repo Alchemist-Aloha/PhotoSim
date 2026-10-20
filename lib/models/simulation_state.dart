@@ -225,11 +225,13 @@ class SimulationState {
   final bool depthOfField;
   final double aperture, focusDistance;
 
-  CelestialPosition get galacticCenter => ObserverSkyFrame(
+  /// Immutable per-state cache: reconstruction is expensive (nutation/precession).
+  late final ObserverSkyFrame observerFrame = ObserverSkyFrame(
     timestamp: timestamp,
     latitude: latitude,
     longitude: longitude,
-  ).galacticCenter;
+  );
+  late final CelestialPosition galacticCenter = observerFrame.galacticCenter;
 
   CelestialPosition? get targetPosition => switch (target) {
     CelestialTarget.none => null,
@@ -276,7 +278,7 @@ class SimulationState {
         direction.dot(up).abs() <= depth * math.tan(verticalFov / 2) + 1e-12;
   }
 
-  SkyState get sky => calculateSky(
+  late final SkyState sky = calculateSky(
     timestamp: timestamp,
     latitude: latitude,
     longitude: longitude,

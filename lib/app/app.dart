@@ -217,8 +217,10 @@ class _WorkspaceShellState extends State<WorkspaceShell>
               '${(await getApplicationSupportDirectory()).path}/photosim/cache-settings.json',
             ),
           );
+      // Publish immediately so GPU/world setup can overlap disk indexing; cache
+      // operations still queue behind initialize inside RasterCache.
+      if (mounted && rasterCache == null) setState(() => rasterCache = cache);
       await cache.initialize();
-      if (mounted) setState(() => rasterCache = cache);
     } on Exception {
       if (mounted) {
         setState(
@@ -467,8 +469,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(widget.sessionWarning!)));
       }
+      // Map and calendar do not need the disk index on their startup path.
+      if (workspace == Workspace.simulation) unawaited(initializeCache());
     });
-    unawaited(initializeCache());
   }
 
   void stopPlayback() {
@@ -927,10 +930,18 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       onSectionChanged: (title, expanded) =>
           setState(() => expandedSections[title] = expanded),
     );
-    void changeWorkspace(int index) => setState(() {
-      if (Workspace.values[index] == Workspace.calendar) stopPlayback();
-      workspace = Workspace.values[index];
-    });
+    void changeWorkspace(int index) {
+      setState(() {
+        if (Workspace.values[index] == Workspace.calendar) stopPlayback();
+        workspace = Workspace.values[index];
+      });
+      if (workspace == Workspace.simulation &&
+          rasterCache == null &&
+          cacheError == null) {
+        unawaited(initializeCache());
+      }
+    }
+
     void showInspector() {
       if (dockedInspector) {
         setState(() => inspectorVisible = !inspectorVisible);

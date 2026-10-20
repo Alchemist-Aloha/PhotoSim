@@ -42,6 +42,9 @@ void main() {
       });
       await tester.pump();
       await tester.tap(find.text('3D Preview'));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
       await tester.pump();
       final oldWorkspace = tester.widget<SimulationWorkspace>(
         find.byType(SimulationWorkspace),

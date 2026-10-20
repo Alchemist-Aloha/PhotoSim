@@ -193,7 +193,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       if (!mounted) return;
       nightRenderer = NightSkyRenderer(stars, band, constellations);
       world!.add(nightRenderer!.root);
-      await loadTerrain();
+      // Render the shell and arriving tiles immediately; terrain is not a first-frame dependency.
+      unawaited(
+        loadTerrain().catchError((Object failure, StackTrace stack) {
+          debugPrint('PhotoSim terrain load failed: $failure\n$stack');
+          if (mounted) setState(() => loading = false);
+        }),
+      );
     } catch (failure, stack) {
       debugPrint('PhotoSim 3D initialization failed: $failure\n$stack');
       if (mounted) {
@@ -838,16 +844,20 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         : state;
     final sky = state.sky;
     // shortcut: Auto meters the whole context canvas; add backend ROI metering for photo-only Auto.
-    configurePhotography(active, state);
+    configurePhotography(active, state, sky: sky);
     final sun = sky.sun;
     // Mean J2000 lunar pole; the texture's near side stays Earth-facing without libration.
-    final lunarPole = ObserverSkyFrame(
-      timestamp: state.timestamp,
-      latitude: state.latitude,
-      longitude: state.longitude,
-    ).direction(269.9949 * math.pi / 180, 66.5392 * math.pi / 180);
+    final lunarPole = state.observerFrame.direction(
+      269.9949 * math.pi / 180,
+      66.5392 * math.pi / 180,
+    );
     moonRenderer!.update(sky, eye, lunarPole);
-    nightRenderer?.update(skyLayerState, eye);
+    nightRenderer?.update(
+      skyLayerState,
+      eye,
+      frame: state.observerFrame,
+      sky: sky,
+    );
     final sunDirection = vm.Vector3(
       sun.direction.x,
       sun.direction.y,
@@ -923,13 +933,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       builder: (context, bounds) => Stack(
         fit: StackFit.expand,
         children: [
-          ground == null
-              ? Center(
-                  child: loading
-                      ? const CircularProgressIndicator()
-                      : const Text(
-                          'Camera ground tile unavailable. Retry terrain or select another location.',
-                        ),
+          ground == null && !loading
+              ? const Center(
+                  child: Text(
+                    'Camera ground tile unavailable. Retry terrain or select another location.',
+                  ),
                 )
               : WasdNavigation(
                   enabled:

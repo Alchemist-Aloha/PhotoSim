@@ -109,7 +109,7 @@ requirements separately from excluded platform work.
 - `lib/render/night_sky.dart`: immutable star/band geometry and target marker.
 - `lib/data/saved_plans.dart`: bounded versioned JSON and native snapshot repository.
 - `lib/app/app.dart`: authoritative shared state, playback timer and lifecycle cleanup.
-- `lib/render/moon.dart`: lunar geometry, phase shading and approximate moonlight.
+- `lib/render/moon.dart`: lunar geometry/texture, cached phase shading and approximate moonlight.
 - `lib/core/terrain_geo.dart`: XYZ/Web Mercator bounds, WGS84 and local frames.
 - `lib/data/terrain/`: PNG/WebP elevations, parent cropping, CPU meshes,
   account-free service selection/fallback and provider-separated elevation repositories.
@@ -242,8 +242,10 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
   Native sub-meter regional imagery is downsampled by existing texture footprints;
   adaptive near-camera imagery subdivision and optional paid providers remain open.
 - Native-only cache; other platform builds and browser storage remain open.
-- Scene warns about depth precision inside ground patches. Shadow accuracy, frame
-  time targets, release-mode interaction and long-run GPU-memory stability are unmeasured.
+- Scene warns about depth precision inside ground patches. Linux profile frame-time
+  and release cold-start measurements are in [performance](performance.md); physical
+  Android/tablet timings, long-run GPU-memory stability and quantitative shadow
+  accuracy remain unmeasured.
 - Lunar surface color is bundled, but crater displacement, libration, earthshine
   and calibrated lunar photometry are not modeled.
   Moonlight is artistically scaled, not calibrated; daytime moonlight is omitted.
@@ -257,8 +259,10 @@ are not a survey-grade landmark alignment or cross-GPU accuracy benchmark.
 - Twilight/lunar sky uses spherical single scattering with Earth shadowing, not
   multiple scattering, ozone or calibrated photometry. Natural imagery retains its lighting.
 - High quality doubles terrain mesh subdivisions (256/128/64), retains native
-  256-pixel peaks and enables PCSS/contact shadows; source accuracy is unchanged
-  and physical-device performance remains unmeasured.
+  256-pixel peaks and enables PCSS/contact shadows; source accuracy is unchanged.
+  Desktop raster stayed below 3 ms in the audit, but physical-device performance
+  is unmeasured. Astronomy caching removed duplicate per-frame ephemeris work;
+  one time-change calculation (~5–10 ms profile) remains a main-isolate spike.
 - Approximate static timezone boundaries; local display only for 1970–2037.
   Local-day scrubbing converts to UTC; no arbitrary local date/time text input or
   timezone override. Civil-time rules can change.

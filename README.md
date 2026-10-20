@@ -71,7 +71,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Click the 3D preview and hold WASD to move at 30 m/s; the camera climbs/descends with terrain while keeping its height offset.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
 - NASA SVS/LRO surface-textured, phase-lit Moon at its calculated position and angular size, with terrain occlusion (offline 2K albedo; no libration or crater relief).
-- UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain.
+- UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain. Per-state astronomy/observer caching removes duplicate ephemeris work per frame.
 - Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
 - Blended terrain shadow cascades; High quality adds PCSS/contact shadows and denser 256/128/64 terrain meshes while retaining imagery.
 - **Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active.
@@ -140,6 +140,9 @@ Ship the **entire bundle directory**, not just its executable. The integration
 test requires a live Linux graphical session and internet access on its first
 terrain/imagery visit. Subsequent visits reuse the source-separated disk caches within the shared size limit. It writes screenshots to
 `build/validation/`.
+
+Frame-time and cold-start measurements, method and remaining bottlenecks are in the
+[performance audit](docs/performance.md).
 
 See [implementation status](docs/implementation-status.md) for validation
 evidence, rendering limitations, and future work.

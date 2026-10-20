@@ -3,20 +3,22 @@ import 'dart:math' as math;
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:vector_math/vector_math.dart' as vm;
 
+import '../core/astronomy.dart';
 import '../models/simulation_state.dart';
 import '../core/exposure.dart';
 
 void configureTerrainShadows(
   scene.DirectionalLight light,
-  SimulationState state,
-) {
+  SimulationState state, {
+  SkyState? sky,
+}) {
   final high = state.renderQuality == RenderQuality.high;
   final performance = state.renderQuality == RenderQuality.performance;
   final distance = math.min(
     state.terrainRenderKm * 1000,
     high ? 24000.0 : 16000.0,
   );
-  final sky = state.sky;
+  final current = sky ?? state.sky;
   light
     ..castsShadow = state.relitImagery && state.weather == Weather.clear
     ..shadowMapResolution = high ? 4096 : (performance ? 1024 : 2048)
@@ -36,13 +38,17 @@ void configureTerrainShadows(
     ..contactShadows =
         high && state.relitImagery && state.weather == Weather.clear
     ..contactShadowDistance = 3
-    ..angularRadius = sky.sun.altitude > 0
-        ? sky.sun.angularRadius
-        : sky.moon.angularRadius;
+    ..angularRadius = current.sun.altitude > 0
+        ? current.sun.angularRadius
+        : current.moon.angularRadius;
 }
 
 /// Applies camera effects and atmosphere without downloading geographic resources.
-void configurePhotography(scene.Scene world, SimulationState state) {
+void configurePhotography(
+  scene.Scene world,
+  SimulationState state, {
+  SkyState? sky,
+}) {
   world.exposure = exposureMultiplier(state);
   world.autoExposure
     ..enabled = state.exposureMode == ExposureMode.automatic
@@ -71,7 +77,7 @@ void configurePhotography(scene.Scene world, SimulationState state) {
       RenderQuality.high => scene.RenderQualityTier.high,
     }
     ..adaptive = false;
-  configureTerrainShadows(world.directionalLight!, state);
+  configureTerrainShadows(world.directionalLight!, state, sky: sky);
   world.depthOfField
     ..enabled = state.depthOfField
     ..fStop = state.aperture

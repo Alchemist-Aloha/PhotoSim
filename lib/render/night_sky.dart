@@ -9,6 +9,7 @@ import 'constellations.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 
+import '../core/astronomy.dart';
 import '../core/geo.dart';
 import '../core/night_sky.dart';
 import '../models/simulation_state.dart';
@@ -134,17 +135,18 @@ class NightSkyRenderer {
   (DateTime, double, double)? _lastObserver;
   vm.Matrix3 _rotation = vm.Matrix3.identity();
 
-  void update(SimulationState state, vm.Vector3 eye) {
+  void update(
+    SimulationState state,
+    vm.Vector3 eye, {
+    ObserverSkyFrame? frame,
+    SkyState? sky,
+  }) {
     final observer = (state.timestamp, state.latitude, state.longitude);
     if (_lastObserver != observer) {
-      final frame = ObserverSkyFrame(
-        timestamp: state.timestamp,
-        latitude: state.latitude,
-        longitude: state.longitude,
-      );
-      final x = frame.direction(0, 0),
-          y = frame.direction(math.pi / 2, 0),
-          z = frame.direction(0, math.pi / 2);
+      final skyFrame = frame ?? state.observerFrame;
+      final x = skyFrame.direction(0, 0),
+          y = skyFrame.direction(math.pi / 2, 0),
+          z = skyFrame.direction(0, math.pi / 2);
       _rotation = vm.Matrix3.columns(
         vm.Vector3(x.x, x.y, x.z),
         vm.Vector3(y.x, y.y, y.z),
@@ -155,10 +157,10 @@ class NightSkyRenderer {
     root.localTransform = vm.Matrix4.identity()
       ..setRotation(_rotation)
       ..setTranslation(eye);
-    final sky = state.sky;
+    final current = sky ?? state.sky;
     final clear = state.weather == Weather.clear;
-    final stars = clear ? nightVisibility(sky) : 0.0,
-        band = clear ? nightVisibility(sky, milkyWay: true) : 0.0;
+    final stars = clear ? nightVisibility(current) : 0.0,
+        band = clear ? nightVisibility(current, milkyWay: true) : 0.0;
     starNode.visible = stars > 0;
     bandNode.visible = band > 0.001;
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);
