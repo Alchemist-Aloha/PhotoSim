@@ -58,7 +58,7 @@ enum ExposureMode {
 }
 
 enum Weather {
-  clear('Clear', 100, 1, 0),
+  clear('Clear', 500, 1, 0),
   cloudy('Cloudy', 18, 0.35, 0),
   fog('Fog', 0.7, 0.2, 0),
   rain('Rain', 3.5, 0.15, 0.6);
@@ -154,7 +154,7 @@ class SimulationState {
         focalLength > maxFocalLength ||
         !this.weatherVisibilityKm.isFinite ||
         this.weatherVisibilityKm < 0.1 ||
-        this.weatherVisibilityKm > 100 ||
+        this.weatherVisibilityKm > Weather.clear.visibilityKm ||
         !this.weatherLightTransmission.isFinite ||
         this.weatherLightTransmission < 0 ||
         this.weatherLightTransmission > 1 ||
@@ -220,7 +220,7 @@ class SimulationState {
   final double weatherVisibilityKm, weatherLightTransmission, rainIntensity;
   bool get atmosphericEffects =>
       weather != Weather.clear ||
-      weatherVisibilityKm < 100 ||
+      weatherVisibilityKm < Weather.clear.visibilityKm ||
       weatherLightTransmission != 1;
   final bool depthOfField;
   final double aperture, focusDistance;

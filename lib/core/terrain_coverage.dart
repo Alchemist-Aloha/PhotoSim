@@ -13,6 +13,31 @@ int terrainMeshResolution(TileId id, TileId center, RenderQuality quality) {
   return quality == RenderQuality.high ? base * 2 : base;
 }
 
+/// Refine the camera tile, or at most nine nearest rendered tiles in High.
+List<TileId> terrainImageryDetailTiles(
+  Iterable<TileId> tiles,
+  SimulationState state,
+) {
+  final center = TileId.at(state.location);
+  final high = state.renderQuality == RenderQuality.high;
+  final nearby =
+      tiles.where((tile) {
+        if (!high) return tile.key == center.key;
+        return terrainDistance(tile, state.location) <=
+            state.terrainRenderKm * 1000;
+      }).toList()..sort((a, b) {
+        if (a.key == b.key) return 0;
+        if (a.key == center.key) return -1;
+        if (b.key == center.key) return 1;
+        final distance = terrainDistance(
+          a,
+          state.location,
+        ).compareTo(terrainDistance(b, state.location));
+        return distance != 0 ? distance : a.key.compareTo(b.key);
+      });
+  return nearby.take(high ? 9 : 1).toList();
+}
+
 /// Nominal circular envelope: nearby tile corners or the requested forward reach.
 /// Coarse forward tiles can extend beyond it; this is not an exact fetch boundary.
 double approximateTerrainLoadingRadius(SimulationState state) {

@@ -12,6 +12,79 @@ import 'package:photosim/render/photography.dart';
 
 void main() {
   test(
+    'detailed imagery is near-first and bounded by quality and render range',
+    () {
+      final state = SimulationState(terrainRings: 3);
+      final tiles = terrainCoverage(state).reversed.toList();
+      final center = TileId.at(state.location);
+      for (final quality in RenderQuality.values) {
+        final selected = terrainImageryDetailTiles(
+          tiles,
+          state.copyWith(renderQuality: quality),
+        );
+        expect(selected.first.key, center.key);
+        expect(selected.length, quality == RenderQuality.high ? 9 : 1);
+        expect(
+          selected.map((tile) => tile.key).toSet().length,
+          selected.length,
+        );
+        expect(
+          selected.skip(1).map((tile) => terrainDistance(tile, state.location)),
+          orderedEquals(
+            selected
+                .skip(1)
+                .map((tile) => terrainDistance(tile, state.location))
+                .toList()
+              ..sort(),
+          ),
+        );
+      }
+      final narrow = state.copyWith(
+        renderQuality: RenderQuality.high,
+        terrainRenderKm: 2,
+      );
+      expect(
+        terrainImageryDetailTiles(
+          tiles,
+          narrow,
+        ).every((tile) => terrainDistance(tile, narrow.location) <= 2000),
+        isTrue,
+      );
+      expect(terrainImageryDetailTiles([], state), isEmpty);
+      final dateline = state.copyWith(
+        longitude: 179.999,
+        renderQuality: RenderQuality.high,
+      );
+      expect(
+        terrainImageryDetailTiles(terrainCoverage(dateline), dateline),
+        hasLength(9),
+      );
+    },
+  );
+
+  test('GTAO is relit High only and resets on quality/imagery changes', () {
+    final occlusion = scene.AmbientOcclusionSettings();
+    final high = SimulationState(renderQuality: RenderQuality.high);
+    configureTerrainOcclusion(occlusion, high);
+    expect(occlusion.enabled, isTrue);
+    expect(occlusion.method, scene.AmbientOcclusionMethod.groundTruth);
+    expect(occlusion.radius, 40);
+    expect(occlusion.intensity, inExclusiveRange(0, 1));
+    expect(occlusion.directLightAffect, 0);
+    expect(occlusion.multiBounce, 1);
+    expect(occlusion.bentNormals, isTrue);
+    expect(occlusion.depthMipChain, isTrue);
+    expect(occlusion.halfResolution, isTrue);
+    for (final state in [
+      high.copyWith(relitImagery: false),
+      high.copyWith(renderQuality: RenderQuality.balanced),
+      high.copyWith(renderQuality: RenderQuality.performance),
+    ]) {
+      configureTerrainOcclusion(occlusion, state);
+      expect(occlusion.enabled, isFalse);
+    }
+  });
+  test(
     'High geometry doubles mesh sampling, other quality budgets stay unchanged',
     () {
       final center = TileId.at(const LatLng(37.744, -119.59));

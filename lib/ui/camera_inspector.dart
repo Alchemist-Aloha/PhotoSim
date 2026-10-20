@@ -298,7 +298,7 @@ class CameraInspector extends StatelessWidget {
           'Visibility',
           state.weatherVisibilityKm,
           0.1,
-          100,
+          Weather.clear.visibilityKm,
           (value) => onChanged(state.copyWith(weatherVisibilityKm: value)),
           ' km',
         ),

@@ -43,6 +43,24 @@ void configureTerrainShadows(
         : current.moon.angularRadius;
 }
 
+/// Terrain-scale GTAO affects indirect light only, not photographed colors.
+void configureTerrainOcclusion(
+  scene.AmbientOcclusionSettings occlusion,
+  SimulationState state,
+) {
+  occlusion
+    ..enabled = state.renderQuality == RenderQuality.high && state.relitImagery
+    ..method = scene.AmbientOcclusionMethod.groundTruth
+    ..radius = 40
+    ..intensity = 0.65
+    ..power = 1
+    ..multiBounce = 1
+    ..directLightAffect = 0
+    ..bentNormals = true
+    ..halfResolution = true
+    ..depthMipChain = true;
+}
+
 /// Applies camera effects and atmosphere without downloading geographic resources.
 void configurePhotography(
   scene.Scene world,
@@ -62,7 +80,12 @@ void configurePhotography(
     // shortcut: approximate color-temperature correction, use calibrated chromatic adaptation for colorimetry.
     ..temperature = ((state.whiteBalance - 6500) / 6500).clamp(-1.0, 1.0);
   final quality = state.renderQuality;
-  world.renderScale = quality == RenderQuality.performance ? 0.7 : 1;
+  world.renderScale = switch (quality) {
+    RenderQuality.performance => 0.7,
+    RenderQuality.balanced => 1,
+    RenderQuality.high => 1.25,
+  };
+  configureTerrainOcclusion(world.ambientOcclusion, state);
   final aa = switch (state.antialiasing) {
     Antialiasing.automatic => scene.AntiAliasingMode.auto,
     Antialiasing.off => scene.AntiAliasingMode.none,
@@ -95,7 +118,7 @@ void configurePhotography(
     ..enabled =
         state.relitImagery ||
         state.weather != Weather.clear ||
-        state.weatherVisibilityKm < 100
+        state.weatherVisibilityKm < Weather.clear.visibilityKm
     ..skyColorInfluence = state.relitImagery ? 1 : 0
     ..mode = scene.FogMode.exponential
     ..density = scene.Fog.visibilityDensity(state.weatherVisibilityKm * 1000)

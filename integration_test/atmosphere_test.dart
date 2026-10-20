@@ -124,7 +124,7 @@ void main() {
         expect(world.fog.skyColorInfluence, 1);
         expect(
           world.fog.density,
-          closeTo(scene.Fog.visibilityDensity(100000), 1e-12),
+          closeTo(scene.Fog.visibilityDensity(500000), 1e-12),
         );
         final hazed = await pixels('haze');
         world.fog.enabled = false;
@@ -265,10 +265,12 @@ void main() {
             same(geometries[i]),
           );
         }
-        // Quality changes replace geometry in-place while keeping imagery/materials resident.
-        final originalMaterials = [
-          for (final node in nodes) node.mesh!.primitives.single.material,
-        ];
+        // High replaces geometry in-place and progressively refines nearby textures.
+        int textureWidth(scene.Node node) =>
+            (node.mesh!.primitives.single.material as scene.UnlitMaterial)
+                .baseColorTexture!
+                .sampledTexture!
+                .width;
         rebuild(
           () => state = state.copyWith(renderQuality: RenderQuality.high),
         );
@@ -284,16 +286,25 @@ void main() {
           }
           await tester.pump(const Duration(milliseconds: 50));
         }
+        for (
+          var i = 0;
+          i < 240 && nodes.any((node) => textureWidth(node) != 1024);
+          i++
+        ) {
+          await tester.pump(const Duration(milliseconds: 500));
+        }
+        expect(world.renderScale, 1.25);
+        expect(world.ambientOcclusion.enabled, isFalse); // Natural imagery.
+        expect(nodes.map(textureWidth), everyElement(1024));
         for (var i = 0; i < nodes.length; i++) {
           expect(
             nodes[i].mesh!.primitives.single.geometry,
             isNot(same(geometries[i])),
           );
-          expect(
-            nodes[i].mesh!.primitives.single.material,
-            same(originalMaterials[i]),
-          );
         }
+        final originalMaterials = [
+          for (final node in nodes) node.mesh!.primitives.single.material,
+        ];
         final highGeometry = [
           for (final node in nodes) node.mesh!.primitives.single.geometry,
         ];
@@ -336,7 +347,16 @@ void main() {
         );
         expect(world.directionalLight!.contactShadows, isTrue);
         expect(world.directionalLight!.cascadeOverlap, 0.12);
+        expect(world.ambientOcclusion.enabled, isTrue);
+        expect(world.ambientOcclusion.bentNormals, isTrue);
         final shadowed = await pixels('high-terrain-shadows');
+        world.ambientOcclusion.enabled = false;
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          await pixels('high-terrain-no-ao'),
+          isNot(orderedEquals(shadowed)),
+        );
+        world.ambientOcclusion.enabled = true;
         world.directionalLight!
           ..castsShadow = false
           ..contactShadows = false;

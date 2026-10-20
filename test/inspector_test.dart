@@ -83,6 +83,21 @@ void main() {
         SavedPlan('Custom rain', state).encode(),
       ).state;
       expect(restored.weatherVisibilityKm, 5);
+      final clear = state.copyWith(weather: Weather.clear);
+      expect(clear.weatherVisibilityKm, 500);
+      expect(
+        SavedPlan.decode(SavedPlan('Clear', clear).encode())
+            .state
+            .weatherVisibilityKm,
+        500,
+      );
+      final previousClear = clear.copyWith(weatherVisibilityKm: 100);
+      expect(
+        SavedPlan.decode(SavedPlan('Previous clear', previousClear).encode())
+            .state
+            .weatherVisibilityKm,
+        100,
+      );
       expect(restored.weatherLightTransmission, 0.8);
       expect(restored.rainIntensity, 0.2);
       final moved = restored.copyWith(azimuth: 90);
@@ -117,7 +132,7 @@ void main() {
       expect(legacy.rainIntensity, Weather.rain.rainIntensity);
       for (final entry in [
         ('weatherVisibilityKm', 0),
-        ('weatherVisibilityKm', 101),
+        ('weatherVisibilityKm', 501),
         ('weatherLightTransmission', -0.1),
         ('weatherLightTransmission', 1.1),
         ('rainIntensity', -1),
@@ -224,6 +239,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('Rain intensity')), findsNothing);
       expect(state.weatherLightTransmission, 1);
+      expect(state.weatherVisibilityKm, 500);
+      final visibility = tester.widget<Slider>(
+        find.byKey(const ValueKey('Visibility')),
+      );
+      expect(visibility.max, 500);
+      expect(visibility.value, 500);
       expect(tester.takeException(), isNull);
     },
   );

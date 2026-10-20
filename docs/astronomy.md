@@ -155,7 +155,7 @@ immediately to avoid stale daylight at night. The environment intensity stays at
 radiance used for haze matches the visible sky.
 
 Approximately relit terrain receives exponential aerial perspective, including in
-clear weather, using the existing visibility setting (100 km by default). Its fog
+clear weather, using the existing visibility setting (500 km by default). Its fog
 color samples the sky in the view direction, so distant ridges converge toward the
 actual horizon rather than uniform gray. Natural imagery retains its captured
 lighting and original clear-weather colors; its explicit weather fog still uses

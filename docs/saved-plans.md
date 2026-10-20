@@ -58,7 +58,7 @@ Each snapshot is a standalone UTF-8 JSON file containing:
   (`clear`, `cloudy`, `fog`, `rain`), `depthOfField`, `aperture` (1.4–22) and
   `focusDistance` (1–1,000,000 meters). Legacy defaults: Balanced, Clear, off,
   f/8 and 1 km focus. All fields are validated and preserve UTC/camera state.
-- Optional `weatherVisibilityKm` (0.1–100), `weatherLightTransmission` (0–1)
+- Optional `weatherVisibilityKm` (0.1–500), `weatherLightTransmission` (0–1)
   and `rainIntensity` (0–1). Missing fields use the selected weather preset's
   defaults. Parameter edits persist; changing presets resets their defaults.
 

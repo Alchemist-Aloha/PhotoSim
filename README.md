@@ -73,7 +73,8 @@ See [Android support](docs/android.md) for tests and device limitations.
 - NASA SVS/LRO surface-textured, phase-lit Moon at its calculated position and angular size, with terrain occlusion (offline 2K albedo; no libration or crater relief).
 - UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain. Per-state astronomy/observer caching removes duplicate ephemeris work per frame.
 - Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
-- Blended terrain shadow cascades; High quality adds PCSS/contact shadows and denser 256/128/64 terrain meshes while retaining imagery.
+- Blended terrain shadow cascades; High quality adds PCSS/contact shadows, denser 256/128/64 terrain meshes, 1.25× supersampling and terrain-scale GTAO with bent-normal indirect lighting.
+- Progressive imagery: 256px previews, then a 1024px camera tile; High refines up to nine nearest rendered tiles with bounded three-request concurrency. Failed detail requests retain previews.
 - **Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
@@ -155,7 +156,11 @@ The 3D surface uses **real elevation and automatically selected free imagery**:
 NAIP in the conterminous US, IGN in France, swisstopo in Switzerland, and the
 approximately 10 m EOX Sentinel-2 **2016** global mosaic elsewhere or as fallback.
 Regional aerial sources can be sub-meter, but current terrain textures downsample
-them; native aerial detail is not displayed. Pixels missing from every source use
+them; native aerial detail is not displayed. High uses more GPU time and texture
+memory (about 48 MiB for nine 1024px RGBA textures with mipmaps, plus other tiles
+and render targets). Refined textures remain resident when lowering quality until
+their terrain tiles unload. GTAO is an approximate, screen-space effect on relit
+terrain only; it is not a terrain-horizon visibility calculation. Pixels missing from every source use
 a labeled green fallback material. Sun/Moon calculations and solar lighting now
 work locally, including a phase-lit lunar sphere and approximate moonlight.
 Lunar surface detail remains unimplemented. PNG export captures the current viewport,

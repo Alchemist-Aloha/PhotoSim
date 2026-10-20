@@ -618,14 +618,25 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         entries.skip(start).take(3).map((entry) => update(entry, 256)),
       );
     }
-    final center = patches[centerKey];
-    if (detail &&
-        mounted &&
-        token == generation &&
-        center != null &&
-        textures.containsKey(center.node) &&
-        (retry || !detailedImagery.contains(centerKey))) {
-      await update(center, 1024);
+    if (detail && mounted && token == generation) {
+      final detailed =
+          terrainImageryDetailTiles(
+                patches.values.map((patch) => patch.id),
+                widget.state,
+              )
+              .map((id) => patches[id.key]!)
+              .where(
+                (patch) =>
+                    textures.containsKey(patch.node) &&
+                    (retry || !detailedImagery.contains(patch.id.key)),
+              )
+              .toList();
+      for (var start = 0; start < detailed.length; start += 3) {
+        if (!mounted || token != generation) return;
+        await Future.wait(
+          detailed.skip(start).take(3).map((patch) => update(patch, 1024)),
+        );
+      }
     }
     if (mounted && token == generation) {
       setState(

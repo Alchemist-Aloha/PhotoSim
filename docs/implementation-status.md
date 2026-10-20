@@ -38,7 +38,9 @@ requirements separately from excluded platform work.
   Pitch/aim/optics changes debounce 400 ms; non-overlapping distant tiles coarsen
   within a 256-patch budget, long lenses prefer finer tiles, retained patches reuse
   meshes/textures, and settings persist in plans with legacy defaults.
-- Progressive 256×256 image previews and a 1024×1024 camera-tile replacement.
+- Progressive 256×256 image previews and a 1024×1024 camera-tile replacement;
+  High refines up to nine nearest tiles within render range, three requests at a
+  time. Failed detail fetches retain previews; resident detail survives lowering quality.
 - Texture swaps preserve existing geometry; switching natural/relit mode also
   preserves geometry and shared camera/time state.
 - Approximate relighting enabled by default for new sessions; saved lighting
@@ -92,6 +94,12 @@ requirements separately from excluded platform work.
   4096 px / 12 MP, with no application controls and no overwriting existing files.
 - Performance/Balanced/High backend rendering budgets; unnecessary shadows skipped
   for natural imagery/overcast weather. Mesh/texture resources remain resident.
+  High adds 1.25× supersampling and terrain-scale GTAO (40 m radius, half-resolution
+  with depth mipmaps and bent-normal indirect lighting), disabled for natural imagery.
+  This is approximate screen-space shading, not survey-grade terrain visibility.
+  The atmosphere Linux GPU regression verifies nine 1024px textures, quality
+  transitions, supersampling and changed pixels with GTAO disabled. Android
+  GPU/performance validation of these additions remains outstanding.
 - Manual illustrative Clear/Cloudy/Fog/Rain, with overcast sky, fog, attenuation
   and clipped animated rain; no forecasts or weather network requests.
   Collapsible inspector sections expose preset, visibility, light transmission

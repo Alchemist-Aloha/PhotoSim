@@ -68,7 +68,7 @@ screen-space streaks clipped to the photograph. No weather service, account,
 network request, wind simulation, wet-surface reconstruction or precipitation
 physics is involved.
 
-Expand **Weather** in the inspector to adjust visibility (0.1–100 km), light
+Expand **Weather** in the inspector to adjust visibility (0.1–500 km; Clear defaults to 500 km), light
 transmission (0–100%) and, for Rain, intensity (0–100%). Visibility controls
 exponential fog; light transmission scales directional lighting and natural-image
 brightness; rain intensity changes streak density, with zero removing the overlay.
