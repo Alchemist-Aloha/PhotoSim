@@ -80,7 +80,13 @@ void main() {
       await capture('linux-planning-unsaved');
       await tester.tap(find.text('Save changes'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField), 'Evening plan');
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextFormField),
+        ),
+        'Evening plan',
+      );
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
       expect(inspector().state.focalLength, destination.focalLength);

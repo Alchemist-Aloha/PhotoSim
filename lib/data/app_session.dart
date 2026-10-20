@@ -15,6 +15,7 @@ class AppSession {
     this.inspectorVisible = true,
     this.timelineExpanded = false,
     this.calendarWeekView = false,
+    this.mapGuideDismissed = false,
     this.cleanPreview = false,
     this.playbackSpeed = 5,
     this.calendarDate,
@@ -27,6 +28,7 @@ class AppSession {
   final String? planName;
   final String workspace;
   final bool inspectorVisible, timelineExpanded, calendarWeekView, cleanPreview;
+  final bool mapGuideDismissed;
   final int playbackSpeed;
   final DateTime? calendarDate;
   final LatLng? mapCenter;
@@ -42,6 +44,7 @@ class AppSession {
     'inspectorVisible': inspectorVisible,
     'timelineExpanded': timelineExpanded,
     'calendarWeekView': calendarWeekView,
+    'mapGuideDismissed': mapGuideDismissed,
     'cleanPreview': cleanPreview,
     'playbackSpeed': playbackSpeed,
     'calendarDate': calendarDate?.toIso8601String(),
@@ -118,6 +121,9 @@ class AppSession {
         inspectorVisible: json['inspectorVisible'] as bool,
         timelineExpanded: json['timelineExpanded'] as bool,
         calendarWeekView: json['calendarWeekView'] as bool,
+        mapGuideDismissed: json.containsKey('mapGuideDismissed')
+            ? json['mapGuideDismissed'] as bool
+            : false,
         cleanPreview: json['cleanPreview'] as bool,
         playbackSpeed: speed,
         calendarDate: date,

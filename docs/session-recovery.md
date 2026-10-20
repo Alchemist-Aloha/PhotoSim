@@ -12,7 +12,8 @@ checkpoint and never creates or overwrites named snapshots.
   validated composition fields as [saved plans](saved-plans.md).
 - Last Map / 3D / Calendar workspace, map center and zoom, inspector visibility
   and expanded sections, timeline expansion, calendar month/week mode and the
-  selected calendar date, playback speed and fullscreen-preview preference.
+  selected calendar date, playback speed, dismissed map-guidance state and
+  fullscreen-preview preference. Older checkpoints default to showing guidance.
 - Plan name and its saved baseline, so recovered edits still show **Unsaved
   changes** and retain Save/Discard/Cancel protection when opening another plan.
 

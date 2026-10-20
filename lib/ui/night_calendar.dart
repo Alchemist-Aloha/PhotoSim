@@ -342,14 +342,20 @@ class _NightCalendarState extends State<NightCalendar> {
     builder: (context, constraints) {
       final measure = TextPainter(
         text: TextSpan(
-          text: '100',
-          style: Theme.of(context).textTheme.titleSmall,
+          text: '360m W',
+          style: Theme.of(context).textTheme.labelSmall,
         ),
         textDirection: Directionality.of(context),
         textScaler: MediaQuery.textScalerOf(context),
       )..layout();
+      final windowWidth = measure.width;
+      measure.text = TextSpan(
+        text: '100',
+        style: Theme.of(context).textTheme.titleLarge,
+      );
+      measure.layout();
       final width = math.max(
-        7.0 * math.max(48.0, measure.width + 10),
+        7.0 * math.max(48.0, math.max(windowWidth, measure.width) + 8),
         constraints.maxWidth,
       );
       measure.dispose();
@@ -397,8 +403,8 @@ class _NightCalendarState extends State<NightCalendar> {
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 7,
                       mainAxisExtent: math.max(
-                        84,
-                        MediaQuery.textScalerOf(context).scale(14) * 4 + 16,
+                        96,
+                        MediaQuery.textScalerOf(context).scale(14) * 5 + 16,
                       ),
                     ),
                     itemCount: days,
@@ -417,7 +423,7 @@ class _NightCalendarState extends State<NightCalendar> {
                               : () => select(date),
                           selected: chosen,
                           label:
-                              '${localizations.formatFullDate(date)}. ${night?.reason ?? 'Calculation pending'}. Score $label. A means astronomy only; W means weather-adjusted.',
+                              '${localizations.formatFullDate(date)}. ${night?.reason ?? 'Calculation pending'}. Score $label. ${night?.window?.minutes ?? 0} minute qualifying window. A means astronomy only; W means weather-adjusted.',
                           excludeSemantics: true,
                           child: Material(
                             color: chosen
@@ -450,7 +456,9 @@ class _NightCalendarState extends State<NightCalendar> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      '${date.day}',
+                                      date.month == anchor.month
+                                          ? '${date.day}'
+                                          : '${date.month}/${date.day}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .labelMedium
@@ -466,7 +474,7 @@ class _NightCalendarState extends State<NightCalendar> {
                                       label.split(' ').first,
                                       style: Theme.of(context)
                                           .textTheme
-                                          .titleSmall
+                                          .titleLarge
                                           ?.copyWith(
                                             color: chosen
                                                 ? colors.onPrimaryContainer
@@ -474,9 +482,9 @@ class _NightCalendarState extends State<NightCalendar> {
                                           ),
                                     ),
                                     Text(
-                                      label.contains(' ')
-                                          ? label.split(' ').last
-                                          : ' ',
+                                      night?.score == null
+                                          ? '—'
+                                          : '${night?.window?.minutes ?? 0}m ${label.split(' ').last}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .labelSmall
@@ -505,6 +513,7 @@ class _NightCalendarState extends State<NightCalendar> {
   );
 
   Widget weekAgenda() => Column(
+    key: const ValueKey('week-agenda'),
     children: List.generate(7, (index) {
       final date = firstDate.add(Duration(days: index));
       final night = rating(date);
@@ -517,7 +526,7 @@ class _NightCalendarState extends State<NightCalendar> {
         subtitle: Text(
           window == null
               ? night?.reason ?? 'Calculating…'
-              : '${window.minutes} min · ${localTime(window.start)}',
+              : '${night!.reason}\n${window.minutes} min · ${localTime(window.start)}',
         ),
         trailing: Text(
           scoreLabel(night),
@@ -566,18 +575,11 @@ class _NightCalendarState extends State<NightCalendar> {
             ),
             Text('${localTime(window.start)}\nto ${localTime(window.end)}'),
             Text('Recommended time: ${localTime(window.bestTime)}'),
-            const SizedBox(height: 8),
-            Text(
-              'Mean visible Milky Way at 0–30°: ${(window.lowMilkyWayFraction * 100).toStringAsFixed(1)}%\nCore altitude at that time: ${window.coreAltitude.toStringAsFixed(1)}°\nMoon below horizontal · ${(window.moonIllumination * 100).round()}% illuminated\nMinimum Moon–core separation ${window.moonSeparation.toStringAsFixed(1)}° (not limiting while Moon is below horizon)',
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Calculator: duration ${window.durationPoints}/50 + mean low Milky Way ${window.lowBandPoints}/50. A two-hour window with all the visible band at 0–30° reaches 100. Band percentage averages the interval endpoints by arc length, not brightness or camera framing.',
-            ),
           ],
           if (previewTime != null) ...[
             const SizedBox(height: 12),
-            Text('Geometry preview time: ${localTime(previewTime)}'),
+            if (window == null)
+              Text('Geometry preview time: ${localTime(previewTime)}'),
             FilledButton.icon(
               onPressed: () => widget.onPreview(previewTime),
               icon: const Icon(Icons.landscape),
@@ -588,6 +590,23 @@ class _NightCalendarState extends State<NightCalendar> {
                 'Geometry preview only; this night still has a zero rating.',
               ),
           ],
+          const Text(
+            'Calculated geometry only; terrain visibility is not predicted.',
+          ),
+          if (window != null)
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Geometry & score details'),
+              children: [
+                Text(
+                  'Mean visible Milky Way at 0–30°: ${(window.lowMilkyWayFraction * 100).toStringAsFixed(1)}%\nCore altitude at that time: ${window.coreAltitude.toStringAsFixed(1)}°\nMoon below horizontal · ${(window.moonIllumination * 100).round()}% illuminated\nMinimum Moon–core separation ${window.moonSeparation.toStringAsFixed(1)}° (not limiting while Moon is below horizon)',
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Calculator: duration ${window.durationPoints}/50 + mean low Milky Way ${window.lowBandPoints}/50. A two-hour window with all the visible band at 0–30° reaches 100. Band percentage averages the interval endpoints by arc length, not brightness or camera framing.',
+                ),
+              ],
+            ),
           if (window != null || night?.darkness != null) ...[
             const SizedBox(height: 16),
             Text(
@@ -607,21 +626,34 @@ class _NightCalendarState extends State<NightCalendar> {
                   ? 'No forecast for this window. Unknown does not mean clear.'
                   : '${conditions!.complete ? '' : 'Partial coverage · '}${conditions.cloud!.round()}% mean cloud · ${(conditions.coverage * 100).round()}% window covered',
             ),
-            if (conditions?.highCloud != null)
-              Text('High cloud up to ${conditions!.highCloud!.round()}%'),
-            if (conditions?.visibility != null)
-              Text(
-                'Minimum visibility ${(conditions!.visibility! / 1000).toStringAsFixed(1)} km',
+            if (conditions?.dewMargin != null && conditions!.dewMargin! < 3)
+              const Text(
+                'Dew risk · temperature is within 3°C of the dew point.',
               ),
-            if (conditions?.gusts != null)
-              Text('Gusts up to ${conditions!.gusts!.toStringAsFixed(0)} km/h'),
-            if (conditions?.dewMargin != null)
-              Text(
-                'Temperature above dew point: at least ${conditions!.dewMargin!.toStringAsFixed(1)}°C${conditions.dewMargin! < 3 ? ' · dew risk' : ''}',
-              ),
-            if (conditions?.rainProbability != null)
-              Text(
-                'Rain probability up to ${conditions!.rainProbability!.round()}%',
+            if (conditions != null)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('Forecast details'),
+                children: [
+                  if (conditions.highCloud != null)
+                    Text('High cloud up to ${conditions.highCloud!.round()}%'),
+                  if (conditions.visibility != null)
+                    Text(
+                      'Minimum visibility ${(conditions.visibility! / 1000).toStringAsFixed(1)} km',
+                    ),
+                  if (conditions.gusts != null)
+                    Text(
+                      'Gusts up to ${conditions.gusts!.toStringAsFixed(0)} km/h',
+                    ),
+                  if (conditions.dewMargin != null)
+                    Text(
+                      'Temperature above dew point: at least ${conditions.dewMargin!.toStringAsFixed(1)}°C',
+                    ),
+                  if (conditions.rainProbability != null)
+                    Text(
+                      'Rain probability up to ${conditions.rainProbability!.round()}%',
+                    ),
+                ],
               ),
             if (conditions?.complete == true)
               Text(
@@ -787,7 +819,7 @@ class _NightCalendarState extends State<NightCalendar> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
-            '${widget.state.latitude.toStringAsFixed(4)}°, ${widget.state.longitude.toStringAsFixed(4)}° · $zone\nLocal evenings → 01:00 · A: astronomy only · W: weather-adjusted',
+            '${widget.state.latitude.toStringAsFixed(4)}°, ${widget.state.longitude.toStringAsFixed(4)}° · $zone\nLocal evenings → 01:00 · Scores /100\nA: astronomy only · W: weather-adjusted · m: qualifying minutes',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),

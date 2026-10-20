@@ -193,10 +193,12 @@ void main() {
         (await files()).where((file) => file.path.endsWith('.png')),
         hasLength(19),
       );
-      final inspectorScroll = find.descendant(
-        of: find.byKey(const PageStorageKey('scene-inspector')),
-        matching: find.byType(Scrollable),
-      );
+      final inspectorScroll = find
+          .descendant(
+            of: find.byKey(const PageStorageKey('scene-inspector')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
       await tester.scrollUntilVisible(
         find.text('Storage'),
         300,

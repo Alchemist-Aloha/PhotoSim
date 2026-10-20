@@ -202,7 +202,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
     }
     final path = '${directory.path}/portrait.png';
-    await tester.enterText(find.byType(TextFormField), path);
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextFormField),
+      ),
+      path,
+    );
     await tester.tap(find.text('Save PNG'));
     for (var i = 0; i < 40 && !await File(path).exists(); i++) {
       await tester.pump(const Duration(milliseconds: 250));

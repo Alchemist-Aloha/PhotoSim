@@ -116,10 +116,12 @@ void main() {
       }
 
       await Directory('build/validation').create(recursive: true);
-      final inspectorScroll = find.descendant(
-        of: find.byKey(const PageStorageKey('scene-inspector')),
-        matching: find.byType(Scrollable),
-      );
+      final inspectorScroll = find
+          .descendant(
+            of: find.byKey(const PageStorageKey('scene-inspector')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
       Future<void> toggleSection(String title) async {
         await tester.scrollUntilVisible(
           find.text(title),
@@ -345,7 +347,13 @@ void main() {
       }
       expect(paused, isTrue);
       final path = '${directory.path}/rain.png';
-      await tester.enterText(find.byType(TextFormField), path);
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextFormField),
+        ),
+        path,
+      );
       await tester.tap(find.text('Save PNG'));
       for (var i = 0; i < 30 && !await File(path).exists(); i++) {
         await tester.pump(const Duration(milliseconds: 250));

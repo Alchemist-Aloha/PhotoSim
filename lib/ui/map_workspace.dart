@@ -14,12 +14,18 @@ class MapWorkspace extends StatefulWidget {
     this.initialCenter,
     this.initialZoom = 14,
     this.onViewChanged,
+    this.guideDismissed = false,
+    this.onGuideDismissedChanged,
+    this.onMoveCompleted,
   });
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
   final LatLng? initialCenter;
   final double initialZoom;
   final void Function(LatLng center, double zoom)? onViewChanged;
+  final bool guideDismissed;
+  final ValueChanged<bool>? onGuideDismissedChanged;
+  final ValueChanged<SimulationState>? onMoveCompleted;
 
   @override
   State<MapWorkspace> createState() => _MapWorkspaceState();
@@ -29,6 +35,15 @@ class _MapWorkspaceState extends State<MapWorkspace> {
   final controller = MapController();
   final mapKey = GlobalKey();
   bool tileError = false;
+  SimulationState? moveStart;
+
+  void beginMove(DragStartDetails _) => moveStart = widget.state;
+
+  void finishMove() {
+    final before = moveStart;
+    moveStart = null;
+    if (before != null) widget.onMoveCompleted?.call(before);
+  }
 
   @override
   void dispose() {
@@ -60,6 +75,19 @@ class _MapWorkspaceState extends State<MapWorkspace> {
     final compact =
         MediaQuery.sizeOf(context).width < 600 ||
         MediaQuery.sizeOf(context).height < 600;
+    // flutter_map bounds require normalized longitudes, so split at the date line.
+    final circleSegments = <List<LatLng>>[[]];
+    for (final point in terrainLoadingCircle(state)) {
+      final normalized = point.longitude < -180 || point.longitude > 180
+          ? LatLng(point.latitude, (point.longitude + 180) % 360 - 180)
+          : point;
+      if (circleSegments.last.isNotEmpty &&
+          (circleSegments.last.last.longitude - normalized.longitude).abs() >
+              180) {
+        circleSegments.add([]);
+      }
+      circleSegments.last.add(normalized);
+    }
     final bodies = [
       ('Sun', sky.sun, const Color(0xFFFFC857)),
       ('Moon', sky.moon, const Color(0xFFADD8FF)),
@@ -80,12 +108,15 @@ class _MapWorkspaceState extends State<MapWorkspace> {
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
             ),
-            onTap: (_, point) => widget.onChanged(
-              state.copyWith(
-                latitude: point.latitude.clamp(-85.05112878, 85.05112878),
-                longitude: (point.longitude + 180) % 360 - 180,
-              ),
-            ),
+            onTap: (_, point) {
+              widget.onChanged(
+                state.copyWith(
+                  latitude: point.latitude.clamp(-85.05112878, 85.05112878),
+                  longitude: (point.longitude + 180) % 360 - 180,
+                ),
+              );
+              widget.onMoveCompleted?.call(state);
+            },
           ),
           children: [
             TileLayer(
@@ -136,14 +167,16 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                         ? const StrokePattern.solid()
                         : StrokePattern.dashed(segments: [8, 5]),
                   ),
-                Polyline(
-                  points: terrainLoadingCircle(state),
-                  color: Theme.of(context).colorScheme.primary,
-                  strokeWidth: 2,
-                  borderColor: Theme.of(context).colorScheme.surface,
-                  borderStrokeWidth: 1,
-                  pattern: StrokePattern.dashed(segments: [8, 6]),
-                ),
+                for (final points in circleSegments)
+                  if (points.length > 1)
+                    Polyline(
+                      points: points,
+                      color: Theme.of(context).colorScheme.primary,
+                      strokeWidth: 2,
+                      borderColor: Theme.of(context).colorScheme.surface,
+                      borderStrokeWidth: 1,
+                      pattern: StrokePattern.dashed(segments: [8, 6]),
+                    ),
               ],
             ),
             MarkerLayer(
@@ -188,6 +221,12 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                     label: 'Camera location. Drag to move.',
                     child: GestureDetector(
                       // Match the map's axis recognizers so marker drags win the gesture arena.
+                      onHorizontalDragStart: beginMove,
+                      onVerticalDragStart: beginMove,
+                      onHorizontalDragEnd: (_) => finishMove(),
+                      onVerticalDragEnd: (_) => finishMove(),
+                      onHorizontalDragCancel: finishMove,
+                      onVerticalDragCancel: finishMove,
                       onHorizontalDragUpdate: (details) =>
                           dragMarker(details, false),
                       onVerticalDragUpdate: (details) =>
@@ -206,6 +245,12 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                   child: Semantics(
                     label: 'Camera direction. Drag to rotate.',
                     child: GestureDetector(
+                      onHorizontalDragStart: beginMove,
+                      onVerticalDragStart: beginMove,
+                      onHorizontalDragEnd: (_) => finishMove(),
+                      onVerticalDragEnd: (_) => finishMove(),
+                      onHorizontalDragCancel: finishMove,
+                      onVerticalDragCancel: finishMove,
                       onHorizontalDragUpdate: (details) =>
                           dragMarker(details, true),
                       onVerticalDragUpdate: (details) =>
@@ -242,9 +287,10 @@ class _MapWorkspaceState extends State<MapWorkspace> {
           top: 16,
           left: 16,
           right: 16,
-          child: IgnorePointer(
-            child: Align(
-              alignment: Alignment.topLeft,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -252,27 +298,36 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (tileError)
+                        const Text(
+                          'Map tiles unavailable. Check your connection. Camera controls still work; switch workspaces to retry.',
+                        ),
+                      if (!widget.guideDismissed)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                compact ||
+                                        Theme.of(context).platform ==
+                                            TargetPlatform.android
+                                    ? 'Tap to place camera · Drag camera to move · Drag green handle to aim'
+                                    : 'Click to place camera · Drag camera to move · Drag green handle to aim',
+                              ),
+                            ),
+                            if (widget.onGuideDismissedChanged != null)
+                              IconButton(
+                                tooltip: 'Hide map guidance',
+                                onPressed: () =>
+                                    widget.onGuideDismissedChanged!(true),
+                                icon: const Icon(Icons.close),
+                              ),
+                          ],
+                        ),
                       Text(
-                        tileError
-                            ? 'Map tiles unavailable. Check your connection.\nCamera controls still work; switch workspaces to retry.'
-                            : compact ||
-                                  Theme.of(context).platform ==
-                                      TargetPlatform.android
-                            ? 'Tap to place camera · Drag camera to move · Drag green handle to aim'
-                            : 'Click to place camera · Drag camera to move · Drag green handle to aim',
-                      ),
-                      Text(
-                        'Dashed circle: ≈${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent · Zoom out for full circle',
+                        '≈${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent · dashed circle',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      if (!compact)
-                        const Text(
-                          'Amber: Sun · Blue: Moon · Violet: Galactic center · Dashed bearings: below horizontal',
-                        ),
-                      if (!compact)
-                        const Text(
-                          'Bearing guides only · Not rise/set or terrain visibility predictions',
-                        ),
                     ],
                   ),
                 ),
@@ -280,34 +335,43 @@ class _MapWorkspaceState extends State<MapWorkspace> {
             ),
           ),
         ),
-        if (compact)
-          Positioned(
-            bottom: 128,
-            right: 16,
-            child: IconButton.filledTonal(
-              tooltip: 'Map guide',
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  scrollable: true,
-                  title: const Text('Map guide'),
-                  content: Text(
-                    'Tap to place the camera. Drag the camera to move; drag its green handle to aim.\n\n'
-                    'Amber: Sun · Blue: Moon · Violet: Galactic center. Dashed bearing lines mean below horizontal.\n\n'
-                    'Dashed circle: approximately ${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent. Forward fetching is directional; the circle is not an exact tile boundary or a download-status indicator. Render distance is a separate limit.\n\n'
-                    'Bearing guides only, not rise/set or terrain visibility predictions.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
+        Positioned(
+          bottom: 128,
+          right: 16,
+          child: IconButton.filledTonal(
+            tooltip: 'Map guide',
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (context) => AlertDialog(
+                scrollable: true,
+                title: const Text('Map guide'),
+                content: Text(
+                  'Tap to place the camera. Drag the camera to move; drag its green handle to aim. Use Undo after a move to restore the previous position or direction.\n\n'
+                  'For precise placement without dragging, enter latitude and longitude in Camera controls → Position & orientation.\n\n'
+                  'Amber: Sun · Blue: Moon · Violet: Galactic center. Dashed bearing lines mean below horizontal.\n\n'
+                  'Dashed circle: approximately ${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent. Forward fetching is directional; the circle is not an exact tile boundary or a download-status indicator. Render distance is a separate limit.\n\n'
+                  'Bearing guides only, not rise/set or terrain visibility predictions.',
                 ),
+                actions: [
+                  if (widget.guideDismissed &&
+                      widget.onGuideDismissedChanged != null)
+                    TextButton(
+                      onPressed: () {
+                        widget.onGuideDismissedChanged!(false);
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Show map guidance'),
+                    ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
               ),
-              icon: const Icon(Icons.info_outline),
             ),
+            icon: const Icon(Icons.info_outline),
           ),
+        ),
         Positioned(
           bottom: 64,
           right: 16,

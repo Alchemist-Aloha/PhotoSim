@@ -256,10 +256,12 @@ void main() {
     // Actual image detail, not merely a material assignment on a still-green render.
     expect(colors.length, greaterThan(500));
     await capture('linux-naip-natural');
-    final inspectorScroll = find.descendant(
-      of: find.byKey(const PageStorageKey('scene-inspector')),
-      matching: find.byType(Scrollable),
-    );
+    final inspectorScroll = find
+        .descendant(
+          of: find.byKey(const PageStorageKey('scene-inspector')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
     await tester.scrollUntilVisible(
       find.text('Rendering'),
       300,
@@ -827,7 +829,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Save plan').last);
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.enterText(find.byType(TextFormField), 'Night ridge');
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextFormField),
+      ),
+      'Night ridge',
+    );
     await tester.tap(find.widgetWithText(TextButton, 'Save'));
     for (
       var i = 0;

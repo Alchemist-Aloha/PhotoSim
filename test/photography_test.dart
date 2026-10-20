@@ -86,10 +86,24 @@ void main() {
           ),
         ),
       );
-      await tester.scrollUntilVisible(find.text('Depth of field'), 200);
+      final inspectorScroll = find
+          .descendant(
+            of: find.byType(CameraInspector),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('Depth of field'),
+        200,
+        scrollable: inspectorScroll,
+      );
       await tester.tap(find.text('Depth of field'));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.byType(SwitchListTile), 200);
+      await tester.scrollUntilVisible(
+        find.byType(SwitchListTile),
+        200,
+        scrollable: inspectorScroll,
+      );
       await tester.tap(find.byType(SwitchListTile));
       await tester.pump();
       expect(state.depthOfField, isTrue);

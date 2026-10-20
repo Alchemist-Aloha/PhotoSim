@@ -41,14 +41,42 @@ class PhotoSimApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ThemeData materialTheme(Brightness brightness) => ThemeData(
-      brightness: brightness,
-      colorSchemeSeed: const Color(0xFF34D9B0),
-      useMaterial3: true,
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
-    );
+    ThemeData materialTheme(Brightness brightness) {
+      final dark = brightness == Brightness.dark;
+      final theme = ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF287E73),
+          brightness: brightness,
+          surface: Color(dark ? 0xFF141A1C : 0xFFF7F9F8),
+          surfaceDim: Color(dark ? 0xFF101618 : 0xFFD5DDD9),
+          surfaceBright: Color(dark ? 0xFF3A4345 : 0xFFF7F9F8),
+          surfaceContainerLowest: Color(dark ? 0xFF0F1517 : 0xFFFFFFFF),
+          surfaceContainerLow: Color(dark ? 0xFF1B2224 : 0xFFF0F4F2),
+          surfaceContainer: Color(dark ? 0xFF20282A : 0xFFEAF0ED),
+          surfaceContainerHigh: Color(dark ? 0xFF293133 : 0xFFE3EBE7),
+          surfaceContainerHighest: Color(dark ? 0xFF343C3E : 0xFFDDE5E1),
+        ),
+        fontFamily: 'Source Sans 3',
+        useMaterial3: true,
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+        ),
+      );
+      return theme.copyWith(
+        textTheme: theme.textTheme.copyWith(
+          titleLarge: theme.textTheme.titleLarge!.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          titleMedium: theme.textTheme.titleMedium!.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          titleSmall: theme.textTheme.titleSmall!.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
     return MaterialApp(
       title: 'PhotoSim',
       debugShowCheckedModeBanner: false,
@@ -103,6 +131,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   bool inspectorVisible = true;
   bool timelineExpanded = false;
   bool calendarWeekView = false;
+  bool mapGuideDismissed = false;
   late final nightConditions = NightConditionsRepository(terrainClient);
   bool cleanPreview = false;
   RasterCache? rasterCache;
@@ -124,6 +153,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     inspectorVisible: inspectorVisible,
     timelineExpanded: timelineExpanded,
     calendarWeekView: calendarWeekView,
+    mapGuideDismissed: mapGuideDismissed,
     cleanPreview: cleanPreview,
     playbackSpeed: playbackSpeed,
     calendarDate: calendarDate,
@@ -411,6 +441,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             if (decision == 'save' && !await savePlan(store)) return;
             if (!mounted) return;
           }
+          ScaffoldMessenger.of(context).removeCurrentSnackBar();
           setState(() {
             state = selected.state;
             cleanComposition = composition;
@@ -449,6 +480,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       inspectorVisible = saved.inspectorVisible;
       timelineExpanded = saved.timelineExpanded;
       calendarWeekView = saved.calendarWeekView;
+      mapGuideDismissed = saved.mapGuideDismissed;
       playbackSpeed = saved.playbackSpeed;
       currentPlanName = saved.planName;
       calendarDate = saved.calendarDate;
@@ -517,6 +549,54 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     if (next.timestamp != state.timestamp) stopPlayback();
     state = next;
   });
+
+  void updateFromInspector(SimulationState next) {
+    final before = state;
+    final moved = before.location != next.location;
+    if (moved) {
+      mapCenter = next.location;
+      openedPlan++;
+    }
+    update(next);
+    if (moved) offerCameraUndo(before);
+  }
+
+  void offerCameraUndo(SimulationState before) {
+    final after = state;
+    if (before.location == after.location && before.azimuth == after.azimuth) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Camera moved'),
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            final locationChanged = before.location != after.location;
+            if (locationChanged) {
+              mapCenter = before.location;
+              openedPlan++;
+            }
+            update(
+              state.copyWith(
+                latitude: locationChanged ? before.latitude : null,
+                longitude: locationChanged ? before.longitude : null,
+                azimuth: before.azimuth != after.azimuth
+                    ? before.azimuth
+                    : null,
+                fixedElevation: locationChanged ? before.fixedElevation : null,
+                clearFixedElevation:
+                    locationChanged && before.fixedElevation == null,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   String localTimeLabel(DateTime timestamp) {
     final clock = localClock(
@@ -923,7 +1003,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     final compactTimeline = compact || size.height < 600;
     final inspector = CameraInspector(
       state: state,
-      onChanged: update,
+      onChanged: updateFromInspector,
       rasterCache: rasterCache,
       cacheError: cacheError,
       expandedSections: expandedSections,
@@ -983,6 +1063,10 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             state: state,
             initialCenter: mapCenter,
             initialZoom: mapZoom,
+            guideDismissed: mapGuideDismissed,
+            onGuideDismissedChanged: (value) =>
+                setState(() => mapGuideDismissed = value),
+            onMoveCompleted: offerCameraUndo,
             onViewChanged: (center, zoom) {
               mapCenter = LatLng(
                 center.latitude.clamp(-85.05112878, 85.05112878),

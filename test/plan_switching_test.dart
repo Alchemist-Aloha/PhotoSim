@@ -83,7 +83,10 @@ void main() {
         'concurrent edit',
       ].contains(action)) {
         await tester.enterText(
-          find.byType(TextFormField),
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextFormField),
+          ),
           'Evening composition',
         );
         await tester.tap(find.text('Save'));

@@ -7,6 +7,7 @@ import '../models/simulation_state.dart';
 import '../data/raster_cache.dart';
 import 'cache_settings_panel.dart';
 import 'terrain_range_controls.dart';
+import 'numeric_setting_field.dart';
 
 class CameraInspector extends StatelessWidget {
   const CameraInspector({
@@ -31,22 +32,20 @@ class CameraInspector extends StatelessWidget {
     double min,
     double max,
     ValueChanged<double> change,
-    String suffix, {
-    bool integer = false,
-  }) => Column(
+    String suffix,
+  ) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text('$label  ${value.toStringAsFixed(integer ? 0 : 1)}$suffix'),
+      Text('$label  ${value.toStringAsFixed(1)}$suffix'),
       Slider(
         key: ValueKey(label),
         semanticFormatterCallback: (value) =>
-            '${value.toStringAsFixed(integer ? 0 : 1)}$suffix',
+            '${value.toStringAsFixed(1)}$suffix',
         label: label,
         value: value,
         min: min,
         max: max,
-        divisions: integer ? (max - min).round() : null,
-        onChanged: integer ? (value) => change(value.roundToDouble()) : change,
+        onChanged: change,
       ),
     ],
   );
@@ -98,14 +97,26 @@ class CameraInspector extends StatelessWidget {
               onChanged(state.copyWith(portrait: value.single)),
         ),
         const SizedBox(height: 16),
-        control(
-          'Focal length',
-          state.focalLength,
-          SimulationState.minFocalLength,
-          SimulationState.maxFocalLength,
-          (value) => onChanged(state.copyWith(focalLength: value)),
-          ' mm',
-          integer: true,
+        NumericSettingField(
+          label: 'Focal length',
+          value: state.focalLength,
+          min: SimulationState.minFocalLength,
+          max: SimulationState.maxFocalLength,
+          suffix: 'mm',
+          onChanged: (value) => onChanged(state.copyWith(focalLength: value)),
+        ),
+        Slider(
+          key: const ValueKey('Focal length'),
+          value: state.focalLength,
+          min: SimulationState.minFocalLength,
+          max: SimulationState.maxFocalLength,
+          divisions:
+              (SimulationState.maxFocalLength - SimulationState.minFocalLength)
+                  .round(),
+          label: 'Focal length',
+          semanticFormatterCallback: (value) => '${value.round()} mm',
+          onChanged: (value) =>
+              onChanged(state.copyWith(focalLength: value.roundToDouble())),
         ),
         Text(
           'Field of view: ${(state.horizontalFov / radians).toStringAsFixed(1)}° × '
@@ -113,12 +124,30 @@ class CameraInspector extends StatelessWidget {
         ),
       ], expanded: true),
       section('Position & orientation', Icons.explore_outlined, [
-        Text(
-          '${state.latitude.toStringAsFixed(5)}°, ${state.longitude.toStringAsFixed(5)}°',
+        NumericSettingField(
+          label: 'Latitude',
+          value: state.latitude,
+          min: -85.05112878,
+          max: 85.05112878,
+          suffix: '°',
+          onChanged: (value) => onChanged(state.copyWith(latitude: value)),
+        ),
+        const SizedBox(height: 16),
+        NumericSettingField(
+          label: 'Longitude',
+          value: state.longitude,
+          min: -180,
+          max: 180,
+          suffix: '°',
+          onChanged: (value) => onChanged(state.copyWith(longitude: value)),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Decimal degrees. Apply each value with the check button or Enter.',
         ),
         const SizedBox(height: 8),
         Text(
-          'Place or drag the camera on the map.\nGround elevation: '
+          'Ground elevation: '
           '${state.groundElevation == null ? 'not loaded' : '${state.groundElevation!.toStringAsFixed(1)} m (source datum)'}',
         ),
         if (state.cameraElevation != null)

@@ -103,7 +103,10 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
       final stopped = state().location;
       await tester.enterText(
-        find.byType(TextFormField),
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextFormField),
+        ),
         '/tmp/wasd-focus-test.png',
       );
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyD);

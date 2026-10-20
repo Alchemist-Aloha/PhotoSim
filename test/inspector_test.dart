@@ -27,11 +27,17 @@ void main() {
     final slider = tester.widget<Slider>(finder);
     expect(slider.divisions, 592);
     expect(slider.semanticFormatterCallback!(24), '24 mm');
-    expect(find.text('Focal length  24 mm'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
+      '24.0',
+    );
     slider.onChanged!(85.6);
     await tester.pump();
     expect(state.focalLength, 86);
-    expect(find.text('Focal length  86 mm'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
+      '86.0',
+    );
     expect(tester.widget<Slider>(finder).value, 86);
   });
 

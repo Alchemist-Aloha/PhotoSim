@@ -90,7 +90,13 @@ void main() {
       ) {
         await tester.pump(const Duration(milliseconds: 200));
       }
-      expect(find.byType(ListTile), findsNWidgets(7));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('week-agenda')),
+          matching: find.byType(ListTile),
+        ),
+        findsNWidgets(7),
+      );
       await capture('linux-calendar-week');
       await tester.tap(find.byTooltip('Switch to month view'));
       await settle();

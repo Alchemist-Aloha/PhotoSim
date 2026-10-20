@@ -12,6 +12,7 @@ import 'package:photosim/data/raster_cache.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/night_calendar.dart';
+import 'package:photosim/ui/map_workspace.dart';
 
 import 'app_session_test.dart' show sessionFixture;
 import 'night_calendar_test.dart' show settleCalendar;
@@ -77,6 +78,7 @@ void main() {
       );
       expect(saved.workspace, 'calendar');
       expect(saved.calendarWeekView, isTrue);
+      expect(saved.mapGuideDismissed, isTrue);
       expect(saved.calendarDate, selected);
       expect(saved.mapCenter, const LatLng(35.7, 139.8));
       expect(saved.mapZoom, 17);
@@ -103,6 +105,10 @@ void main() {
       expect(restored.state.location, edited.location);
       expect(restored.state.focalLength, 135);
       expect(restored.expandedSections['Exposure'], isTrue);
+      expect(
+        tester.widget<MapWorkspace>(find.byType(MapWorkspace)).guideDismissed,
+        isTrue,
+      );
       final restoredMap = tester
           .widget<FlutterMap>(find.byType(FlutterMap))
           .mapController!

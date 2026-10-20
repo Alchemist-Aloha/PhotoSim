@@ -59,6 +59,7 @@ AppSession sessionFixture({
     inspectorVisible: inspectorVisible,
     timelineExpanded: true,
     calendarWeekView: true,
+    mapGuideDismissed: true,
     cleanPreview: false,
     playbackSpeed: 30,
     calendarDate: DateTime.utc(2026, 8, 15),
@@ -81,6 +82,11 @@ void main() {
       isNot(restored.cleanComposition),
     );
   });
+  test('older sessions default to visible map guidance', () {
+    final json = jsonDecode(sessionFixture().encode()) as Map<String, dynamic>;
+    json.remove('mapGuideDismissed');
+    expect(AppSession.decode(jsonEncode(json)).mapGuideDismissed, isFalse);
+  });
   test(
     'invalid session versions, types, coordinates and preferences are rejected',
     () {
@@ -98,6 +104,8 @@ void main() {
           'mapCenter': [0, 181],
         },
         {'inspectorVisible': 'yes'},
+        {'mapGuideDismissed': 'yes'},
+        {'mapGuideDismissed': null},
         {
           'expandedSections': {'Optics': 1},
         },

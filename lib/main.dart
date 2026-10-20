@@ -23,6 +23,9 @@ Future<void> main() async {
     yield LicenseEntryWithLineBreaks([
       'NASA SVS / LRO Moon surface',
     ], await rootBundle.loadString('assets/moon/LICENSE.txt'));
+    yield LicenseEntryWithLineBreaks([
+      'Source Sans 3',
+    ], await rootBundle.loadString('assets/fonts/OFL.txt'));
   });
   SessionStore? store;
   AppSession? session;

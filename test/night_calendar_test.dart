@@ -95,7 +95,13 @@ void main() {
       await tester.tap(find.byTooltip('Toggle calendar'));
       await settleCalendar(tester);
       expect(find.byType(GridView), findsNothing);
-      expect(find.byType(ListTile), findsNWidgets(7));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('week-agenda')),
+          matching: find.byType(ListTile),
+        ),
+        findsNWidgets(7),
+      );
       expect(calls, 2);
       await tester.ensureVisible(find.text('Preview best geometry'));
       await tester.tap(find.text('Preview best geometry'));
@@ -103,6 +109,13 @@ void main() {
       expect(preview!.isUtc, isTrue);
       expect(find.textContaining('Modeled zenith: 22.00'), findsOneWidget);
       expect(find.textContaining('Weather-adjusted:'), findsOneWidget);
+      expect(
+        find.textContaining('Mean visible Milky Way at 0–30°:'),
+        findsNothing,
+      );
+      await tester.ensureVisible(find.text('Geometry & score details'));
+      await tester.tap(find.text('Geometry & score details'));
+      await tester.pumpAndSettle();
       expect(
         find.textContaining('Mean visible Milky Way at 0–30°:'),
         findsOneWidget,
@@ -269,6 +282,9 @@ void main() {
       await settleCalendar(tester);
       expect(weatherCalls, 0);
       expect(find.text('Preview best geometry'), findsOneWidget);
+      await tester.ensureVisible(find.text('Geometry & score details'));
+      await tester.tap(find.text('Geometry & score details'));
+      await tester.pumpAndSettle();
       expect(
         find.textContaining('Mean visible Milky Way at 0–30°:'),
         findsOneWidget,

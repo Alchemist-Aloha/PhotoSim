@@ -67,7 +67,9 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Collapsible inspector sections for optics, position/orientation, depth of field, weather and rendering.
 - Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
 - Persistent terrain/imagery disk caching with one adjustable size limit under **Storage** (512 MiB default), LRU eviction, corruption recovery and source metadata.
-- Drag the 3D preview to look around, with finer aiming when zoomed in; change focal length in whole millimeters to zoom optically.
+- Drag the 3D preview to look around, with finer aiming when zoomed in; use the focal-length slider in whole millimeters or type an exact 8–600 mm value and apply it.
+- Enter decimal-degree latitude/longitude under **Position & orientation** for precise, keyboard-accessible placement. Map placement, marker drags and coordinate edits offer a one-step **Undo** for 10 seconds; undo preserves other lens/time settings.
+- Dismiss map instructions with **Hide map guidance**; the preference survives restart. **Map guide** keeps the full instructions available.
 - Click the 3D preview and hold WASD to move at 100 m/s; the camera climbs/descends with terrain while keeping its height offset.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
 - NASA SVS/LRO surface-textured, phase-lit Moon at its calculated position and angular size, with terrain occlusion (offline 2K albedo; no libration or crater relief).

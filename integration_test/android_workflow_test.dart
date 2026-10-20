@@ -133,7 +133,13 @@ void main() {
       await settle();
       await tester.tap(find.text('Save plan'));
       await settle();
-      await tester.enterText(find.byType(TextFormField), 'Android composition');
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextFormField),
+        ),
+        'Android composition',
+      );
       await tester.tap(find.text('Save'));
       await settle();
       expect(

@@ -6,6 +6,14 @@ or week; the date heading opens a date picker. Select a date for its explanation
 On narrow windows the details are below the calendar; wider windows place them
 beside it. Large text can make the month grid horizontally scrollable.
 
+Month cells emphasize the score out of 100. The smaller line gives qualifying
+window minutes (`m`) and score source: `A` for astronomy only, `W` for
+weather-adjusted. Zero minutes means no qualifying window. Dates outside the
+current month include the month number. The selected night's window or limiting
+condition and preview action appear first; expand **Geometry & score details**
+or **Forecast details** for the calculations and additional weather metrics.
+Unknown-weather, zero-rating and terrain-visibility warnings remain visible.
+
 Each date means **that local evening until 01:00 the following local day**,
 using the camera location's estimated timezone, not the device timezone.
 Browsing does not change the saved composition or simulation clock. **Preview
