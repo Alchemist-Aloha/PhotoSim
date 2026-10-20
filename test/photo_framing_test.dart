@@ -74,7 +74,7 @@ void main() {
       expect(region.contains(label.topLeft), isTrue);
       expect(region.contains(label.bottomRight), isTrue);
       expect(region.width / region.height, closeTo(2 / 3, 1e-12));
-      expect(find.text('85.0 mm · f/1.4\nDOF on'), findsOneWidget);
+      expect(find.text('85 mm · f/1.4\nDOF on'), findsOneWidget);
       expect(find.byIcon(Icons.add), findsNothing);
       expect(find.textContaining('Roll '), findsNothing);
       expect(tester.takeException(), isNull);

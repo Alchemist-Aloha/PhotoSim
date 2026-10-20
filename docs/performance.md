@@ -19,7 +19,16 @@ flutter drive --profile -d linux \
   --target=integration_test/perf_test.dart
 ```
 
-The test reports build and raster p50/p95 over four-second phases: time
+The test first measures Map → 3D Preview readiness with an empty raster cache,
+then recreates the app and cache object against the populated directory. It
+records milliseconds from workspace selection to the first scene render
+(`renderStats.frameCount > 0`), center terrain attached, and center preview
+texture attached. These are wall-clock observations sampled with 10 ms pumps
+and delays, not GPU presentation timestamps. The warm run re-indexes disk but
+reuses process-wide GPU resources and OS caches; neither run is process startup.
+Cold-cache terrain/imagery readiness includes live network latency.
+
+The test then reports build and raster p50/p95 over four-second phases: time
 scrubbing (one five-minute step per frame tick), playback, camera aim scrubbing,
 and high-quality aim scrubbing. Results are written to
 `build/validation/render-performance.txt`.
@@ -31,7 +40,7 @@ supplies framework-init and first-frame timings. Network tile latency is exclude
 from cold-start numbers. Raw profile runs and traces are in `build/validation/`
 (`perf-baseline.log`, `perf-final.log`, `perf-trace-clean-*.log`).
 
-## Results
+## Results: initial astronomy/cache optimization
 
 | Phase | Before build p50/p95 (ms) | After build p50/p95 (ms) | Before raster p50/p95 | After raster p50/p95 |
 |---|---:|---:|---:|---:|
@@ -79,6 +88,49 @@ Cold start (release, five launches):
    frame. The sky/tiles render as they arrive instead of waiting for all nine
    tiles, and the center-tile spinner is only an error state now.
 
+## Follow-up: 3D workspace startup
+
+The scene now initializes independently of the disk index. Terrain waits for
+cache settings/indexing and source attribution, preserving the saved disk budget
+and source credits. Atmosphere, Moon texture, star catalog and Milky Way texture
+load concurrently after static GPU initialization.
+
+Constellation data and its name atlas load only when guides are enabled, after
+the scene is published. Existing enabled-guide sessions also load them after the
+first frame. A failed guide load leaves the scene usable and can be retried by
+toggling guides. The loaded renderer is reused on subsequent toggles.
+
+Center preview imagery starts as soon as the center mesh arrives, without
+waiting for the other two terrain jobs in its batch. Generation-scoped in-flight
+tracking prevents duplicate imagery requests while nearby previews continue.
+
+One Linux profile run of the updated benchmark (not a before/after comparison):
+
+| Raster cache | First scene (ms) | Center terrain ready (ms) | Center imagery ready (ms) |
+|---|---:|---:|---:|
+| Empty | 195.8 | 616.6 | 3818.7 |
+| Populated, fresh cache index | 121.8 | 226.1 | 226.1 |
+
+These single-run observations establish the new measurement path, not a speedup
+claim. Repeat runs are needed to separate startup changes from network and
+machine-load variance.
+
+Validation:
+
+```bash
+flutter test integration_test/startup_test.dart -d linux
+flutter test integration_test/linux_loading_test.dart -d linux
+flutter test integration_test/linux_workflow_test.dart -d linux
+```
+
+The startup regression deliberately holds cache initialization until a scene
+frame renders, then holds neighboring terrain until center imagery is requested.
+It also checks lazy guide loading, renderer reuse and no duplicate center preview.
+The existing loading test verifies that slow imagery still cannot block terrain.
+All 230 unit/widget tests, all three Linux integration tests above, and the
+profile benchmark passed. The workflow test now waits for guides to load on
+first enable and retains its rendering/occlusion checks.
+
 ## Remaining bottlenecks and limits
 
 - One `calculateSky` still costs roughly 5–10 ms in profile whenever simulation
@@ -90,5 +142,6 @@ Cold start (release, five launches):
 - Numbers cover one x86_64 desktop and X11. Wayland, Android phones/tablets,
   integrated GPUs, large High-quality networks and network-bound loading remain
   unmeasured.
-- The startup figures measure the Flutter shell; they do not promise when all
-  downloaded terrain/imagery becomes visible.
+- The original cold-start figures measure the Flutter shell, not downloaded
+  terrain/imagery. The follow-up readiness figures separately measure 3D entry;
+  Android hardware and repeated startup measurements remain unverified.

@@ -52,7 +52,7 @@ class PhotographyOverlays extends StatelessWidget {
                           ),
                           color: Colors.black54,
                           child: Text(
-                            '${state.focalLength.toStringAsFixed(1)} mm · f/${state.aperture.toStringAsFixed(1)}\nDOF ${state.depthOfField ? 'on' : 'off'}',
+                            '${state.focalLength.toStringAsFixed(0)} mm · f/${state.aperture.toStringAsFixed(1)}\nDOF ${state.depthOfField ? 'on' : 'off'}',
                             key: const ValueKey('photo-lens-label'),
                             style: const TextStyle(
                               color: Colors.white,

@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_scene/scene.dart' as scene;
+import 'package:photosim/core/terrain_geo.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/app/app.dart';
@@ -26,22 +28,73 @@ void main() {
     );
     final output = StringBuffer();
     try {
-      await tester.pumpWidget(
-        PhotoSimApp(
-          rasterCache: RasterCache(Directory('${directory.path}/cache')),
-          initialSession: AppSession(
-            state: state,
-            cleanComposition: SavedPlan('Performance', state).encode(),
-            workspace: 'simulation',
-            expandedSections: const {'Optics': false},
+      for (final phase in ['cold-cache', 'warm-cache']) {
+        // Recreate the cache object so the warm run includes disk re-indexing.
+        await tester.pumpWidget(
+          PhotoSimApp(
+            key: ValueKey(phase),
+            rasterCache: RasterCache(Directory('${directory.path}/cache')),
+            initialSession: AppSession(
+              state: state,
+              cleanComposition: SavedPlan('Performance', state).encode(),
+              workspace: 'map',
+              expandedSections: const {'Optics': false},
+            ),
           ),
-        ),
-      );
-      for (var i = 0; i < 240; i++) {
-        if (find.text('Imagery 9/9').evaluate().isNotEmpty) break;
-        await tester.pump(const Duration(milliseconds: 500));
+        );
+        await tester.pump();
+        final watch = Stopwatch()..start();
+        await tester.tap(find.text('3D Preview'));
+        final milestones = <String, double>{};
+        final centerKey = TileId.at(state.location).key;
+        while (watch.elapsed < const Duration(minutes: 2)) {
+          await tester.pump(const Duration(milliseconds: 10));
+          final views = find.byType(scene.SceneView);
+          if (views.evaluate().isNotEmpty) {
+            final world = tester.widget<scene.SceneView>(views).scene!;
+            if (world.renderStats.frameCount > 0) {
+              milestones.putIfAbsent(
+                'first-scene',
+                () => watch.elapsedMicroseconds / 1000,
+              );
+              final center = world.root.children.where(
+                (node) => node.name == centerKey,
+              );
+              if (center.isNotEmpty) {
+                milestones.putIfAbsent(
+                  'center-terrain',
+                  () => watch.elapsedMicroseconds / 1000,
+                );
+                final material = center.single.mesh!.primitives.single.material;
+                if (material is scene.PhysicallyBasedMaterial &&
+                        material.baseColorTexture != null ||
+                    material is scene.UnlitMaterial &&
+                        material.baseColorTexture != null) {
+                  milestones.putIfAbsent(
+                    'center-imagery',
+                    () => watch.elapsedMicroseconds / 1000,
+                  );
+                }
+              }
+            }
+          }
+          if (milestones.length == 3 &&
+              find.text('Imagery 9/9').evaluate().isNotEmpty) {
+            break;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        expect(
+          milestones.keys,
+          containsAll(['first-scene', 'center-terrain', 'center-imagery']),
+        );
+        expect(find.text('Imagery 9/9'), findsOneWidget);
+        output.writeln('$phase workspace-to-ready ms: $milestones');
+        if (phase == 'cold-cache') {
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump(const Duration(milliseconds: 100));
+        }
       }
-      expect(find.text('Imagery 9/9'), findsOneWidget);
       SchedulerBinding.instance.addTimingsCallback(timings.addAll);
       Future<void> run(
         String label,
@@ -149,11 +202,13 @@ void main() {
         'galacticCenter frame: ${(stopwatch.elapsedMicroseconds / 1000).toStringAsFixed(3)} ms/call over 1000 calls',
       );
 
+      await Directory('build/validation').create(recursive: true);
       File('build/validation/render-performance.txt')
           .writeAsStringSync(output.toString());
       debugPrint(output.toString());
       expect(timings, isNotEmpty);
     } finally {
+      SchedulerBinding.instance.removeTimingsCallback(timings.addAll);
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 100));
       await directory.delete(recursive: true);

@@ -67,14 +67,14 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Collapsible inspector sections for optics, position/orientation, depth of field, weather and rendering.
 - Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
 - Persistent terrain/imagery disk caching with one adjustable size limit under **Storage** (512 MiB default), LRU eviction, corruption recovery and source metadata.
-- Drag the 3D preview to look around; change focal length to zoom optically.
-- Click the 3D preview and hold WASD to move at 30 m/s; the camera climbs/descends with terrain while keeping its height offset.
+- Drag the 3D preview to look around, with finer aiming when zoomed in; change focal length in whole millimeters to zoom optically.
+- Click the 3D preview and hold WASD to move at 100 m/s; the camera climbs/descends with terrain while keeping its height offset.
 - Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
 - NASA SVS/LRO surface-textured, phase-lit Moon at its calculated position and angular size, with terrain occlusion (offline 2K albedo; no libration or crater relief).
 - UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain. Per-state astronomy/observer caching removes duplicate ephemeris work per frame.
 - Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
 - Blended terrain shadow cascades; High quality adds PCSS/contact shadows and denser 256/128/64 terrain meshes while retaining imagery.
-- **Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active.
+- **Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
 - Persistent navigation rail for Map/3D Preview/Calendar; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
@@ -126,6 +126,8 @@ flutter test integration_test/linux_sunlight_test.dart -d linux
 flutter test integration_test/linux_spec_photography_test.dart -d linux
 flutter test integration_test/linux_wasd_test.dart -d linux
 flutter test integration_test/linux_loading_test.dart -d linux
+flutter test integration_test/startup_test.dart -d linux
+flutter test integration_test/camera_light_test.dart -d linux
 flutter test integration_test/linux_planning_ui_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim

@@ -31,20 +31,22 @@ class CameraInspector extends StatelessWidget {
     double min,
     double max,
     ValueChanged<double> change,
-    String suffix,
-  ) => Column(
+    String suffix, {
+    bool integer = false,
+  }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text('$label  ${value.toStringAsFixed(1)}$suffix'),
+      Text('$label  ${value.toStringAsFixed(integer ? 0 : 1)}$suffix'),
       Slider(
         key: ValueKey(label),
         semanticFormatterCallback: (value) =>
-            '${value.toStringAsFixed(1)}$suffix',
+            '${value.toStringAsFixed(integer ? 0 : 1)}$suffix',
         label: label,
         value: value,
         min: min,
         max: max,
-        onChanged: change,
+        divisions: integer ? (max - min).round() : null,
+        onChanged: integer ? (value) => change(value.roundToDouble()) : change,
       ),
     ],
   );
@@ -103,6 +105,7 @@ class CameraInspector extends StatelessWidget {
           SimulationState.maxFocalLength,
           (value) => onChanged(state.copyWith(focalLength: value)),
           ' mm',
+          integer: true,
         ),
         Text(
           'Field of view: ${(state.horizontalFov / radians).toStringAsFixed(1)}° × '

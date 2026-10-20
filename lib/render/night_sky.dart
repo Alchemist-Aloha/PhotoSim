@@ -81,11 +81,7 @@ scene.MeshGeometry _milkyWayGeometry() {
 }
 
 class NightSkyRenderer {
-  NightSkyRenderer(
-    List<Star> stars,
-    scene.Texture2D milkyWay,
-    this.constellations,
-  ) {
+  NightSkyRenderer(List<Star> stars, scene.Texture2D milkyWay) {
     final data = starMesh(stars);
     starGeometry = scene.MeshGeometry.fromArrays(
       positions: data.positions,
@@ -120,13 +116,17 @@ class NightSkyRenderer {
     root = scene.Node(name: 'Night sky')
       ..add(starNode)
       ..add(bandNode)
-      ..add(marker)
-      ..add(constellations.root);
+      ..add(marker);
   }
-  final ConstellationRenderer constellations;
+  ConstellationRenderer? constellations;
+
+  void addConstellations(ConstellationRenderer renderer) {
+    constellations = renderer;
+    root.add(renderer.root);
+  }
 
   void updateLabels(SimulationState state, Size viewport) =>
-      constellations.update(state, viewport, _rotation);
+      constellations?.update(state, viewport, _rotation);
 
   static const starDistance = 40000.0, bandDistance = 45000.0;
   late final scene.Node root, starNode, bandNode, marker;
@@ -166,6 +166,6 @@ class NightSkyRenderer {
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);
     bandMaterial.baseColorFactor = vm.Vector4(1, 1, 1, band);
     marker.visible = state.target == CelestialTarget.galacticCenter;
-    constellations.root.visible = state.showConstellations;
+    constellations?.root.visible = state.showConstellations;
   }
 }

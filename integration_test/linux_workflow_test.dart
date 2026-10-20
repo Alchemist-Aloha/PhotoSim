@@ -562,6 +562,19 @@ void main() {
     }
     await tester.pump(const Duration(seconds: 1));
     await capture('linux-night-sky-isolated');
+    expect(
+      nightRoot.children.where((node) => node.name == 'Constellations'),
+      isEmpty,
+    );
+    final withoutGuides = await brightSkyPixels(tester, captureKey);
+    await tester.tap(find.text('Constellations'));
+    for (var i = 0; i < 100; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (nightRoot.children.any((node) => node.name == 'Constellations')) {
+        break;
+      }
+    }
+    await tester.pump(const Duration(milliseconds: 100));
     final guides = nightRoot.children.singleWhere(
       (node) => node.name == 'Constellations',
     );
@@ -570,10 +583,6 @@ void main() {
     final labels =
         guides.children.last.mesh!.primitives.single.geometry
             as scene.BillboardGeometry;
-    expect(guides.visible, isFalse);
-    final withoutGuides = await brightSkyPixels(tester, captureKey);
-    await tester.tap(find.text('Constellations'));
-    await tester.pump(const Duration(seconds: 1));
     expect(camera().showConstellations, isTrue);
     expect(guides.visible, isTrue);
     expect(labels.instanceCount, greaterThan(0));

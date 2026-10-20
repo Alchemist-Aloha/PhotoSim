@@ -152,7 +152,7 @@ void main() {
     );
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('photo-lens-label'))).data,
-      contains('${state().focalLength.toStringAsFixed(1)} mm'),
+      contains('${state().focalLength.toStringAsFixed(0)} mm'),
     );
     expect(find.byType(PhotographyOverlays), findsOneWidget);
     change(state().copyWith(exposureMode: ExposureMode.automatic));

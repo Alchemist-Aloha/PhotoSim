@@ -7,6 +7,34 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 
 void main() {
+  testWidgets('focal length edits and readouts use whole millimeters', (
+    tester,
+  ) async {
+    var state = SimulationState();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, update) => CameraInspector(
+              state: state,
+              onChanged: (next) => update(() => state = next),
+            ),
+          ),
+        ),
+      ),
+    );
+    final finder = find.byKey(const ValueKey('Focal length'));
+    final slider = tester.widget<Slider>(finder);
+    expect(slider.divisions, 592);
+    expect(slider.semanticFormatterCallback!(24), '24 mm');
+    expect(find.text('Focal length  24 mm'), findsOneWidget);
+    slider.onChanged!(85.6);
+    await tester.pump();
+    expect(state.focalLength, 86);
+    expect(find.text('Focal length  86 mm'), findsOneWidget);
+    expect(tester.widget<Slider>(finder).value, 86);
+  });
+
   testWidgets(
     'rendering section exposes antialiasing without changing camera/time',
     (tester) async {

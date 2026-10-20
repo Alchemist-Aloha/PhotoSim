@@ -58,7 +58,7 @@ canvas, not a photo-only ROI; manual exposure/physical photo FOV are unchanged.
 
 Click the 3D preview to focus it. Hold W/S to move forward/back along the crosshair's
 horizontal bearing, A/D to strafe left/right. Pitch, roll and focal length do not
-change the travel direction or speed. Movement is 30 m/s with normalized diagonals
+change the travel direction or speed. Movement is 100 m/s with normalized diagonals
 and capped frame deltas to prevent jumps after stalls. Keyboard shortcuts with
 Ctrl/Alt/Meta are not consumed. Movement stops on focus loss, dialogs, leaving 3D,
 backgrounding and disposal; typing in text fields does not move the camera.

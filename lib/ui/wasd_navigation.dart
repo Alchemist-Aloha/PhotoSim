@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
-const navigationMetersPerSecond = 30.0;
+const navigationMetersPerSecond = 100.0;
 
 /// Focus-scoped, frame-rate-independent movement; no app-global key interception.
 class WasdNavigation extends StatefulWidget {

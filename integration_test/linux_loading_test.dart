@@ -153,7 +153,7 @@ void main() {
         find.descendant(
           of: find.byKey(const ValueKey('preview-actions')),
           matching: find.byTooltip(
-            'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
+            'Click preview · Drag to aim · WASD: 100 m/s, follows terrain',
           ),
         ),
         findsOneWidget,

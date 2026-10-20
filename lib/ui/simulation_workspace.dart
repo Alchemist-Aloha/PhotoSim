@@ -83,6 +83,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   Timer? coverageDebounce;
   final imageProviders = <String, List<ImageryProvider>>{};
   bool imageryLoading = false;
+  final imageryInFlight = <(int, String)>{};
   int imageryFailures = 0;
   String? imageryFailure;
   late final http.Client client;
@@ -104,6 +105,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   scene.Node? cameraLightNode;
   int? autoExposureStartFrame;
   NightSkyRenderer? nightRenderer;
+  bool constellationsLoading = false;
 
   @override
   void initState() {
@@ -115,7 +117,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
 
   Future<void> initialize() async {
     try {
-      await scene.Scene.initializeStaticResources();
       final budget =
           widget.rasterCache ??
           RasterCache(
@@ -123,83 +124,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               '${(widget.cacheDirectory ?? await getApplicationCacheDirectory()).path}/photosim',
             ),
           );
-      await budget.initialize();
+      // Publish the scene independently; only geographic data needs the disk index.
+      await (initializeScene(), initializeSources(budget)).wait;
       if (!mounted) return;
-      terrainCredits =
-          (jsonDecode(
-                await rootBundle.loadString(
-                  'assets/terrain/mapterhorn-attribution.json',
-                ),
-              ) as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(
-                (source) =>
-                    '${source['name']}\n${source['producer']}\n${source['license']}\n'
-                    '${source['website']}\n${source['license_pdf']}',
-              )
-              .toSet()
-              .join('\n\n');
-      if (!mounted) return;
-      repository = TerrainSources(
-        client: client,
-        directory: budget.directory,
-        budget: budget,
-      );
-      imagery = ImagerySources(
-        client: client,
-        directory: budget.directory,
-        budget: budget,
-      );
-      skySource = await AtmosphereSky.load();
-      if (!mounted) return;
-      overcastSky = scene.GradientSkySource();
-      world = scene.Scene()..skybox = scene.Skybox(skySource!);
-      world!.directionalLight = scene.DirectionalLight(
-        castsShadow: true,
-        cacheStaticShadows: false,
-        shadowMaxDistance: 16000,
-        shadowMapResolution: 2048,
-        // Kilometer-scale patches need meter-scale bias to avoid self-shadow acne.
-        shadowDepthBias: 0.8,
-        shadowNormalBias: 2,
-        intensity: 3,
-      );
-      cameraLight = scene.PointLight(
-        intensity: 0,
-        range: 40000,
-        radius: 2,
-        castsShadow: false,
-      );
-      cameraLightNode = scene.Node(name: 'Camera light')
-        ..addComponent(scene.PointLightComponent(cameraLight!));
-      world!.add(cameraLightNode!);
-      final lunarAlbedo = await scene.Texture2D.fromAsset(
-        'assets/moon/lroc_color_2k.jpg',
-        maxSize: 2048,
-      );
-      if (!mounted) return;
-      moonRenderer = MoonRenderer(lunarAlbedo);
-      world!.add(moonRenderer!.node);
-      final stars = parseStarCatalog(
-        await rootBundle.loadString('assets/sky/stars.json'),
-      );
-      if (!mounted) return;
-      final band = await scene.Texture2D.fromAsset('assets/sky/milky_way.png');
-      if (!mounted) return;
-      final figures = parseConstellations(
-        await rootBundle.loadString('assets/sky/constellations.json'),
-      );
-      final constellations = await ConstellationRenderer.create(figures);
-      if (!mounted) return;
-      nightRenderer = NightSkyRenderer(stars, band, constellations);
-      world!.add(nightRenderer!.root);
-      // Render the shell and arriving tiles immediately; terrain is not a first-frame dependency.
-      unawaited(
-        loadTerrain().catchError((Object failure, StackTrace stack) {
-          debugPrint('PhotoSim terrain load failed: $failure\n$stack');
-          if (mounted) setState(() => loading = false);
-        }),
-      );
+      await loadTerrain();
     } catch (failure, stack) {
       debugPrint('PhotoSim 3D initialization failed: $failure\n$stack');
       if (mounted) {
@@ -211,10 +139,121 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
   }
 
+  Future<void> initializeSources(RasterCache budget) async {
+    final (_, attribution) = await (
+      budget.initialize(),
+      rootBundle.loadString('assets/terrain/mapterhorn-attribution.json'),
+    ).wait;
+    if (!mounted) return;
+    terrainCredits = (jsonDecode(attribution) as List<Object?>)
+        .cast<Map<String, Object?>>()
+        .map(
+          (source) =>
+              '${source['name']}\n${source['producer']}\n${source['license']}\n'
+              '${source['website']}\n${source['license_pdf']}',
+        )
+        .toSet()
+        .join('\n\n');
+    repository = TerrainSources(
+      client: client,
+      directory: budget.directory,
+      budget: budget,
+    );
+    imagery = ImagerySources(
+      client: client,
+      directory: budget.directory,
+      budget: budget,
+    );
+  }
+
+  Future<void> initializeScene() async {
+    await scene.Scene.initializeStaticResources();
+    final (atmosphere, lunarAlbedo, starCatalog, band) = await (
+      AtmosphereSky.load(),
+      scene.Texture2D.fromAsset('assets/moon/lroc_color_2k.jpg', maxSize: 2048),
+      rootBundle.loadString('assets/sky/stars.json'),
+      scene.Texture2D.fromAsset('assets/sky/milky_way.png'),
+    ).wait;
+    skySource = atmosphere;
+    if (!mounted) return;
+    overcastSky = scene.GradientSkySource();
+    world = scene.Scene()..skybox = scene.Skybox(skySource!);
+    world!.directionalLight = scene.DirectionalLight(
+      castsShadow: true,
+      cacheStaticShadows: false,
+      shadowMaxDistance: 16000,
+      shadowMapResolution: 2048,
+      // Kilometer-scale patches need meter-scale bias to avoid self-shadow acne.
+      shadowDepthBias: 0.8,
+      shadowNormalBias: 2,
+      intensity: 3,
+    );
+    cameraLight = scene.PointLight(
+      intensity: 0,
+      range: 40000,
+      radius: 2,
+      castsShadow: false,
+    );
+    cameraLightNode = scene.Node(name: 'Camera light')
+      ..addComponent(scene.PointLightComponent(cameraLight!));
+    world!.add(cameraLightNode!);
+    moonRenderer = MoonRenderer(lunarAlbedo);
+    world!.add(moonRenderer!.node);
+    nightRenderer = NightSkyRenderer(parseStarCatalog(starCatalog), band);
+    world!.add(nightRenderer!.root);
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(loadConstellations());
+    });
+  }
+
+  Future<void> loadConstellations() async {
+    final renderer = nightRenderer;
+    if (renderer == null ||
+        renderer.constellations != null ||
+        constellationsLoading ||
+        !widget.state.showConstellations ||
+        widget.cleanPreview) {
+      return;
+    }
+    constellationsLoading = true;
+    try {
+      final figures = parseConstellations(
+        await rootBundle.loadString('assets/sky/constellations.json'),
+      );
+      if (!mounted) return;
+      final constellations = await ConstellationRenderer.create(figures);
+      if (!mounted) return;
+      setState(() => renderer.addConstellations(constellations));
+    } catch (failure, stack) {
+      debugPrint('PhotoSim constellation load failed: $failure\n$stack');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Constellation guides unavailable. Toggle guides to retry.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      constellationsLoading = false;
+    }
+  }
+
   @override
   void didUpdateWidget(covariant SimulationWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
     final old = oldWidget.state, next = widget.state;
+    if ((!old.showConstellations && next.showConstellations) ||
+        (oldWidget.cleanPreview && !widget.cleanPreview)) {
+      unawaited(loadConstellations());
+    }
+    if (old.timestamp != next.timestamp ||
+        old.weather != next.weather ||
+        old.weatherLightTransmission != next.weatherLightTransmission) {
+      autoExposureStartFrame = null;
+    }
     if (old.timestamp != next.timestamp ||
         old.location != next.location ||
         old.weather != next.weather ||
@@ -289,10 +328,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     } else {
       autoExposureStartFrame = null;
     }
-    // The pinned backend snaps its first two Auto frames; meter them without fill.
+    // Meter two unfilled frames after a lighting change, then hold exposure again.
     final ready =
         autoExposureStartFrame == null ||
         active.renderStats.frameCount - autoExposureStartFrame! >= 2;
+    if (!ready) active.autoExposure.reset();
     final strength = state.relitImagery && ready
         ? state.cameraLightStrength / 100
         : 0.0;
@@ -328,6 +368,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   }
 
   Future<void> loadTerrain({bool retry = false}) async {
+    if (repository == null || imagery == null || nightRenderer == null) return;
     final location = widget.state.location;
     // shortcut: rebase on camera-tile exit; retain more height fields for uninterrupted long-range flight.
     final retainFrame =
@@ -386,7 +427,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final missing = tiles
         .where((tile) => patches[tile.key]?.resolution != resolution(tile))
         .toList();
-    Future<void>? nearbyImagery;
+    Future<void>? centerImagery, nearbyImagery;
     // Near-first jobs, bounded concurrency; overlapping resident patches keep their buffers/textures.
     for (var start = 0; start < missing.length; start += 3) {
       if (!mounted || token != generation) return;
@@ -447,6 +488,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               widget.onGroundElevationChanged(widget.state.location, sampled);
             }
             setState(() => loaded = patches.length);
+            if (id.key == center.key) {
+              centerImagery = loadImagery(
+                token,
+                stop,
+                detail: false,
+                centerOnly: true,
+              );
+            }
           } catch (failure) {
             if (!mounted || token != generation) return;
             setState(() {
@@ -463,7 +512,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
     if (mounted && token == generation) {
       setState(() => loading = false);
-      if (nearbyImagery != null) await nearbyImagery;
+      await Future.wait([
+        if (centerImagery != null) centerImagery!,
+        ?nearbyImagery,
+      ]);
       await loadImagery(token, stop, retry: retry);
     }
   }
@@ -493,6 +545,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     Completer<void> stop, {
     bool retry = false,
     bool detail = true,
+    bool centerOnly = false,
   }) async {
     if (!mounted || token != generation) return;
     setState(() {
@@ -505,10 +558,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         patches.values
             .where(
               (patch) =>
-                  !textures.containsKey(patch.node) ||
-                  (retry &&
-                      partialImagery.contains(patch.id.key) &&
-                      !detailedImagery.contains(patch.id.key)),
+                  !imageryInFlight.contains((token, patch.id.key)) &&
+                  (!centerOnly || patch.id.key == centerKey) &&
+                  (!textures.containsKey(patch.node) ||
+                      (retry &&
+                          partialImagery.contains(patch.id.key) &&
+                          !detailedImagery.contains(patch.id.key))),
             )
             .toList()
           ..sort(
@@ -520,6 +575,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       ({TileId id, scene.Node node, int resolution}) patch,
       int size,
     ) async {
+      final key = (token, patch.id.key);
+      if (!imageryInFlight.add(key)) return;
       try {
         final result = await imagery!.load(patch.id, size, abort: stop.future);
         final raster = result.raster;
@@ -550,6 +607,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           imageryFailures++;
           imageryFailure = '$failure';
         });
+      } finally {
+        imageryInFlight.remove(key);
       }
     }
 
@@ -568,7 +627,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         (retry || !detailedImagery.contains(centerKey))) {
       await update(center, 1024);
     }
-    if (mounted && token == generation) setState(() => imageryLoading = false);
+    if (mounted && token == generation) {
+      setState(
+        () => imageryLoading = imageryInFlight.any((key) => key.$1 == token),
+      );
+    }
   }
 
   Future<void> exportImage() async {
@@ -608,7 +671,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         bytes = await encodePreview(
           image,
           '$credits\n'
-          '${snapshot.timestamp.toIso8601String()} · ${snapshot.sensor.label} · ${snapshot.focalLength.toStringAsFixed(1)} mm · '
+          '${snapshot.timestamp.toIso8601String()} · ${snapshot.sensor.label} · ${snapshot.focalLength.toStringAsFixed(0)} mm · '
           'f/${snapshot.aperture.toStringAsFixed(1)} · ISO ${snapshot.iso.round()} · ${snapshot.shutterLabel} · ${snapshot.exposureMode.label} · ${snapshot.weather.label} (illustrative) · visibility ${snapshot.weatherVisibilityKm.toStringAsFixed(1)} km · light ${(snapshot.weatherLightTransmission * 100).round()}% · rain ${(snapshot.rainIntensity * 100).round()}%',
           crop: Rect.fromLTRB(
             region.left * ratio,
@@ -971,7 +1034,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                 children: [
                                   Semantics(
                                     label: state.showConstellations
-                                        ? 'Constellation guides. Labels in the photo field of view: ${nightRenderer!.constellations.activeNames.join(', ')}. Terrain may occlude labels.'
+                                        ? 'Constellation guides. Labels in the photo field of view: ${nightRenderer!.constellations?.activeNames.join(', ') ?? ''}. Terrain may occlude labels.'
                                         : '3D photography preview',
                                     // Scene's +Z-forward camera reverses east/west in our ENU axes.
                                     child: Transform.flip(
@@ -1064,7 +1127,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                           'terrain-cache-count',
                                         ),
                                         message:
-                                            '${repository!.cacheHits} cached · ${repository!.downloads} downloaded',
+                                            '${repository?.cacheHits ?? 0} cached · ${repository?.downloads ?? 0} downloaded',
                                         child: Text(
                                           'Terrain $loaded/$total${loading ? ' · loading' : ''}',
                                           key: const ValueKey('terrain-status'),
@@ -1075,7 +1138,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                           'imagery-cache-count',
                                         ),
                                         message:
-                                            '${imagery!.cacheHits} cached · ${imagery!.downloads} downloaded',
+                                            '${imagery?.cacheHits ?? 0} cached · ${imagery?.downloads ?? 0} downloaded',
                                         child: Text(
                                           'Imagery ${textures.length}/$loaded${imageryLoading ? ' · loading' : ''}',
                                           key: const ValueKey('imagery-status'),
@@ -1090,7 +1153,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                       Tooltip(
                                         message: Platform.isAndroid
                                             ? 'Drag to aim · Pinch to zoom · Place the camera on the map to move'
-                                            : 'Click preview · Drag to aim · WASD: 30 m/s, follows terrain',
+                                            : 'Click preview · Drag to aim · WASD: 100 m/s, follows terrain',
                                         child: const Icon(
                                           Icons.help_outline,
                                           size: 16,
@@ -1137,7 +1200,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                 ),
                                 if (!widget.cleanPreview &&
                                     (failed > 0 ||
-                                        repository!.cacheWarning != null))
+                                        repository?.cacheWarning != null))
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -1162,7 +1225,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                   ),
                                 if (!widget.cleanPreview &&
                                     (imageryFailures > 0 ||
-                                        imagery!.cacheWarning != null))
+                                        imagery?.cacheWarning != null))
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,

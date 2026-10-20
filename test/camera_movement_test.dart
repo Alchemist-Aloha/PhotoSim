@@ -161,12 +161,12 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
       await tester.pump();
       await frames(5);
-      expect(forward, closeTo(3, 0.01));
+      expect(forward, closeTo(10, 0.01));
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyD);
       final before = forward;
       await frames(5);
-      expect(forward - before, closeTo(3 / math.sqrt(2), 0.01));
-      expect(right, closeTo(3 / math.sqrt(2), 0.01));
+      expect(forward - before, closeTo(10 / math.sqrt(2), 0.01));
+      expect(right, closeTo(10 / math.sqrt(2), 0.01));
       textFocus.requestFocus();
       await tester.pump();
       final stopped = forward;

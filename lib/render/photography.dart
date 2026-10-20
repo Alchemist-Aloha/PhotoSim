@@ -54,7 +54,7 @@ void configurePhotography(
     ..enabled = state.exposureMode == ExposureMode.automatic
     ..strength = 1
     ..compensation = 0
-    // Hold the existing GPU exposure factor so terrain fill cannot remeter the sky.
+    // Hold between lighting changes; the workspace re-meters unfilled frames after time/weather edits.
     ..speedUp = state.relitImagery && state.cameraLightStrength > 0 ? 0 : 3
     ..speedDown = state.relitImagery && state.cameraLightStrength > 0 ? 0 : 1;
   world.postProcess.colorGrading
