@@ -1,0 +1,172 @@
+material {
+  name: "PhotoSimClouds",
+  shading_model: unlit,
+  blending: alpha,
+  culling: front,
+  depth_test: always,
+  engine_inputs: [scene_depth],
+  parameters: [
+    { type: sampler2D, name: cloud_noise, hint: default_white },
+    { type: vec3, name: cloud_origin, default: [0, 0, 0] },
+    { type: vec3, name: seed_offset, default: [0, 0, 0] },
+    { type: vec4, name: layer, default: [1.6, 2.4, 1.8, 3.5] },
+    { type: vec3, name: sun_direction, default: [0, 1, 0] },
+    { type: vec3, name: sun_color, default: [1, 1, 1] },
+    { type: vec3, name: moon_direction, default: [0, -1, 0] },
+    { type: float, name: moon_strength, default: 0 },
+    { type: float, name: daylight, default: 1 },
+    { type: float, name: energy, default: 1 },
+    { type: float, name: amount, default: 0.5 },
+    { type: float, name: max_distance, default: 256 },
+    { type: float, name: scene_far, default: 50000 },
+    { type: int, name: cloud_type, default: 0 },
+    { type: int, name: view_steps, default: 48 }
+  ]
+}
+fragment {
+  precision highp float;
+
+  vec3 CloudNoise(vec3 p) {
+    // 64³ tileable volume in an 8×8 slice atlas, with one-voxel wrap gutters.
+    vec3 voxel = fract(p / 8.0) * 64.0;
+    float z = floor(voxel.z), next = mod(z + 1.0, 64.0);
+    vec2 a = vec2(mod(z, 8.0), floor(z / 8.0)) * 66.0;
+    vec2 b = vec2(mod(next, 8.0), floor(next / 8.0)) * 66.0;
+    vec3 first = texture(cloud_noise, (a + voxel.xy + 1.5) / 528.0).rgb;
+    vec3 second = texture(cloud_noise, (b + voxel.xy + 1.5) / 528.0).rgb;
+    return mix(first, second, fract(voxel.z));
+  }
+
+  float CloudDensity(vec3 p, float detail) {
+    vec4 layer = material_params.layer;
+    float h = (p.y - layer.x) / layer.y;
+    if (h <= 0.0 || h >= 1.0) return 0.0;
+    vec3 q = vec3(p.x, p.y - layer.x, p.z) / layer.z + material_params.seed_offset;
+    float bottom = smoothstep(0.0, 0.08, h);
+    float top = 1.0 - smoothstep(0.72, 1.0, h);
+    if (material_params.cloud_type == 3) {
+      // Curl the elongated ice filaments with low-frequency turbulence.
+      vec3 warp = CloudNoise(q * 0.28);
+      q.x = q.x * 0.32 + (warp.g - 0.5) * 1.8;
+      q.z = q.z * 2.2 + (warp.b - 0.5) * 1.2;
+      vec3 ice = CloudNoise(q * 2.0);
+      float wisps = ice.r * 0.7 + ice.g * 0.3;
+      return max(0.0, wisps - mix(0.76, 0.36, material_params.amount)) * bottom * top * 1.2;
+    }
+    vec3 noise = CloudNoise(q);
+    float weather = 0.5;
+    if (detail > 0.01) weather = mix(0.5, CloudNoise(vec3(q.x * 0.25, material_params.seed_offset.y, q.z * 0.25)).r, detail);
+    float shape = noise.r - 0.47 + (material_params.amount - 0.5) * 0.75 + (weather - 0.5) * 0.3;
+    if (material_params.cloud_type == 2) {
+      return max(0.0, shape + 0.08) * bottom * top * 6.0;
+    }
+    if (material_params.cloud_type == 4) {
+      // Lower density threshold aloft lets the same coherent towers spread into anvils.
+      shape += smoothstep(0.5, 0.8, h) * 0.14;
+    } else {
+      shape -= h * 0.12;
+    }
+    float erosion = mix(0.06, (1.0 - noise.g * 0.7 - noise.b * 0.3) * 0.18, detail);
+    return max(0.0, shape - erosion) * bottom * top * 7.5;
+  }
+
+  float CloudShadow(vec3 p, vec3 light) {
+    float stepSize = material_params.layer.y * 0.28;
+    float optical = CloudDensity(p + light * stepSize, 0.0) * stepSize;
+    optical += CloudDensity(p + light * stepSize * 2.8, 0.0) * stepSize * 1.8;
+    return exp(-optical * material_params.layer.w);
+  }
+
+  vec2 CloudSphereRoots(vec3 ray, float radius) {
+    float observerRadius = 6371.0 + material_params.cloud_origin.y;
+    float b = observerRadius * ray.y;
+    float c = (observerRadius - radius) * (observerRadius + radius);
+    float discriminant = b * b - c;
+    if (discriminant < 0.0) return vec2(-1.0);
+    float root = sqrt(discriminant);
+    return vec2(-b - root, -b + root);
+  }
+
+  vec2 CloudInterval(vec3 ray) {
+    float innerRadius = 6371.0 + material_params.layer.x;
+    vec2 outer = CloudSphereRoots(ray, innerRadius + material_params.layer.y);
+    if (outer.y <= 0.0) return vec2(-1.0);
+    float start = max(0.0, outer.x), end = outer.y;
+    vec2 inner = CloudSphereRoots(ray, innerRadius);
+    if (inner.y > 0.0) {
+      if (6371.0 + material_params.cloud_origin.y < innerRadius) {
+        start = max(start, inner.y);
+      } else if (inner.x > start && inner.x < end) {
+        end = inner.x;
+      }
+    }
+    return vec2(start, min(end, material_params.max_distance));
+  }
+
+  void Surface(inout MaterialInputs material) {
+    material.base_color = vec4(0.0);
+    if (material_params.amount <= 0.0) return;
+    vec3 ray = -normalize(v_viewvector);
+    vec3 origin = material_params.cloud_origin;
+    vec2 interval = CloudInterval(ray);
+    float start = interval.x, end = interval.y;
+    // Stop at real opaque geometry, not at this camera-centered proxy sphere.
+    float cosine = max(dot(ray, frag_info.camera_forward.xyz), 0.001);
+    float sceneDepth = GetSceneDepth(vec2(0.0));
+    // Empty depth is the camera far plane, not a real surface at 50 km.
+    if (sceneDepth < material_params.scene_far - 1.0) {
+      end = min(end, sceneDepth / cosine / 1000.0);
+    }
+    if (end <= start) return;
+    // Far banks need fewer steps; quadratic spacing preserves detail near the camera.
+    int steps = int(max(8.0, float(material_params.view_steps) *
+      mix(1.0, 0.35, smoothstep(20.0, 120.0, start))));
+
+    vec3 sun = normalize(material_params.sun_direction);
+    float mu = dot(ray, sun);
+    // Forward scattering makes a silver lining toward the light, not a painted outline.
+    float phase = 0.22 + 0.22 * (1.0 - 0.55 * 0.55) /
+      pow(max(1.0 + 0.55 * 0.55 - 2.0 * 0.55 * mu, 0.05), 1.5);
+    vec3 color = vec3(0.0);
+    float transmission = 1.0;
+    for (int i = 0; i < 64; i++) {
+      if (i >= steps || transmission < 0.015) break;
+      float a = float(i) / float(steps), b = float(i + 1) / float(steps);
+      float stepSize = (end - start) * (b * b - a * a);
+      float t = start + (end - start) * (a * a + b * b) * 0.5;
+      vec3 radial = vec3(ray.x * t, 6371.0 + origin.y + ray.y * t, ray.z * t);
+      vec3 p = origin + ray * t;
+      p.y = length(radial) - 6371.0;
+      float detail = 1.0 - smoothstep(12.0, 48.0, t);
+      float density = CloudDensity(p, detail);
+      if (density < 0.001) continue;
+      float opacity = 1.0 - exp(-density * stepSize * material_params.layer.w);
+      float localSunHeight = dot(normalize(radial), sun);
+      float lightVisible = smoothstep(-0.006, 0.006, localSunHeight + sqrt(max(0.0, 2.0 * p.y / 6371.0)));
+      float shadow = exp(-density * material_params.layer.y * material_params.layer.w * 0.6);
+      if (detail > 0.05) shadow = CloudShadow(p, sun);
+      float height = clamp((p.y - material_params.layer.x) / material_params.layer.y, 0.0, 1.0);
+      float sunset = exp(-pow((localSunHeight + 0.015) / 0.10, 2.0));
+      vec3 ambient = mix(vec3(0.00004, 0.00007, 0.00014), vec3(0.30, 0.39, 0.52), material_params.daylight);
+      // Cool violet shadows contrast with warm, still sunlit upper billows.
+      ambient = mix(ambient, vec3(0.18, 0.12, 0.22) * material_params.daylight, sunset * 0.6);
+      ambient *= mix(0.45, 1.2, height);
+      vec3 direct = material_params.sun_color * lightVisible * phase * (0.16 + 1.7 * shadow);
+      vec3 moon = vec3(0.0);
+      if (material_params.moon_strength > 0.001) {
+        float lunarShadow = detail > 0.05 ? CloudShadow(p, normalize(material_params.moon_direction)) : shadow;
+        moon = vec3(0.0010, 0.0014, 0.0022) * material_params.moon_strength * (0.25 + 0.75 * lunarShadow);
+      }
+      vec3 radiance = (ambient + direct + moon) * material_params.energy;
+      float haze = 1.0 - exp(-t * 0.018);
+      vec3 horizonColor = mix(ambient * 1.8, material_params.sun_color * 0.35,
+        sunset * pow(max(mu, 0.0), 2.0) * 0.5);
+      radiance = mix(radiance, horizonColor, haze * 0.65);
+      color += transmission * opacity * radiance;
+      transmission *= 1.0 - opacity;
+    }
+    float alpha = 1.0 - transmission;
+    // The engine premultiplies Surface output; undo the integration's premultiplication once.
+    material.base_color = vec4(color / max(alpha, 0.0001), alpha);
+  }
+}

@@ -61,9 +61,10 @@ them. Quality changes preserve resident geographic meshes/textures and do not
 fetch new data. Viewport/screen-error terrain and imagery refinement remains future work.
 
 **Weather**: Clear, Cloudy, Fog, Rain. These are deterministic, illustrative manual
-presets, not forecasts or observations. Cloudy uses a uniform overcast sky rather
-than volumetric cloud shapes. Fog and rain reduce visibility; non-clear modes
-attenuate light and obscure the physical night sky. Rain includes animated,
+presets, not forecasts or observations. The Weather panel also selects five
+[procedural volumetric cloud types](clouds.md), amount and a randomized pattern.
+Fog and rain reduce visibility; cloud density controls sky occlusion and presets
+attenuate light. Rain includes animated,
 screen-space streaks clipped to the photograph. No weather service, account,
 network request, wind simulation, wet-surface reconstruction or precipitation
 physics is involved.

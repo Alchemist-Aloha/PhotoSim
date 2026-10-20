@@ -78,14 +78,17 @@ class MoonRenderer {
       storage: scene.GeometryStorage.updatable,
     );
     normals = data.normals!;
-    node = scene.Node(
-      name: 'Moon',
-      mesh: scene.Mesh(
-        geometry,
-        CelestialMaterial(colorTexture: albedo)
-          ..alphaMode = scene.AlphaMode.blend,
-      ),
-    )..shadowCastingMode = scene.ShadowCastingMode.off;
+    node =
+        scene.Node(
+            name: 'Moon',
+            mesh: scene.Mesh(
+              geometry,
+              CelestialMaterial(colorTexture: albedo)
+                ..alphaMode = scene.AlphaMode.blend,
+            ),
+          )
+          ..shadowCastingMode = scene.ShadowCastingMode.off
+          ..renderOrder = -20;
   }
 
   // shortcut: smooth sphere with fixed near-side aspect; add libration/relief for precise lunar feature planning.

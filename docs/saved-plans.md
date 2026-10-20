@@ -61,6 +61,10 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Optional `weatherVisibilityKm` (0.1–500), `weatherLightTransmission` (0–1)
   and `rainIntensity` (0–1). Missing fields use the selected weather preset's
   defaults. Parameter edits persist; changing presets resets their defaults.
+- Optional `cloudType` (`cumulus`, `stratocumulus`, `stratus`, `cirrus`,
+  `cumulonimbus`), `cloudAmount` (0–1) and `cloudSeed` (integer 0–2,147,483,647).
+  Missing type/amount use weather-preset defaults; missing seed is zero. These
+  [procedural cloud settings](clouds.md) are illustrative, not forecast data.
 
 Legacy version-1 files remain readable: their obsolete `lens` preset field is
 ignored, while focal length and sensor are preserved. New version-2 files omit

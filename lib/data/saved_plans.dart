@@ -47,6 +47,9 @@ class SavedPlan {
     'weatherVisibilityKm': state.weatherVisibilityKm,
     'weatherLightTransmission': state.weatherLightTransmission,
     'rainIntensity': state.rainIntensity,
+    'cloudType': state.cloudType.name,
+    'cloudAmount': state.cloudAmount,
+    'cloudSeed': state.cloudSeed,
     'depthOfField': state.depthOfField,
     'aperture': state.aperture,
     'focusDistance': state.focusDistance,
@@ -115,6 +118,15 @@ class SavedPlan {
           weatherLightTransmission: (json['weatherLightTransmission'] as num?)
               ?.toDouble(),
           rainIntensity: (json['rainIntensity'] as num?)?.toDouble(),
+          cloudType: json.containsKey('cloudType')
+              ? CloudType.values.byName(json['cloudType'] as String)
+              : null,
+          cloudAmount: json.containsKey('cloudAmount')
+              ? number('cloudAmount')
+              : null,
+          cloudSeed: json.containsKey('cloudSeed')
+              ? json['cloudSeed'] as int
+              : 0,
           depthOfField: json['depthOfField'] as bool? ?? false,
           aperture: (json['aperture'] as num?)?.toDouble() ?? 8,
           focusDistance: (json['focusDistance'] as num?)?.toDouble() ?? 1000,

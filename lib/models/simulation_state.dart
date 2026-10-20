@@ -57,20 +57,37 @@ enum ExposureMode {
   final String label;
 }
 
+enum CloudType {
+  cumulus('Cumulus', 'Puffy fair-weather clouds with flat bases.'),
+  stratocumulus(
+    'Stratocumulus',
+    'Low, rounded banks with breaks between them.',
+  ),
+  stratus('Stratus', 'A low, layered overcast sky.'),
+  cirrus('Cirrus', 'High, thin streaks of ice cloud.'),
+  cumulonimbus('Cumulonimbus', 'Tall storm towers with spreading anvil tops.');
+
+  const CloudType(this.label, this.description);
+  final String label, description;
+}
+
 enum Weather {
-  clear('Clear', 500, 1, 0),
-  cloudy('Cloudy', 18, 0.35, 0),
-  fog('Fog', 0.7, 0.2, 0),
-  rain('Rain', 3.5, 0.15, 0.6);
+  clear('Clear', 500, 1, 0, CloudType.cumulus, 0),
+  cloudy('Cloudy', 18, 0.35, 0, CloudType.stratocumulus, 0.7),
+  fog('Fog', 0.7, 0.2, 0, CloudType.stratus, 0.95),
+  rain('Rain', 3.5, 0.15, 0.6, CloudType.stratus, 1);
 
   const Weather(
     this.label,
     this.visibilityKm,
     this.lightTransmission,
     this.rainIntensity,
+    this.cloudType,
+    this.cloudAmount,
   );
   final String label;
-  final double visibilityKm, lightTransmission, rainIntensity;
+  final double visibilityKm, lightTransmission, rainIntensity, cloudAmount;
+  final CloudType cloudType;
 }
 
 @immutable
@@ -110,6 +127,9 @@ class SimulationState {
     double? weatherVisibilityKm,
     double? weatherLightTransmission,
     double? rainIntensity,
+    CloudType? cloudType,
+    double? cloudAmount,
+    this.cloudSeed = 0,
     this.depthOfField = false,
     this.aperture = 8,
     this.focusDistance = 1000,
@@ -118,6 +138,8 @@ class SimulationState {
        weatherLightTransmission =
            weatherLightTransmission ?? weather.lightTransmission,
        rainIntensity = rainIntensity ?? weather.rainIntensity,
+       cloudType = cloudType ?? weather.cloudType,
+       cloudAmount = cloudAmount ?? weather.cloudAmount,
        timestamp = (timestamp ?? DateTime.now()).toUtc() {
     if (this.timestamp.year < 1900 ||
         this.timestamp.year > 2100 ||
@@ -161,6 +183,11 @@ class SimulationState {
         !this.rainIntensity.isFinite ||
         this.rainIntensity < 0 ||
         this.rainIntensity > 1 ||
+        !this.cloudAmount.isFinite ||
+        this.cloudAmount < 0 ||
+        this.cloudAmount > 1 ||
+        cloudSeed < 0 ||
+        cloudSeed > 0x7fffffff ||
         !aperture.isFinite ||
         aperture < 1.4 ||
         aperture > 22 ||
@@ -218,7 +245,11 @@ class SimulationState {
   final Antialiasing antialiasing;
   final Weather weather;
   final double weatherVisibilityKm, weatherLightTransmission, rainIntensity;
+  final CloudType cloudType;
+  final double cloudAmount;
+  final int cloudSeed;
   bool get atmosphericEffects =>
+      cloudAmount > 0 ||
       weather != Weather.clear ||
       weatherVisibilityKm < Weather.clear.visibilityKm ||
       weatherLightTransmission != 1;
@@ -330,6 +361,9 @@ class SimulationState {
     double? weatherVisibilityKm,
     double? weatherLightTransmission,
     double? rainIntensity,
+    CloudType? cloudType,
+    double? cloudAmount,
+    int? cloudSeed,
     bool? depthOfField,
     double? aperture,
     double? focusDistance,
@@ -393,6 +427,17 @@ class SimulationState {
           (weather != null && weather != this.weather
               ? weather.rainIntensity
               : this.rainIntensity),
+      cloudType:
+          cloudType ??
+          (weather != null && weather != this.weather
+              ? weather.cloudType
+              : this.cloudType),
+      cloudAmount:
+          cloudAmount ??
+          (weather != null && weather != this.weather
+              ? weather.cloudAmount
+              : this.cloudAmount),
+      cloudSeed: cloudSeed ?? this.cloudSeed,
       depthOfField: depthOfField ?? this.depthOfField,
       aperture: aperture ?? this.aperture,
       focusDistance: focusDistance ?? this.focusDistance,

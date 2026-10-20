@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import '../models/simulation_state.dart';
 
+const previewFarDistanceMeters = 50000.0;
+
 /// The sensor-sized composition sits inside the full context viewport.
 Rect photoRegion(Size viewport, double aspect) {
   if (viewport.isEmpty) return Rect.zero;

@@ -25,6 +25,7 @@ import '../data/terrain/terrain_sources.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
 import '../render/atmosphere_sky.dart';
+import '../render/clouds.dart';
 import '../render/photography.dart';
 import '../render/photo_framing.dart';
 import '../core/sunlight.dart';
@@ -69,7 +70,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   final photoKey = GlobalKey();
   bool exporting = false;
   scene.Scene? world;
-  scene.GradientSkySource? overcastSky;
+  CloudRenderer? cloudRenderer;
   TerrainSources? repository;
   final terrainProviders = <String, TerrainProvider>{};
   String terrainCredits = '';
@@ -168,16 +169,18 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
 
   Future<void> initializeScene() async {
     await scene.Scene.initializeStaticResources();
-    final (atmosphere, lunarAlbedo, starCatalog, band) = await (
+    final (atmosphere, lunarAlbedo, starCatalog, band, clouds) = await (
       AtmosphereSky.load(),
       scene.Texture2D.fromAsset('assets/moon/lroc_color_2k.jpg', maxSize: 2048),
       rootBundle.loadString('assets/sky/stars.json'),
       scene.Texture2D.fromAsset('assets/sky/milky_way.png'),
+      CloudRenderer.load(),
     ).wait;
     skySource = atmosphere;
     if (!mounted) return;
-    overcastSky = scene.GradientSkySource();
+    cloudRenderer = clouds;
     world = scene.Scene()..skybox = scene.Skybox(skySource!);
+    world!.add(clouds.node);
     world!.directionalLight = scene.DirectionalLight(
       castsShadow: true,
       cacheStaticShadows: false,
@@ -251,7 +254,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
     if (old.timestamp != next.timestamp ||
         old.weather != next.weather ||
-        old.weatherLightTransmission != next.weatherLightTransmission) {
+        old.weatherLightTransmission != next.weatherLightTransmission ||
+        old.cloudType != next.cloudType ||
+        old.cloudAmount != next.cloudAmount ||
+        old.cloudSeed != next.cloudSeed) {
       autoExposureStartFrame = null;
     }
     if (old.timestamp != next.timestamp ||
@@ -683,7 +689,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           image,
           '$credits\n'
           '${snapshot.timestamp.toIso8601String()} · ${snapshot.sensor.label} · ${snapshot.focalLength.toStringAsFixed(0)} mm · '
-          'f/${snapshot.aperture.toStringAsFixed(1)} · ISO ${snapshot.iso.round()} · ${snapshot.shutterLabel} · ${snapshot.exposureMode.label} · ${snapshot.weather.label} (illustrative) · visibility ${snapshot.weatherVisibilityKm.toStringAsFixed(1)} km · light ${(snapshot.weatherLightTransmission * 100).round()}% · rain ${(snapshot.rainIntensity * 100).round()}%',
+          'f/${snapshot.aperture.toStringAsFixed(1)} · ISO ${snapshot.iso.round()} · ${snapshot.shutterLabel} · ${snapshot.exposureMode.label} · ${snapshot.weather.label} (illustrative) · visibility ${snapshot.weatherVisibilityKm.toStringAsFixed(1)} km · light ${(snapshot.weatherLightTransmission * 100).round()}% · rain ${(snapshot.rainIntensity * 100).round()}% · ${snapshot.cloudType.label} ${(snapshot.cloudAmount * 100).round()}% · cloud seed ${snapshot.cloudSeed}',
           crop: Rect.fromLTRB(
             region.left * ratio,
             region.top * ratio,
@@ -960,25 +966,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         RenderQuality.high => 12,
       }
       ..lightSamples = state.renderQuality == RenderQuality.high ? 6 : 4;
-    active.environmentIntensity = 1;
-    final transmission = state.weatherLightTransmission;
-    moonRenderer!.node.visible = state.weather == Weather.clear;
-    if (state.weather == Weather.clear) {
-      if (active.skybox?.source != skySource) {
-        active.skybox = scene.Skybox(skySource!);
-      }
-    } else {
-      final brightness =
-          ((sun.altitude + 18) / 33).clamp(0.0, 1.0) * transmission;
-      overcastSky!
-        ..sunColor = vm.Vector3.zero()
-        ..zenithColor = vm.Vector3(0.22, 0.25, 0.29) * brightness
-        ..horizonColor = vm.Vector3(0.42, 0.46, 0.50) * brightness
-        ..groundColor = vm.Vector3(0.12, 0.13, 0.14) * brightness;
-      if (active.skybox?.source != overcastSky) {
-        active.skybox = scene.Skybox(overcastSky!);
-      }
-    }
+    cloudRenderer!.update(state, eye);
+    final cloudTransmission = cloudLightTransmission(state);
+    active.environmentIntensity = cloudTransmission;
+    final transmission = state.weatherLightTransmission * cloudTransmission;
+    moonRenderer!.node.visible = true;
     final lightingSky = active.skybox!.source as scene.ShaderSkySource;
     if (!identical(active.skyEnvironment?.source, lightingSky)) {
       active.skyEnvironment = scene.SkyEnvironment(lightingSky);
@@ -1062,7 +1054,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                             constraints.biggest,
                                           ),
                                           fovNear: 0.5,
-                                          fovFar: 50000,
+                                          fovFar: previewFarDistanceMeters,
                                         ),
                                       ),
                                     ),

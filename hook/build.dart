@@ -6,7 +6,10 @@ void main(List<String> args) async {
     await buildMaterials(
       buildInput: input,
       buildOutput: output,
-      materials: ['assets/atmosphere/sky.fmat'],
+      materials: [
+        'assets/atmosphere/sky.fmat',
+        'assets/atmosphere/clouds.fmat',
+      ],
     );
   });
 }

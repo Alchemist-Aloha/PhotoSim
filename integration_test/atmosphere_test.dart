@@ -241,7 +241,13 @@ void main() {
         );
         await settleLighting();
         expect(world.skyEnvironment!.source, same(world.skybox!.source));
-        expect(world.skyEnvironment!.source, isA<scene.GradientSkySource>());
+        expect(world.skyEnvironment!.source, isA<AtmosphereSky>());
+        expect(
+          world.root.children
+              .singleWhere((node) => node.name == 'Clouds')
+              .visible,
+          isTrue,
+        );
         expect(world.skyEnvironment!.faceResolution, 32);
         await pixels('overcast');
         rebuild(

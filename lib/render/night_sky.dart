@@ -88,17 +88,21 @@ class NightSkyRenderer {
       colors: data.colors,
       indices: data.indices,
     );
-    starMaterial = CelestialMaterial();
+    // Celestial proxy distances must not clip the far-cloud ray march as terrain depth.
+    starMaterial = CelestialMaterial()..alphaMode = scene.AlphaMode.blend;
     bandMaterial = CelestialMaterial(colorTexture: milkyWay)
       ..alphaMode = scene.AlphaMode.blend;
-    starNode = scene.Node(
-      name: 'Stars',
-      mesh: scene.Mesh(starGeometry, starMaterial),
-    )..shadowCastingMode = scene.ShadowCastingMode.off;
-    bandNode = scene.Node(
-      name: 'Milky Way',
-      mesh: scene.Mesh(_milkyWayGeometry(), bandMaterial),
-    )..shadowCastingMode = scene.ShadowCastingMode.off;
+    starNode =
+        scene.Node(name: 'Stars', mesh: scene.Mesh(starGeometry, starMaterial))
+          ..shadowCastingMode = scene.ShadowCastingMode.off
+          ..renderOrder = -30;
+    bandNode =
+        scene.Node(
+            name: 'Milky Way',
+            mesh: scene.Mesh(_milkyWayGeometry(), bandMaterial),
+          )
+          ..shadowCastingMode = scene.ShadowCastingMode.off
+          ..renderOrder = -40;
     marker = scene.Node(
       name: 'Galactic center',
       mesh: scene.Mesh(
@@ -158,9 +162,10 @@ class NightSkyRenderer {
       ..setRotation(_rotation)
       ..setTranslation(eye);
     final current = sky ?? state.sky;
-    final clear = state.weather == Weather.clear;
-    final stars = clear ? nightVisibility(current) : 0.0,
-        band = clear ? nightVisibility(current, milkyWay: true) : 0.0;
+    final stars = nightVisibility(current) * state.weatherLightTransmission,
+        band =
+            nightVisibility(current, milkyWay: true) *
+            state.weatherLightTransmission;
     starNode.visible = stars > 0;
     bandNode.visible = band > 0.001;
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);

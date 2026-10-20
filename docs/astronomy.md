@@ -151,8 +151,9 @@ baked once, then invalidated by time, location, weather, transmission or quality
 changes; subsequent bakes advance one GPU pass per frame. Cube faces are 32/64/128
 pixels for performance/balanced/high quality. Lighting can lag the visible sky by
 a bake cycle during scrubbing; crossing the solar horizon resets the binding
-immediately to avoid stale daylight at night. The environment intensity stays at 1 so horizon
-radiance used for haze matches the visible sky.
+immediately to avoid stale daylight at night. Procedural clouds apply an average
+attenuation factor to environment and directional intensity; spatial cloud-shadow
+maps and cloud geometry in the baked environment are not implemented.
 
 Approximately relit terrain receives exponential aerial perspective, including in
 clear weather, using the existing visibility setting (500 km by default). Its fog
@@ -163,10 +164,12 @@ the flat fallback color. Celestial proxy meshes exclude terrestrial distance fog
 but retain exposure, tone mapping and terrain occlusion.
 
 These are approximate appearance controls, **not calibrated irradiance, exposure
-or weather simulation**. There is no artificial ambient night floor. Lunar sky
-radiance uses the same preview-relative scale family as direct moonlight, not
-photometric units. Multiple scattering, ozone, measured aerosol profiles and
-cloud volumes are not modeled. Direct moonlight remains a separate directional light.
+or weather simulation**. The atmospheric sky has no artificial ambient night floor.
+Lunar sky radiance is preview-relative, not photometric. Ozone, measured aerosol
+profiles and exact multiple scattering are not modeled. [Procedural cloud
+volumes](clouds.md) have separate bounded lighting and distance-based quality;
+their small night fill and phase-dependent moonlight are also uncalibrated.
+Direct moonlight remains a separate directional light.
 
 Terrain shadows use a 300 m near cascade, logarithmically weighted remaining
 splits, 12% overlap and a 15% far fade. Performance uses two 1024-pixel cascades;

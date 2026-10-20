@@ -323,6 +323,45 @@ class CameraInspector extends StatelessWidget {
           },
         ),
         const SizedBox(height: 16),
+        DropdownButtonFormField<CloudType>(
+          key: ValueKey(state.cloudType),
+          initialValue: state.cloudType,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Cloud type'),
+          items: [
+            for (final type in CloudType.values)
+              DropdownMenuItem(value: type, child: Text(type.label)),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(state.copyWith(cloudType: value));
+          },
+        ),
+        const SizedBox(height: 8),
+        Text(state.cloudType.description),
+        const SizedBox(height: 8),
+        control(
+          'Cloud amount',
+          state.cloudAmount * 100,
+          0,
+          100,
+          (value) => onChanged(state.copyWith(cloudAmount: value / 100)),
+          '%',
+        ),
+        OutlinedButton.icon(
+          onPressed: state.cloudAmount == 0
+              ? null
+              : () {
+                  var seed = math.Random().nextInt(0x80000000);
+                  if (seed == state.cloudSeed) seed = (seed + 1) % 0x80000000;
+                  onChanged(state.copyWith(cloudSeed: seed));
+                },
+          icon: const Icon(Icons.shuffle),
+          label: const Text('Randomize clouds'),
+        ),
+        const Text(
+          '0% removes clouds. Amount controls procedural coverage, not a measured forecast.',
+        ),
+        const SizedBox(height: 16),
         control(
           'Visibility',
           state.weatherVisibilityKm,
@@ -355,6 +394,8 @@ class CameraInspector extends StatelessWidget {
               weatherVisibilityKm: state.weather.visibilityKm,
               weatherLightTransmission: state.weather.lightTransmission,
               rainIntensity: state.weather.rainIntensity,
+              cloudType: state.weather.cloudType,
+              cloudAmount: state.weather.cloudAmount,
             ),
           ),
           child: const Text('Reset weather parameters'),
