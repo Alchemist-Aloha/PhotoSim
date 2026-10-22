@@ -79,6 +79,41 @@ jobs:
           path: build/dist/PhotoSim-*
           if-no-files-found: error
 
+  windows:
+    needs: check
+    runs-on: windows-2025
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Build Windows portable binary and EXE installer
+        run: python tool/build_release.py windows --installer
+      - name: Test silent install, complete payload and uninstall
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          ./tool/test_windows_installer.ps1 `
+            -InstallerPath "build/dist/PhotoSim-${env:VERSION}-windows-x64-setup.exe" `
+            -BundleDirectory 'build/windows/x64/runner/Release' `
+            -InstallDirectory (Join-Path $env:RUNNER_TEMP 'PhotoSim-installer-test')
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-x64
+          path: |
+            build/dist/PhotoSim-*-windows-x64.zip
+            build/dist/PhotoSim-*-windows-x64.zip.sha256
+            build/dist/PhotoSim-*-windows-x64-setup.exe
+            build/dist/PhotoSim-*-windows-x64-setup.exe.sha256
+          if-no-files-found: error
+
   android:
     needs: check
     runs-on: ubuntu-24.04
@@ -124,7 +159,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [check, linux, android]
+    needs: [check, linux, windows, android]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -147,7 +182,7 @@ jobs:
         run: |
           git -C "$GITHUB_WORKSPACE" archive --format=tar.gz --prefix="PhotoSim-$VERSION/" HEAD > "PhotoSim-$VERSION-source.tar.gz"
           # Fail before publishing if any expected platform artifact is absent.
-          for suffix in x86_64.deb x86_64.pkg.tar.zst x86_64.AppImage armeabi-v7a.apk arm64-v8a.apk x86_64.apk; do
+          for suffix in x86_64.deb x86_64.pkg.tar.zst x86_64.AppImage windows-x64.zip windows-x64.zip.sha256 windows-x64-setup.exe windows-x64-setup.exe.sha256 armeabi-v7a.apk arm64-v8a.apk x86_64.apk; do
             test -s "PhotoSim-$VERSION-$suffix"
           done
           sha256sum PhotoSim-* > SHA256SUMS

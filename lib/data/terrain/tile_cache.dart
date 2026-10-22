@@ -102,7 +102,8 @@ class TileCache {
     var total = 0;
     await for (final entry in directory.list(followLinks: false)) {
       if (entry is! File ||
-          !RegExp(r'/\d+-\d+-\d+\.png$').hasMatch(entry.path)) {
+          !RegExp(r'^\d+-\d+-\d+\.png$')
+              .hasMatch(entry.uri.pathSegments.last)) {
         continue;
       }
       final stat = await entry.stat();

@@ -22,6 +22,10 @@ class RasterCache {
   Future<void> _pending = Future.value();
   Future<void>? _initialization;
 
+  // Directory listings use native separators; callers may build paths with '/'.
+  static String _key(File file) =>
+      file.absolute.uri.normalizePath().toFilePath();
+
   Iterable<Directory> get _directories sync* {
     for (final provider in TerrainProvider.values) {
       yield Directory('${directory.path}/${provider.cacheKey}');
@@ -100,9 +104,10 @@ class RasterCache {
   }
 
   void touch(File file) {
-    final entry = _entries[file.path];
+    final key = _key(file);
+    final entry = _entries[key];
     if (entry != null) {
-      _entries[file.path] = (bytes: entry.bytes, used: DateTime.now());
+      _entries[key] = (bytes: entry.bytes, used: DateTime.now());
     }
   }
 
@@ -126,8 +131,9 @@ class RasterCache {
         final metadata = File('${file.path}.json');
         final size =
             stat.size + (await metadata.exists() ? await metadata.length() : 0);
-        _bytes -= _entries[file.path]?.bytes ?? 0;
-        _entries[file.path] = (bytes: size, used: DateTime.now());
+        final key = _key(file);
+        _bytes -= _entries[key]?.bytes ?? 0;
+        _entries[key] = (bytes: size, used: DateTime.now());
         _bytes += size;
         await _evict();
       } on FileSystemException {
@@ -156,20 +162,20 @@ class RasterCache {
       }
       await for (final entry in folder.list(followLinks: false)) {
         if (entry is! File) continue;
-        if (RegExp(r'/\d+-\d+-\d+\.png(?:\.json)?\.tmp$')
-                .hasMatch(entry.path) ||
-            (RegExp(r'/\d+-\d+-\d+\.png\.json$').hasMatch(entry.path) &&
+        final name = entry.uri.pathSegments.last;
+        if (RegExp(r'^\d+-\d+-\d+\.png(?:\.json)?\.tmp$').hasMatch(name) ||
+            (RegExp(r'^\d+-\d+-\d+\.png\.json$').hasMatch(name) &&
                 !await File(entry.path.substring(0, entry.path.length - 5))
                     .exists())) {
           await entry.delete();
           continue;
         }
-        if (!RegExp(r'/\d+-\d+-\d+\.png$').hasMatch(entry.path)) continue;
+        if (!RegExp(r'^\d+-\d+-\d+\.png$').hasMatch(name)) continue;
         final stat = await entry.stat();
         final metadata = File('${entry.path}.json');
         final size =
             stat.size + (await metadata.exists() ? await metadata.length() : 0);
-        _entries[entry.path] = (bytes: size, used: stat.modified);
+        _entries[_key(entry)] = (bytes: size, used: stat.modified);
         _bytes += size;
       }
     }
@@ -180,7 +186,7 @@ class RasterCache {
     if (await file.exists()) await file.delete();
     final metadata = File('${file.path}.json');
     if (await metadata.exists()) await metadata.delete();
-    _bytes -= _entries.remove(file.path)?.bytes ?? 0;
+    _bytes -= _entries.remove(_key(file))?.bytes ?? 0;
   }
 
   Future<void> _evict() async {

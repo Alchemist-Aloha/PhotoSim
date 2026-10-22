@@ -93,6 +93,8 @@ void main() {
       savePreview('${directory.path}/absent/photo.png', bytes),
       throwsA(isA<FileSystemException>()),
     );
-    expect((await directory.list().toList()).map((file) => file.path), [path]);
+    expect((await directory.list().toList()).map((file) => file.uri), [
+      File(path).uri,
+    ]);
   });
 }

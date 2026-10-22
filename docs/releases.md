@@ -2,7 +2,7 @@
 
 `.github/workflows/build.yml` checks pushes to `main`/`master`, pull requests,
 `v*` tags, published GitHub releases, and manual runs. It pins Flutter 3.47.6,
-checks formatting/analysis/tests, builds both platforms and retains workflow
+checks formatting/analysis/tests, builds Linux, Windows and Android and retains workflow
 artifacts. Only **tag refs** publish release assets; a manual run on a branch
 builds artifacts without publishing.
 
@@ -12,7 +12,7 @@ builds artifacts without publishing.
 2. Update `pubspec.yaml`, increasing both the public version and numeric build
    number, e.g. `version: 0.2.0+2`. Commit the change.
 3. Push the matching tag: `git tag v0.2.0 && git push origin v0.2.0`.
-4. After both platform jobs succeed, the workflow creates the GitHub release
+4. After all platform jobs succeed, the workflow creates the GitHub release
    (or adds files to an existing release) and uploads binaries, a tagged source
    archive and `SHA256SUMS`.
 
@@ -39,6 +39,8 @@ For version `0.2.0+2`, filenames use public version `0.2.0`:
 | `PhotoSim-0.2.0-x86_64.deb` | Debian/Ubuntu amd64 |
 | `PhotoSim-0.2.0-x86_64.pkg.tar.zst` | Arch/pacman x86_64 |
 | `PhotoSim-0.2.0-x86_64.AppImage` | Linux x86_64 |
+| `PhotoSim-0.2.0-windows-x64.zip` | Windows x64 portable binary bundle |
+| `PhotoSim-0.2.0-windows-x64-setup.exe` | Windows x64 per-user installer |
 | `PhotoSim-0.2.0-armeabi-v7a.apk` | Android ARMv7 |
 | `PhotoSim-0.2.0-arm64-v8a.apk` | Android ARM64 |
 | `PhotoSim-0.2.0-x86_64.apk` | Android x86_64 |
@@ -54,6 +56,16 @@ The AppImage bundles the Flutter application, **not GTK or graphics drivers**;
 it needs those host libraries too, and is not a promise of compatibility with
 older distributions. Linux ARM builds are not included. Android remains API 29+;
 a matching CPU ABI does not guarantee that an older GPU can run Flutter GPU.
+
+Windows builds run on `windows-2025` with the preinstalled Visual Studio C++
+toolchain and Inno Setup 6. The ZIP and installer include the full Flutter bundle
+and Visual C++ runtime DLLs. The job verifies a silent install, compares all
+installed bundle files with the build output and uninstalls before uploading
+the `windows-x64` artifact. Hosted CI does not claim GPU runtime coverage.
+The installer adds a Start menu shortcut and uninstall entry without requiring
+administrator privileges; it preserves saved user data on uninstall. Both Windows
+packages also include a separate `.sha256` file. They are currently unsigned.
+See [Windows builds](windows.md) for local prerequisites, usage and checks.
 
 Install with `sudo apt install ./PhotoSim-...deb`, `sudo pacman -U PhotoSim-...pkg.tar.zst`,
 or `chmod +x PhotoSim-...AppImage` then run it. The AppImage can also use
@@ -102,6 +114,19 @@ sudo apt-get install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
 python3 tool/build_release.py linux
 python3 tool/build_release.py android
 ```
+
+On Windows, install the Flutter SDK, Visual Studio's Desktop development with C++
+workload, Python 3 and Inno Setup 6, then run:
+
+```powershell
+python tool/build_release.py windows --installer
+```
+
+Use `ISCC` to specify a custom path to `ISCC.exe`. Omit `--installer` if only the
+portable ZIP is needed. `--skip-build --installer` packages an existing Windows
+release bundle and compiles its installer. Windows numeric version components,
+including the pubspec build number, must fit in 0–65,535; prerelease text remains
+in the displayed version and filenames.
 
 Outputs are under `build/dist/`. `--skip-build` packages an existing release
 bundle or split APKs. For local release signing, export `PHOTOSIM_KEYSTORE_FILE`,

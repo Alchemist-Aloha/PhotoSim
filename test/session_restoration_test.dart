@@ -22,13 +22,17 @@ void main() {
   const channel = MethodChannel('plugins.flutter.io/path_provider');
   setUp(() {
     support = Directory.systemTemp.createTempSync('photosim-session-support-');
+    // Start the cache worker outside the widget test's fake async zone.
+    BuiltInMapCachingProvider.getOrCreateInstance(cacheDirectory: support.path);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (_) async => support.path);
   });
-  tearDown(() {
+  tearDown(() async {
+    // flutter_map keeps its process-wide disk-cache worker alive between maps.
+    await BuiltInMapCachingProvider.getOrCreateInstance().destroy();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
-    support.deleteSync(recursive: true);
+    if (await support.exists()) await support.delete(recursive: true);
   });
   testWidgets(
     'immediate exit checkpoints edits and restores UI, map framing and calendar date',

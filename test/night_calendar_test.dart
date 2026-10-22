@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:photosim/app/app.dart';
@@ -137,13 +138,22 @@ void main() {
       final directory = Directory.systemTemp.createTempSync(
         'photosim-calendar-test-',
       );
+      // Cache-worker messages need the real event loop, including during teardown.
+      await tester.runAsync(() async {
+        BuiltInMapCachingProvider.getOrCreateInstance(
+          cacheDirectory: directory.path,
+        );
+      });
       const channel = MethodChannel('plugins.flutter.io/path_provider');
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (_) async => directory.path);
-      addTearDown(() {
+      addTearDown(() async {
+        await tester.runAsync(
+          () => BuiltInMapCachingProvider.getOrCreateInstance().destroy(),
+        );
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, null);
-        directory.deleteSync(recursive: true);
+        await directory.delete(recursive: true);
       });
       await tester.pumpWidget(const PhotoSimApp());
       final inspector = tester.widget<CameraInspector>(

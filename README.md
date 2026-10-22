@@ -1,6 +1,6 @@
 # PhotoSim
 
-Landscape photography simulator for **Linux and Android phones/tablets**, built
+Landscape photography simulator for **Linux, Windows and Android phones/tablets**, built
 with Flutter and Material 3. **The Linux MVP is complete** under the revised
 [Linux release scope](docs/linux-mvp.md). Android setup and validation are recorded
 in [Android support](docs/android.md); the long-term specification is not a claim
@@ -23,6 +23,20 @@ are needed. Under Hyprland and niri, it automatically hides GTK's window header
 and client-side decorations using compositor/desktop environment variables;
 PhotoSim's own toolbar remains available. Other desktops keep their existing
 window-decoration behavior. Direct dependencies are pinned and `pubspec.lock` is included.
+
+## Run on Windows
+
+Requires Windows 10/11 x64 and an Impeller-compatible graphics driver. Extract
+the portable ZIP and open `photosim.exe`, keeping its DLLs and `data` folder
+together. To build from source with Flutter and Visual Studio's C++ tools:
+
+```powershell
+python tool/build_release.py windows --installer
+```
+
+Inno Setup 6 is required for the EXE installer; omit `--installer` to build only
+the portable ZIP. Versioned packages and checksums are written to `build/dist/`. See
+[Windows build and usage](docs/windows.md) for prerequisites and controls.
 
 ## Run on Android
 
@@ -113,7 +127,8 @@ Bundled third-party components and data retain their own licenses and attributio
 ## Automated releases
 
 [GitHub Actions](.github/workflows/build.yml) builds Linux `.deb`, pacman and
-AppImage packages plus per-ABI Android APKs. Matching `v<version>` tags upload
+AppImage packages, Windows x64 portable ZIP and EXE installer, plus per-ABI
+Android APKs. Matching `v<version>` tags upload
 `PhotoSim-<version>-<arch>.<ext>` assets and checksums to GitHub Releases.
 Configure persistent Android signing secrets first; see [release setup](docs/releases.md).
 
@@ -216,5 +231,6 @@ before distribution or scaling. No paid API or credentials are required.
 
 Linux remains the completed MVP baseline. The Android phone/tablet version
 shares its planning/rendering core and has emulator workflow coverage; physical
-Android hardware performance is not yet characterized. Web, Windows, macOS and
-iOS remain outside the supported build claims.
+Android hardware performance is not yet characterized. Windows has a local x64
+build; graphics-driver compatibility and performance need validation on other
+machines. Web, macOS and iOS remain outside the supported build claims.

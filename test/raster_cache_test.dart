@@ -116,6 +116,29 @@ void main() {
     expect(await external.readAsString(), 'keep');
   });
 
+  test(
+    'reopened cache recognizes reads and rewrites across path separators',
+    () async {
+      await budget.setLimitMiB(1);
+      final original = source('mapterhorn-v1');
+      final bytes = Uint8List(400 * 1024);
+      await original.write(a, bytes);
+      await original.write(b, bytes);
+      await raster(original, a).setLastModified(DateTime.utc(2000));
+      await raster(original, b).setLastModified(DateTime.utc(2001));
+      final reopened = RasterCache(budget.directory, settingsFile: settings);
+      await reopened.initialize();
+      final cache = TileCache(original.directory, budget: reopened);
+      expect(await cache.read(a), isNotNull);
+      await cache.write(c, bytes);
+      expect(await raster(cache, a).exists(), isTrue);
+      expect(await raster(cache, b).exists(), isFalse);
+      await cache.write(a, bytes);
+      expect(await raster(cache, c).exists(), isTrue);
+      expect(await cache.read(a), hasLength(bytes.length));
+    },
+  );
+
   test('concurrent writes and settings changes serialize; zero disables disk caching', () async {
     final terrain = source('mapterhorn-v1'),
         imagery = source('naip-natural-256-v1');

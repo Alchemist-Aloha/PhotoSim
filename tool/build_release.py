@@ -11,6 +11,10 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+import zipfile
+from contextlib import nullcontext
+
+from flutter_windows import patched_framework
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / 'build'
@@ -55,7 +59,9 @@ def artifact_name(version, arch, extension):
 
 
 def run(*args, **kwargs):
-    subprocess.run(args, check=True, **kwargs)
+    # Resolve flutter.bat as well as native executables on Windows.
+    command = shutil.which(args[0]) or args[0]
+    subprocess.run((command, *args[1:]), check=True, **kwargs)
 
 
 def download_tool(name):
@@ -86,6 +92,102 @@ def package_android(apk_dir, output, version):
     output.mkdir(parents=True, exist_ok=True)
     for abi, source in zip(ABIS, sources):
         shutil.copy2(source, output / artifact_name(version, abi, 'apk'))
+
+
+def validate_windows_bundle(bundle):
+    required = (
+        'photosim.exe', 'flutter_windows.dll', 'data/app.so',
+        'data/icudtl.dat', 'data/flutter_assets/AssetManifest.bin',
+        'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
+    )
+    for relative in required:
+        if not (bundle / relative).is_file():
+            raise ValueError(f'Missing Windows release bundle file: {relative}')
+
+
+def write_checksum(artifact):
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    artifact.with_suffix(artifact.suffix + '.sha256').write_text(
+        f'{digest}  {artifact.name}\n', encoding='utf-8')
+
+
+def package_windows(bundle, output, version):
+    validate_windows_bundle(bundle)
+    output.mkdir(parents=True, exist_ok=True)
+    name = artifact_name(version, 'windows-x64', 'zip')
+    archive = output / name
+    temporary = output / (name + '.tmp')
+    prefix = name.removesuffix('.zip')
+    try:
+        with zipfile.ZipFile(temporary, 'w', zipfile.ZIP_DEFLATED) as package:
+            for source in sorted(bundle.rglob('*')):
+                if source.is_file():
+                    package.write(source, f'{prefix}/{source.relative_to(bundle).as_posix()}')
+            for source, relative in (
+                (ROOT / 'LICENSE', 'LICENSE'),
+                (ROOT / 'docs/windows.md', 'README.md'),
+            ):
+                package.write(source, f'{prefix}/{relative}')
+        temporary.replace(archive)
+    finally:
+        temporary.unlink(missing_ok=True)
+    write_checksum(archive)
+    print(archive)
+
+
+def windows_version(version, number):
+    parts = [int(value) for value in version.split('-', 1)[0].split('.')] + [number]
+    if any(not 0 <= part <= 65535 for part in parts):
+        raise ValueError('Windows version components and build number must be 0–65535')
+    return '.'.join(str(part) for part in parts)
+
+
+def find_iscc():
+    configured = os.environ.get('ISCC')
+    if configured:
+        if not Path(configured).is_file():
+            raise ValueError(f'ISCC does not point to an Inno Setup compiler: {configured}')
+        return configured
+    command = shutil.which('ISCC.exe')
+    if command:
+        return command
+    for variable in ('ProgramFiles(x86)', 'ProgramFiles', 'LOCALAPPDATA'):
+        folder = os.environ.get(variable)
+        if not folder:
+            continue
+        for relative in ('Inno Setup 6/ISCC.exe', 'Programs/Inno Setup 6/ISCC.exe'):
+            candidate = Path(folder) / relative
+            if candidate.is_file():
+                return str(candidate)
+    raise ValueError('Inno Setup 6 is required for --installer; install it or set ISCC to ISCC.exe')
+
+
+def build_windows_installer(bundle, output, version, number):
+    validate_windows_bundle(bundle)
+    numeric_version = windows_version(version, number)
+    compiler = find_iscc()
+    output.mkdir(parents=True, exist_ok=True)
+    name = artifact_name(version, 'windows-x64-setup', 'exe')
+    with tempfile.TemporaryDirectory(prefix='inno-', dir=output) as work:
+        run(compiler, '/Qp', f'/DAppVersion={version}',
+            f'/DAppNumericVersion={numeric_version}',
+            f'/DBundleDir={bundle.resolve()}', f'/DProjectDir={ROOT}',
+            f'/O{Path(work).resolve()}', f'/F{Path(name).stem}',
+            str(ROOT / 'packaging/windows/photosim.iss'), cwd=ROOT)
+        built = Path(work) / name
+        if not built.is_file() or built.stat().st_size == 0:
+            raise ValueError(f'Inno Setup did not produce {name}')
+        # Copy out of TemporaryDirectory so the EXE inherits the output folder's
+        # permissions rather than the private temporary folder's Windows ACL.
+        staged = output / (name + '.tmp')
+        try:
+            staged.unlink(missing_ok=True)
+            shutil.copyfile(built, staged)
+            staged.replace(output / name)
+        finally:
+            staged.unlink(missing_ok=True)
+    write_checksum(output / name)
+    print(output / name)
 
 
 def package_linux(bundle, output, version, number):
@@ -158,24 +260,35 @@ def package_linux(bundle, output, version, number):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('platform', choices=('metadata', 'linux', 'android'))
+    parser.add_argument('platform', choices=('metadata', 'linux', 'android', 'windows'))
     parser.add_argument('--skip-build', action='store_true', help='Package an already-built release bundle/APKs')
+    parser.add_argument('--installer', action='store_true', help='Also build the Windows EXE installer (requires Inno Setup 6)')
     args = parser.parse_args()
+    if args.installer and args.platform != 'windows':
+        parser.error('--installer is supported only for windows')
     version, number = version_from((ROOT / 'pubspec.yaml').read_text())
     check_tag(version, os.environ.get('GITHUB_REF', ''))
     if args.platform == 'metadata':
         print(f'version={version}\nbuild_number={number}')
         return
+    if args.platform == 'windows':
+        windows_version(version, number)
     BUILD.mkdir(exist_ok=True)
     if not args.skip_build:
-        run('flutter', 'pub', 'get', '--enforce-lockfile', cwd=ROOT)
-        command = ['flutter', 'build', 'apk' if args.platform == 'android' else 'linux', '--release',
-                   f'--build-name={version}', f'--build-number={number}']
-        if args.platform == 'android':
-            command.append('--split-per-abi')
-        run(*command, cwd=ROOT)
+        with patched_framework() if args.platform == 'windows' else nullcontext():
+            run('flutter', 'pub', 'get', '--enforce-lockfile', cwd=ROOT)
+            command = ['flutter', 'build', 'apk' if args.platform == 'android' else args.platform, '--release',
+                       f'--build-name={version}', f'--build-number={number}']
+            if args.platform == 'android':
+                command.append('--split-per-abi')
+            run(*command, cwd=ROOT)
     if args.platform == 'linux':
         package_linux(BUILD / 'linux/x64/release/bundle', DIST, version, number)
+    elif args.platform == 'windows':
+        bundle = BUILD / 'windows/x64/runner/Release'
+        package_windows(bundle, DIST, version)
+        if args.installer:
+            build_windows_installer(bundle, DIST, version, number)
     else:
         package_android(BUILD / 'app/outputs/flutter-apk', DIST, version)
 
