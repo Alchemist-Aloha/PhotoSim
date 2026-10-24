@@ -188,6 +188,39 @@ void main() {
   );
 
   test(
+    'inaccessible plan storage is not reported as an empty collection',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'photosim-denied-plans-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final parent = await Directory('${root.path}/private').create();
+      final store = PlanRepository(Directory('${parent.path}/plans'));
+      final file = await store.save(SavedPlan('Keep this plan', state));
+      final original = await file.readAsBytes();
+      expect((await Process.run('chmod', ['000', parent.path])).exitCode, 0);
+      try {
+        if (await file.exists()) {
+          markTestSkipped(
+            'Directory permission bits are not enforced for this user.',
+          );
+          return;
+        }
+        await expectLater(store.loadAll(), throwsA(isA<FileSystemException>()));
+      } finally {
+        expect((await Process.run('chmod', ['700', parent.path])).exitCode, 0);
+      }
+      expect(await file.readAsBytes(), original);
+      expect((await store.loadAll()).plans.single.name, 'Keep this plan');
+      expect(
+        (await store.directory.list().toList()).map((entry) => entry.uri),
+        [file.uri],
+      );
+    },
+    skip: !Platform.isLinux,
+  );
+
+  test(
     'missing storage is empty; a failed save does not delete existing data',
     () async {
       final directory = await Directory.systemTemp.createTemp(

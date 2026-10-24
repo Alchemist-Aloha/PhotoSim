@@ -15,7 +15,7 @@ class MemoryPlans extends PlanRepository {
     SimulationState(focalLength: 85, timestamp: DateTime.utc(2026, 6, 21, 12)),
   );
   final saved = <SavedPlan>[];
-  bool failSave = false;
+  bool failSave = false, failLoad = false;
   Completer<File>? pendingSave;
 
   @override
@@ -28,8 +28,10 @@ class MemoryPlans extends PlanRepository {
   }
 
   @override
-  Future<({List<SavedPlan> plans, int unreadable})> loadAll() async =>
-      (plans: [destination], unreadable: 0);
+  Future<({List<SavedPlan> plans, int unreadable})> loadAll() async {
+    if (failLoad) throw const FileSystemException('Permission denied');
+    return (plans: [destination], unreadable: 0);
+  }
 }
 
 void main() {
@@ -124,6 +126,45 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+    'failed plan listing preserves edits and offers storage guidance',
+    (tester) async {
+      tester.view.physicalSize = const Size(1600, 960);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final store = MemoryPlans()..failLoad = true;
+      await tester.pumpWidget(PhotoSimApp(plans: store));
+      CameraInspector inspector() =>
+          tester.widget<CameraInspector>(find.byType(CameraInspector));
+      final original = inspector().state.copyWith(focalLength: 50);
+      inspector().onChanged(original);
+      await tester.pump();
+      await tester.tap(find.byTooltip('Photography plans'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open plan'));
+      await tester.pumpAndSettle();
+      expect(find.text('No saved plans found.'), findsNothing);
+      expect(
+        find.textContaining('Check storage space and folder permissions'),
+        findsOneWidget,
+      );
+      expect(find.text('Unsaved changes'), findsOneWidget);
+      expect(inspector().state, same(original));
+      store.failLoad = false;
+      await tester.tap(find.byTooltip('Photography plans'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open plan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mountain morning'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(inspector().state, same(original));
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'dirty status ignores derived terrain and clears when edits are reverted',
