@@ -68,7 +68,7 @@ class AppSession {
       final clean = SavedPlan.decode(jsonEncode(json['cleanComposition']))
           .state;
       final workspace = json['workspace'] as String;
-      if (!['map', 'simulation', 'calendar'].contains(workspace)) {
+      if (!['map', 'simulation', 'calendar', 'export'].contains(workspace)) {
         throw const FormatException('Workspace');
       }
       final name = json['planName'] as String?;

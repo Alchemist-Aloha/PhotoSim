@@ -72,6 +72,10 @@ void main() {
       }
       await tester.tap(find.text('3D Preview').last);
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Export').last);
+      await tester.pumpAndSettle();
+      expect(find.byType(CameraInspector), findsNothing);
+      expect(find.byTooltip('Play time'), findsNothing);
       await tester.tap(find.text('Map').last);
       await tester.pumpAndSettle();
       await tester.tap(

@@ -95,7 +95,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - **Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
 - Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
-- Persistent navigation rail for Map/3D Preview/Calendar; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
+- Persistent navigation rail for Map/3D Preview/Calendar/Export; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
 - Collapsible inspector with weather/quality/relighting in the right panel; camera-local date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
@@ -104,7 +104,8 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Sun/Moon/Galactic-center targeting, aim action and rectangular lens-FOV readout.
 - Toggleable constellation names and blue connecting figures in 3D, depth-tested against terrain.
 - Named versioned JSON snapshots, with local save/open and restoration after app restart.
-- **Export PNG**: current photographic viewport with source credits, weather and DOF; no application controls.
+- **Export** tab: render and review the high-resolution PNG before saving, with an editable, copyable AI-enhancement prompt containing the captured location, UTC/estimated local time, optics, weather, astronomy, render settings and source credits. Rendering uses the current quality preset at twice screen pixel density, bounded to 6144 px / 20 MP. The preview and saved file use identical PNG bytes. No AI service is called; attach the saved PNG to your own model. Review precise GPS/time before sharing. Prompt edits are temporary (retained between 3D and Export, not across Map/Calendar or app restart); re-rendering resets them.
+- **Export PNG** remains available as a quick-export shortcut in 3D Preview: current photographic viewport with source credits, weather and DOF; no application controls.
 - **Performance / Balanced / High** render-quality presets (render scale, AA, shadows and DOF quality).
 - Manual **Clear / Cloudy / Fog / Rain** presets, explicitly illustrative rather than forecast weather.
 - Depth-buffer **depth of field** linked to aperture (f/1.4–f/22), focal length, sensor and focus distance.

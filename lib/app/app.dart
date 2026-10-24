@@ -96,7 +96,7 @@ class PhotoSimApp extends StatelessWidget {
   }
 }
 
-enum Workspace { map, simulation, calendar }
+enum Workspace { map, simulation, calendar, export }
 
 class WorkspaceShell extends StatefulWidget {
   const WorkspaceShell({
@@ -506,7 +506,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             .showSnackBar(SnackBar(content: Text(widget.sessionWarning!)));
       }
       // Map and calendar do not need the disk index on their startup path.
-      if (workspace == Workspace.simulation) unawaited(initializeCache());
+      if (workspace == Workspace.simulation || workspace == Workspace.export) {
+        unawaited(initializeCache());
+      }
     });
   }
 
@@ -1005,6 +1007,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     final compact = size.width < 600;
     final dockedInspector = size.width >= 1000;
     final compactTimeline = compact || size.height < 600;
+    final editingScene =
+        workspace == Workspace.map || workspace == Workspace.simulation;
     final inspector = CameraInspector(
       state: state,
       onChanged: updateFromInspector,
@@ -1016,10 +1020,14 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     );
     void changeWorkspace(int index) {
       setState(() {
-        if (Workspace.values[index] == Workspace.calendar) stopPlayback();
+        if (Workspace.values[index] == Workspace.calendar ||
+            Workspace.values[index] == Workspace.export) {
+          stopPlayback();
+        }
         workspace = Workspace.values[index];
       });
-      if (workspace == Workspace.simulation &&
+      if ((workspace == Workspace.simulation ||
+              workspace == Workspace.export) &&
           rasterCache == null &&
           cacheError == null) {
         unawaited(initializeCache());
@@ -1088,6 +1096,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             httpClient: terrainClient,
             state: state,
             cleanPreview: cleanPreview,
+            exportMode: workspace == Workspace.export,
             onChanged: update,
             onGroundElevationChanged: (location, elevation) {
               if (state.location == location) {
@@ -1115,6 +1124,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   Text(
                     workspace == Workspace.calendar
                         ? 'Night calendar'
+                        : workspace == Workspace.export
+                        ? 'Export'
                         : 'PhotoSim',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1171,7 +1182,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                           : Icons.calendar_view_week,
                     ),
                   ),
-                if (!compact && workspace != Workspace.calendar) ...[
+                if (!compact && editingScene) ...[
                   PopupMenuButton<CelestialTarget>(
                     tooltip: 'Select astronomical target',
                     icon: const Icon(Icons.track_changes),
@@ -1198,7 +1209,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                         : null,
                   ),
                 ],
-                if (workspace != Workspace.calendar)
+                if (editingScene)
                   IconButton(
                     tooltip: dockedInspector
                         ? 'Toggle camera inspector'
@@ -1206,7 +1217,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                     onPressed: showInspector,
                     icon: const Icon(Icons.tune),
                   ),
-                if (compact && workspace != Workspace.calendar)
+                if (compact && editingScene)
                   PopupMenuButton<Object>(
                     tooltip: 'More options',
                     itemBuilder: (_) => [
@@ -1240,8 +1251,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   ),
               ],
             ),
-      endDrawer:
-          dockedInspector || cleanPreview || workspace == Workspace.calendar
+      endDrawer: dockedInspector || cleanPreview || !editingScene
           ? null
           : Drawer(
               width: size.width < 400 ? size.width : 400,
@@ -1298,6 +1308,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   selectedIcon: Icon(Icons.calendar_month),
                   label: 'Calendar',
                 ),
+                NavigationDestination(
+                  icon: Icon(Icons.ios_share_outlined),
+                  selectedIcon: Icon(Icons.ios_share),
+                  label: 'Export',
+                ),
               ],
             ),
       body: SafeArea(
@@ -1325,6 +1340,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                     selectedIcon: Icon(Icons.calendar_month),
                     label: Text('Calendar'),
                   ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.ios_share_outlined),
+                    selectedIcon: Icon(Icons.ios_share),
+                    label: Text('Export'),
+                  ),
                 ],
               ),
               const VerticalDivider(width: 1),
@@ -1337,7 +1357,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                       children: [
                         Expanded(child: viewport),
                         if (!cleanPreview &&
-                            workspace != Workspace.calendar &&
+                            editingScene &&
                             dockedInspector &&
                             inspectorVisible) ...[
                           const VerticalDivider(width: 1),
@@ -1346,7 +1366,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                       ],
                     ),
                   ),
-                  if (!cleanPreview && workspace != Workspace.calendar) ...[
+                  if (!cleanPreview && editingScene) ...[
                     const Divider(height: 1),
                     timeline(compactTimeline),
                   ],

@@ -85,6 +85,13 @@ void main() {
       isNot(restored.cleanComposition),
     );
   });
+  test(
+    'export workspace round-trips without invalidating session recovery',
+    () {
+      final session = sessionFixture(workspace: 'export');
+      expect(AppSession.decode(session.encode()).workspace, 'export');
+    },
+  );
   test('older sessions default to visible map guidance', () {
     final json = jsonDecode(sessionFixture().encode()) as Map<String, dynamic>;
     json.remove('mapGuideDismissed');

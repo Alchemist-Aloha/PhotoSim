@@ -30,6 +30,8 @@ import '../render/photography.dart';
 import '../render/photo_framing.dart';
 import '../core/sunlight.dart';
 import '../data/image_export.dart';
+import '../data/enhancement_prompt.dart';
+import 'export_panel.dart';
 import '../data/raster_cache.dart';
 import 'rain_overlay.dart';
 import 'photography_overlays.dart';
@@ -48,6 +50,7 @@ class SimulationWorkspace extends StatefulWidget {
     required this.onGroundElevationChanged,
     this.onPausePlayback,
     this.cleanPreview = false,
+    this.exportMode = false,
     this.httpClient,
     this.cacheDirectory,
     this.rasterCache,
@@ -56,6 +59,7 @@ class SimulationWorkspace extends StatefulWidget {
   final http.Client? httpClient;
   final Directory? cacheDirectory;
   final bool cleanPreview;
+  final bool exportMode;
   final VoidCallback? onPausePlayback;
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
@@ -69,6 +73,12 @@ class SimulationWorkspace extends StatefulWidget {
 class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   final photoKey = GlobalKey();
   bool exporting = false;
+  bool saving = false;
+  Uint8List? exportBytes;
+  SimulationState? exportState;
+  int? exportWidth, exportHeight;
+  String? exportError;
+  final prompt = TextEditingController();
 
   /// The saved photograph is rendered again at this multiple of the device pixel
   /// ratio, so it carries real geometry and shading at every output pixel
@@ -657,10 +667,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
   }
 
-  Future<void> exportImage() async {
-    if (exporting) return;
+  Future<void> exportImage({bool previewOnly = false}) async {
+    if (exporting || saving) return;
     widget.onPausePlayback?.call();
-    setState(() => exporting = true);
+    setState(() {
+      exporting = true;
+      exportError = null;
+    });
     try {
       // First frame applies the export render scale, second renders the scene
       // into the larger target; capturing before that would upscale the screen copy.
@@ -702,6 +715,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               .map((provider) => provider.attribution),
           'Sky catalog: D3-Celestial / XHIP · BSD-3-Clause',
         }.join(' · ');
+        final width = (region.width * ratio).round();
+        final height = (region.height * ratio).round();
+        final description = enhancementPrompt(
+          snapshot,
+          credits: credits,
+          width: width,
+          height: height,
+        );
         bytes = await encodePreview(
           image,
           '$credits\n'
@@ -714,9 +735,39 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             region.bottom * ratio,
           ),
         );
+        if (!mounted) return;
+        setState(() {
+          exportBytes = bytes;
+          exportState = snapshot;
+          exportWidth = width;
+          exportHeight = height;
+          prompt.text = description;
+        });
       } finally {
         image.dispose();
       }
+      if (!previewOnly && mounted) await saveImage(bytes);
+    } catch (failure) {
+      if (mounted) {
+        setState(
+          () => exportError = 'Render failed: $failure. Try rendering again.',
+        );
+        ScaffoldMessenger.of(context)
+          ..removeCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(exportError!)));
+      }
+    } finally {
+      if (mounted) setState(() => exporting = false);
+    }
+  }
+
+  Future<void> saveImage(Uint8List bytes) async {
+    if (saving) return;
+    setState(() {
+      saving = true;
+      exportError = null;
+    });
+    try {
       if (Platform.isAndroid) {
         await const MethodChannel('photosim/export').invokeMethod<String>(
           'savePng',
@@ -727,9 +778,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           },
         );
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved PNG to Pictures/PhotoSim.')),
-        );
+        ScaffoldMessenger.of(context)
+          ..removeCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Saved PNG to Pictures/PhotoSim.')),
+          );
         return;
       }
       final directory =
@@ -778,21 +831,29 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       if (destination == null) return;
       final file = await savePreview(destination, bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: SelectableText('Exported PNG · ${file.path}')),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: SelectableText('Exported PNG · ${file.path}')),
+        );
     } catch (failure) {
       if (mounted) {
+        setState(
+          () => exportError =
+              'Save failed: $failure. Choose another path or retry.',
+        );
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Export failed: $failure')));
+          ..removeCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(exportError!)));
       }
     } finally {
-      if (mounted) setState(() => exporting = false);
+      if (mounted) setState(() => saving = false);
     }
   }
 
   @override
   void dispose() {
+    prompt.dispose();
     coverageDebounce?.cancel();
     generation++;
     if (cancellation != null && !cancellation!.isCompleted) {
@@ -877,6 +938,47 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
 
   @override
   Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ExcludeFocus(
+          excluding: widget.exportMode,
+          child: ExcludeSemantics(
+            excluding: widget.exportMode,
+            child: IgnorePointer(
+              ignoring: widget.exportMode,
+              child: TickerMode(
+                enabled: !widget.exportMode || exporting || exportBytes == null,
+                child: buildPreview(context),
+              ),
+            ),
+          ),
+        ),
+        if (widget.exportMode)
+          ExportPanel(
+            bytes: exportBytes,
+            prompt: prompt,
+            busy: exporting || saving,
+            ready:
+                world != null &&
+                ground != null &&
+                !loading &&
+                !imageryLoading &&
+                error == null,
+            stale: exportState != null && !identical(exportState, widget.state),
+            error:
+                exportError ??
+                (error == null ? null : '3D rendering unavailable: $error'),
+            width: exportWidth,
+            height: exportHeight,
+            onRender: () => exportImage(previewOnly: true),
+            onSave: () => saveImage(exportBytes!),
+          ),
+      ],
+    );
+  }
+
+  Widget buildPreview(BuildContext context) {
     if (error != null) {
       return Center(
         child: Padding(

@@ -17,6 +17,7 @@ import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/photography_overlays.dart';
 import 'package:photosim/render/photo_framing.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
+import 'package:photosim/ui/export_panel.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -229,6 +230,29 @@ void main() {
     await Directory('build/validation').create(recursive: true);
     await File('build/validation/linux-portrait-exposure-export.png')
         .writeAsBytes(bytes);
+    await openWorkspace(tester, 'Export');
+    expect(find.byType(CameraInspector), findsNothing);
+    final panel = tester.widget<ExportPanel>(find.byType(ExportPanel));
+    expect(panel.bytes, bytes);
+    expect(panel.prompt.text, contains('"portrait": true'));
+    expect(panel.prompt.text, contains('"roll": 30.0'));
+    expect(panel.stale, isFalse);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final screenshot =
+        await (capture.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary)
+            .toImage();
+    try {
+      final png = (await screenshot.toByteData(
+        format: ui.ImageByteFormat.png,
+      ))!;
+      await File('build/validation/linux-export-workspace.png')
+          .writeAsBytes(png.buffer.asUint8List());
+    } finally {
+      screenshot.dispose();
+    }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(milliseconds: 500));
