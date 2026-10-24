@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 256 tests
+flutter test                                       # currently 257 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,45 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — exact polar destinations
+
+### `b89f3e0` fix: keep exact polar destinations inside the asin domain
+
+The shared spherical `destination` helper produced NaN for valid travel exactly
+to a pole. For example, latitude **89.914°**, bearing **0°**, distance
+**9562.776900083667 m** produces an intermediate sine of
+**1.0000000000000002** through floating-point roundoff. `asin` then returns NaN;
+the analogous southern inputs round below −1. Clamp this intermediate value to
+`[-1, 1]` before `asin`, without changing the formula, coordinate conventions,
+wrapping or the app's separate Mercator/camera latitude limits.
+
+Files: `lib/core/geo.dart`, `test/geo_test.dart`. Added a regression covering
+three positive and three negative starting latitudes approaching the respective
+pole, with longitude near the date line. It failed before the fix (NaN rather
+than 90°) and now returns the expected ±90° latitude and finite wrapped longitude.
+Longitude at an exact pole is not unique, so the test does not prescribe one.
+
+Checked every caller: WASD movement, camera/celestial map handles, FOV wedges,
+terrain loading circles and the related tests. No API, fixture, configuration,
+export schema or UI change is needed. This corrects the generic helper for
+valid polar coordinates, not a claim that the UI now supports placing its
+camera outside its existing ±85.05112878° range.
+
+Ordinary output is fingerprint-proven: 25 origin positions (including ±85° and
+±180°), eight bearings, six distances from zero to 80 km, plus FOV wedges yield
+**2050 coordinate pairs / 71875 JSON bytes / hash 3037040543338686**, exactly the
+same before and after. Probe/artifacts under ignored `build/validation/`:
+`destination_fingerprint_test.dart`, `polar-destination-{before,after}.log`,
+`polar_destination_probe.dart`.
+
+Verified: analyzer 0 issues; format clean; **257 unit/widget tests pass**.
+`linux_wasd_test` and `linux_workflow_test` pass on the real Linux GPU, each
+bounded to 180 seconds; logs `build/validation/polar-destination-*_test.log`.
+No performance gain or new Android device verification is claimed. Other public
+input-validation and persistence failure-path work remains incomplete.
 
 ---
 
