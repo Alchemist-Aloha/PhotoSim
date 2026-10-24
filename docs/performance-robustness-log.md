@@ -38,7 +38,9 @@ relative deltas as the signal and absolutes as pessimistic.
 
 ## 2026-10-24 — snackbar footer prototype rejected
 
-### Documentation only — unchanged application baseline `a5380a0`
+### `295a629` docs: record rejected snackbar footer layout
+
+Application/test sources remain unchanged from `a5380a0`.
 
 Reproduced the timeline overlap with a five-case geometry/interaction probe:
 390×844 and 844×390 with collapsed/expanded timelines, plus 1280×800, all
