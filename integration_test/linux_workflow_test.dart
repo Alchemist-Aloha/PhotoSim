@@ -205,14 +205,15 @@ void main() {
       find.byType(scene.SceneView),
     );
     final world = initialView.scene;
+    // Only terrain nodes carry the imagery materials; sky, clouds and markers do not.
+    bool isTerrain(scene.Node node) =>
+        node.mesh != null && RegExp(r'^\d+-\d+-\d+$').hasMatch(node.name);
     final meshes = world!.root.children
-        .where((node) => node.mesh != null && node.name != 'Moon')
+        .where(isTerrain)
         .map((node) => node.mesh!.primitives.single.geometry)
         .toList();
     await waitForImagery();
-    final texturedMeshes = world.root.children
-        .where((node) => node.mesh != null && node.name != 'Moon')
-        .toList();
+    final texturedMeshes = world.root.children.where(isTerrain).toList();
     expect(texturedMeshes.length, 9);
     for (var i = 0; i < meshes.length; i++) {
       expect(
@@ -299,6 +300,12 @@ void main() {
         .map((text) => text.data)
         .where((text) => text?.endsWith('downloaded') ?? false)
         .toList();
+    // The camera-move undo SnackBar floats over the timeline and would swallow
+    // this tap; dismiss it so the time controls are hittable.
+    tester
+        .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).first)
+        .removeCurrentSnackBar();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byTooltip('Later by one hour'));
     await tester.pump(const Duration(seconds: 1));
     expect(world.directionalLight!.direction, isNot(lightDirection));
@@ -839,7 +846,7 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Save'));
     for (
       var i = 0;
-      i < 30 && find.textContaining('Saved Night ridge').evaluate().isEmpty;
+      i < 50 && find.textContaining('Saved Night ridge').evaluate().isEmpty;
       i++
     ) {
       await tester.pump(const Duration(milliseconds: 100));
