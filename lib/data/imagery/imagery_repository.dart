@@ -36,14 +36,20 @@ class ImageryDecodeRequest {
 
 ImageryRaster decodeImagery(ImageryDecodeRequest request) {
   final bytes = request.bytes;
-  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
   if ((request.size != 256 && request.size != 1024) ||
       bytes.length < 33 ||
       bytes.length > 8 * 1024 * 1024) {
     throw const FormatException('Invalid imagery raster');
   }
   final image.Decoder decoder;
-  if (List.generate(8, (i) => bytes[i] == signature[i]).every((v) => v)) {
+  if (bytes[0] == 137 &&
+      bytes[1] == 80 &&
+      bytes[2] == 78 &&
+      bytes[3] == 71 &&
+      bytes[4] == 13 &&
+      bytes[5] == 10 &&
+      bytes[6] == 26 &&
+      bytes[7] == 10) {
     final header = ByteData.sublistView(bytes);
     if (header.getUint32(8) != 13 ||
         header.getUint32(12) != 0x49484452 ||
@@ -75,9 +81,12 @@ ImageryRaster decodeImagery(ImageryDecodeRequest request) {
   if (decoded == null) throw const FormatException('Could not decode imagery');
   final rgba = Uint8List(request.size * request.size * 4);
   var present = 0, partial = false;
+  // getPixel(x, y) allocates a fresh Pixel on every call: 1M+ objects per 1024² tile.
+  // The decoder's optional `pixel` argument reuses one instance for the whole scan.
+  final pixel = decoded.getPixel(0, 0);
   for (var y = 0; y < request.size; y++) {
     for (var x = 0; x < request.size; x++) {
-      final pixel = decoded.getPixel(x, y);
+      decoded.getPixel(x, y, pixel);
       final alpha = pixel.a.toInt();
       if (alpha > 0) present++;
       if (alpha < 255) partial = true;
@@ -88,13 +97,11 @@ ImageryRaster decodeImagery(ImageryDecodeRequest request) {
         rgba[offset + 2] = pixel.b.toInt();
         rgba[offset + 3] = alpha;
       } else {
+        final inverse = 1 - alpha / 255;
         // Missing coverage stays visibly distinct from real imagery.
-        rgba[offset] = (pixel.r * alpha / 255 + 154 * (1 - alpha / 255))
-            .round();
-        rgba[offset + 1] = (pixel.g * alpha / 255 + 170 * (1 - alpha / 255))
-            .round();
-        rgba[offset + 2] = (pixel.b * alpha / 255 + 137 * (1 - alpha / 255))
-            .round();
+        rgba[offset] = (pixel.r * alpha / 255 + 154 * inverse).round();
+        rgba[offset + 1] = (pixel.g * alpha / 255 + 170 * inverse).round();
+        rgba[offset + 2] = (pixel.b * alpha / 255 + 137 * inverse).round();
         rgba[offset + 3] = 255;
       }
     }
