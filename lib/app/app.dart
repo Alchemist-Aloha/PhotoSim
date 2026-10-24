@@ -341,15 +341,19 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       cleanComposition = SavedPlan('Composition', snapshot.state).encode();
       currentPlanName = name;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          hasUnsavedChanges
-              ? 'Snapshot saved. Newer changes remain unsaved; save them before opening another plan.'
-              : 'Saved $name · ${file.path}',
+    // A save confirmation outranks the transient undo prompt; without this the
+    // messenger queues it behind that snackbar's ten-second duration.
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            hasUnsavedChanges
+                ? 'Snapshot saved. Newer changes remain unsaved; save them before opening another plan.'
+                : 'Saved $name · ${file.path}',
+          ),
         ),
-      ),
-    );
+      );
     return !hasUnsavedChanges;
   }
 
