@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 253 tests
+flutter test                                       # currently 256 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,55 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — bounded HTTP header acquisition
+
+### `259b458` fix: bound pending HTTP headers by cancellation and deadline
+
+`downloadBytes` completed its stop signal on deadline/caller cancellation but
+still directly awaited `client.send`. A client that had not attached its abort
+handler could therefore leave the caller waiting and occupy all three per-origin
+slots indefinitely. This is a real transport boundary: the installed http
+1.6.0 `IOClient.send` awaits `HttpClient.openUrl` before attaching its abort
+handler, so connection setup can precede abort handling.
+
+Files: `lib/data/http_bytes.dart`, `test/http_bytes_test.dart`. Header arrival,
+ordinary send errors and the existing stop signal now complete a single result.
+If cancellation/deadline wins, the host slot is released through the existing
+`finally`; any later response stream is subscribed/cancelled instead of being
+left unread. Late transport errors are consumed; timely errors retain their
+original exception/stack. No dependency, API, decoder, cache or UI change.
+
+The fix reaches all callers through the shared helper: terrain, imagery,
+forecast and atlas downloads. Existing source fallback distinguishes service
+abort from caller cancellation, so provider fallback/error messages can now
+advance rather than hang waiting for headers.
+
+Three regressions cover 20 ms deadline expiry, explicit cancellation with a
+20-second deadline, and ordinary header failures. The two pending-header cases
+occupy all three slots with non-cooperative clients and failed before the fix
+(their one-second safety timeouts expired); after the fix they finish within
+the safety bound, three subsequent requests all start/succeed, and three late
+body streams are cancelled. Ordinary send exceptions propagate unchanged.
+Existing body-size, cooldown, retry, fallback and empty-cache-on-cancel checks
+also pass.
+
+Successful payloads are fingerprint-proven before/after with terrain PNG,
+terrain WebP and 256/1024 imagery fixtures, each delivered in chunks of 1, 127
+and 4096 bytes: **12 samples / 24603 bytes / hash 250886605207858**. The probe
+also compares each returned byte buffer to its fixture. Artifacts under ignored
+`build/validation/`: `http_bytes_fingerprint_test.dart`,
+`http-headers-{before,after}.log`.
+
+Verified: analyzer 0 issues; format clean; **256 unit/widget tests pass**.
+`linux_loading_test` and `startup_test` pass on the real Linux GPU, each with a
+180-second command bound; logs `http-headers-final-*_test.log`.
+This bounds the app's wait for headers, not the OS's connection teardown:
+underlying pending connection work still relies on the transport observing
+abort. OS-level DNS fault injection, Android hardware and new power/performance
+measurements were not performed.
 
 ---
 
