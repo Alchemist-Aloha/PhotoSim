@@ -186,7 +186,59 @@ void main() {
   );
 
   for (final size in [const Size(390, 844), const Size(1600, 960)]) {
-    testWidgets('checkpoint errors preempt camera undo and retry at $size', (
+    testWidgets(
+      'requested startup warning preempts undo without enabling saves at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        const warning =
+            'Session storage is unavailable. Your previous session is left unchanged, but this session cannot be recovered automatically. Check folder permissions and restart.';
+        final original = sessionFixture(
+          workspace: 'map',
+          inspectorVisible: true,
+        );
+        final file = File('${support.path}/session.json');
+        SessionStore(file).save(original.encode());
+        final checkpoint = file.readAsStringSync();
+        await tester.pumpWidget(
+          PhotoSimApp(
+            initialSession: original,
+            sessionWarning: warning,
+            rasterCache: RasterCache(Directory('${support.path}/cache')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(warning), findsOneWidget);
+        MapWorkspace map() =>
+            tester.widget<MapWorkspace>(find.byType(MapWorkspace));
+        final before = map().state;
+        final moved = before.copyWith(
+          latitude: before.latitude + 0.001,
+          focalLength: 135,
+        );
+        map().onChanged(moved);
+        map().onMoveCompleted!(before);
+        await tester.pumpAndSettle();
+        expect(find.text('Camera moved'), findsOneWidget);
+        expect(find.text(warning), findsNothing);
+        await tester.tap(find.byTooltip('Session recovery warning'));
+        await tester.pumpAndSettle();
+        expect(find.text(warning), findsOneWidget);
+        expect(find.text('Camera moved'), findsNothing);
+        expect(find.text('Retry'), findsNothing);
+        expect(map().state, same(moved));
+        expect(file.readAsStringSync(), checkpoint);
+        await tester.pumpWidget(const SizedBox());
+        expect(file.readAsStringSync(), checkpoint);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('checkpoint failure and requested warning retry at $size', (
       tester,
     ) async {
       tester.view.physicalSize = size;
@@ -231,6 +283,21 @@ void main() {
       expect(find.byTooltip('Session recovery warning'), findsOneWidget);
       expect(map().state, same(moved));
       expect(store.file.readAsStringSync(), checkpoint);
+      final latest = moved.copyWith(latitude: moved.latitude + 0.001);
+      map().onChanged(latest);
+      map().onMoveCompleted!(moved);
+      await tester.pumpAndSettle();
+      expect(find.text('Camera moved'), findsOneWidget);
+      await tester.tap(find.byTooltip('Session recovery warning'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Session could not be saved. Check storage'),
+        findsOneWidget,
+      );
+      expect(find.text('Camera moved'), findsNothing);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(map().state, same(latest));
+      expect(store.file.readAsStringSync(), checkpoint);
       blocked.deleteSync();
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
@@ -238,10 +305,10 @@ void main() {
       final saved = AppSession.decode(store.file.readAsStringSync());
       expect(
         SavedPlan('Session', saved.state).encode(),
-        SavedPlan('Session', moved).encode(),
+        SavedPlan('Session', latest).encode(),
       );
       expect(saved.cleanComposition, original.cleanComposition);
-      expect(map().state, same(moved));
+      expect(map().state, same(latest));
       await tester.pumpWidget(const SizedBox());
       expect(tester.takeException(), isNull);
     });

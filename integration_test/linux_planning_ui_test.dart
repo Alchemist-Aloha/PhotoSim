@@ -192,6 +192,22 @@ void main() {
       expect(find.text('Retry'), findsOneWidget);
       expect(checkpoint.file.readAsStringSync(), previousCheckpoint);
       await capture('linux-session-error-feedback');
+      final latest = composed.copyWith(latitude: composed.latitude + 0.001);
+      inspector().onChanged(latest);
+      await tester.pumpAndSettle();
+      expect(find.text('Camera moved'), findsOneWidget);
+      await tester.tap(find.byTooltip('Session recovery warning'));
+      await tester.pumpAndSettle();
+      expect(find.text('Camera moved'), findsNothing);
+      expect(
+        find.textContaining('Session could not be saved. Check storage'),
+        findsOneWidget,
+      );
+      expect(find.text('Retry'), findsOneWidget);
+      expect(inspector().state, same(latest));
+      expect(checkpoint.file.readAsStringSync(), previousCheckpoint);
+      composed = latest;
+      await capture('linux-manual-session-warning');
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       tester.platformDispatcher.textScaleFactorTestValue = 2;

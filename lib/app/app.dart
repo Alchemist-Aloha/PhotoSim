@@ -1154,18 +1154,19 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   IconButton(
                     tooltip: 'Session recovery warning',
                     icon: const Icon(Icons.warning_amber),
-                    onPressed: () =>
-                        ScaffoldMessenger.of(context).showWorkspaceFeedback(
-                          SnackBar(
-                            content: Text(sessionWarning!),
-                            action: widget.sessionStore == null
-                                ? null
-                                : SnackBarAction(
-                                    label: 'Retry',
-                                    onPressed: saveSession,
-                                  ),
-                          ),
+                    onPressed: () => ScaffoldMessenger.of(context)
+                      ..removeWorkspaceFeedback()
+                      ..showWorkspaceFeedback(
+                        SnackBar(
+                          content: Text(sessionWarning!),
+                          action: widget.sessionStore == null
+                              ? null
+                              : SnackBarAction(
+                                  label: 'Retry',
+                                  onPressed: saveSession,
+                                ),
                         ),
+                      ),
                   ),
                 PopupMenuButton<bool>(
                   tooltip: 'Photography plans',
