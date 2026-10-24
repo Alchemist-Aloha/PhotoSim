@@ -36,6 +36,47 @@ relative deltas as the signal and absolutes as pessimistic.
 
 ---
 
+## 2026-10-24 — snackbar footer prototype rejected
+
+### Documentation only — unchanged application baseline `a5380a0`
+
+Reproduced the timeline overlap with a five-case geometry/interaction probe:
+390×844 and 844×390 with collapsed/expanded timelines, plus 1280×800, all
+with 1.3 text scaling and 24-pixel safe-area insets. Moving the timeline into
+`Scaffold.bottomNavigationBar` let the platform put snackbars above it without
+per-message offsets. The candidate passed **270 unit/widget tests**, including
+slider/play interaction and unchanged map size while feedback was visible.
+A scrollable navigation rail was needed for the shorter landscape body.
+
+**Rejected, not shipped:** the native `linux_workflow_test` then failed because
+the snackbar intercepted the inspector's “Approximate relighting” tap at
+(1073, 881); its material remained Unlit instead of becoming PhysicallyBased.
+Restoring the exact `HEAD~` shell first made that unchanged native test pass.
+The prototype moved the obstruction from the timeline to inspector controls.
+No test assertion was weakened, notification suppressed, or quality setting
+changed to make it pass. All application and test edits were reverted.
+
+The candidate's bounded native sweep had six executed passes, this one failure,
+and three expected platform skips. After reverting, analyzer has 0 issues,
+format is clean, **265 unit/widget tests pass**, and both native Linux planning
+and camera/GPU workflow pass. Session round-trip output also matches the prior
+baseline exactly: **8 sessions / 15850 JSON bytes / 7707460953092100**.
+
+Only this documentation changes. Reproduction artifacts are ignored/local:
+`build/validation/snackbar_layout_probe_test.dart`,
+`app-snackbar-footer-candidate.dart`, `snackbar-layout-unit.log`,
+`snackbar-layout-linux_workflow_test.log`, `snackbar-layout-baseline-workflow.log`,
+`snackbar-layout-restored-{unit,planning}.log`, and
+`snackbar-layout-integration-summary.txt`. The probe deliberately still fails
+against the restored application; it is not part of the passing test suite.
+
+**The overlap remains unfixed.** Next work must protect timeline *and* inspector
+access with live notifications, not merely relocate their overlay. Preserve
+Undo/action semantics and do not hide feedback or wait out its timer in tests.
+No performance/pixel-identity claim or Android hardware validation is made.
+
+---
+
 ## 2026-10-24 — plan-error snackbar priority
 
 ### `e704570` fix: surface plan errors ahead of camera undo feedback
@@ -606,6 +647,16 @@ thousands of files. Named `static final` patterns now compile once per isolate.
 
 Recorded so the same ground is not re-covered. Each was measured; each was
 rejected for a stated reason.
+
+### Timeline as Scaffold footer (rejected in hardening iteration 10)
+
+Moving the timeline into `Scaffold.bottomNavigationBar` cleared all five
+compact/desktop timeline probes but moved the snackbar over lower inspector
+controls. Native `linux_workflow_test` could no longer toggle approximate
+relighting; the exact `HEAD~` shell passed. Reverted the entire candidate and
+its test edits. Do not retry this footer-only solution, dismiss notifications,
+or weaken the inspector test to paper over the obstruction. See the dated
+entry above and retained ignored probe/prototype/native failure logs.
 
 ### Saved-plan directory existence rewrite (rejected by `067c8ed` audit)
 
