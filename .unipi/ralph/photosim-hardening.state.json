@@ -1,0 +1,14 @@
+{
+  "name": "photosim-hardening",
+  "taskFile": ".unipi/ralph/photosim-hardening.md",
+  "iteration": 15,
+  "maxIterations": 60,
+  "itemsPerIteration": 1,
+  "reflectEvery": 10,
+  "reflectInstructions": "REFLECTION CHECKPOINT\n\nPause and reflect on your progress:\n1. What has been accomplished so far?\n2. What's working well?\n3. What's not working or blocking progress?\n4. Should the approach be adjusted?\n5. What are the next priorities?\n\nUpdate the task file with your reflection, then continue working.",
+  "active": false,
+  "status": "completed",
+  "startedAt": "2026-10-24T06:14:28.601Z",
+  "lastReflectionAt": 11,
+  "completedAt": "2026-10-24T18:55:52.491Z"
+}

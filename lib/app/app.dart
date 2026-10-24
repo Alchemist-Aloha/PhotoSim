@@ -253,7 +253,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       // Publish immediately so GPU/world setup can overlap disk indexing; cache
       // operations still queue behind initialize inside RasterCache.
       if (mounted && rasterCache == null) setState(() => rasterCache = cache);
+      final boot = Stopwatch()..start();
       await cache.initialize();
+      debugPrint('BOOT cache initialize ${boot.elapsedMilliseconds}ms');
     } on Exception {
       if (mounted) {
         setState(

@@ -158,6 +158,8 @@ class RasterCache {
 
   Future<void> _index() async {
     if (_indexed) return;
+    final watch = Stopwatch()..start();
+    var files = 0;
     _entries.clear();
     _bytes = 0;
     for (final folder in _directories) {
@@ -185,6 +187,7 @@ class RasterCache {
       }
     }
     _indexed = true;
+    debugPrint('BOOT cache index $files files in ${watch.elapsedMilliseconds}ms bytes=$_bytes');
   }
 
   Future<void> _delete(File file) async {
