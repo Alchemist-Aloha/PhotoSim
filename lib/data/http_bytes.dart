@@ -121,7 +121,28 @@ Future<Uint8List> downloadBytes(
             http.AbortableRequest('GET', uri, abortTrigger: stop.future)
               ..headers['User-Agent'] =
                   'PhotoSim/0.1 (landscape photography planner)';
-        final response = await client.send(request);
+        // Some clients only attach abort handlers after connecting; bound header acquisition too.
+        final headers = Completer<http.StreamedResponse>();
+        unawaited(
+          stop.future.then((_) {
+            if (!headers.isCompleted) {
+              headers.completeError(http.RequestAbortedException(uri));
+            }
+          }),
+        );
+        unawaited(
+          Future.sync(() => client.send(request))
+              .then<void>((response) {
+                if (headers.isCompleted) {
+                  return response.stream.listen(null).cancel();
+                }
+                headers.complete(response);
+              })
+              .catchError((Object error, StackTrace stack) {
+                if (!headers.isCompleted) headers.completeError(error, stack);
+              }),
+        );
+        final response = await headers.future;
         if (response.statusCode != 200) {
           final throttled =
               response.statusCode == 429 || response.statusCode == 503;

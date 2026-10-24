@@ -41,6 +41,92 @@ void main() {
     );
   });
 
+  test('header failures propagate and release their request slots', () async {
+    final failure = http.ClientException('Connection failed', uri);
+    var calls = 0;
+    final client = MockClient.streaming((_, _) async {
+      if (++calls <= 3) throw failure;
+      return http.StreamedResponse(Stream.value([1]), 200);
+    });
+    addTearDown(client.close);
+    for (var i = 0; i < 3; i++) {
+      await expectLater(fetch(client), throwsA(same(failure)));
+    }
+    expect(
+      await Future.wait([
+        for (var i = 0; i < 3; i++)
+          fetch(client, timeout: const Duration(milliseconds: 100)),
+      ]),
+      [
+        [1],
+        [1],
+        [1],
+      ],
+    );
+  });
+
+  for (final cancel in [false, true]) {
+    test(
+      'pending headers ${cancel ? 'cancel' : 'expire'} without holding request slots',
+      () async {
+        final replies = <Completer<http.StreamedResponse>>[];
+        final bodies = <StreamController<List<int>>>[];
+        var calls = 0, cancelledBodies = 0;
+        final client = MockClient.streaming((_, _) async {
+          if (++calls > 3) return http.StreamedResponse(Stream.value([1]), 200);
+          final reply = Completer<http.StreamedResponse>();
+          final body = StreamController<List<int>>(
+            onCancel: () => cancelledBodies++,
+          );
+          final response = http.StreamedResponse(body.stream, 200);
+          replies.add(reply);
+          bodies.add(body);
+          addTearDown(() async {
+            if (!reply.isCompleted) reply.complete(response);
+            await body.close();
+          });
+          return reply.future;
+        });
+        addTearDown(client.close);
+        final stop = Completer<void>();
+        final rejected = [
+          for (var i = 0; i < 3; i++)
+            expectLater(
+              fetch(
+                client,
+                abort: stop.future,
+                timeout: cancel
+                    ? const Duration(seconds: 20)
+                    : const Duration(milliseconds: 20),
+              ).timeout(const Duration(seconds: 1)),
+              throwsA(isA<http.RequestAbortedException>()),
+            ),
+        ];
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        expect(calls, 3);
+        if (cancel) stop.complete();
+        await Future.wait(rejected);
+        expect(
+          await Future.wait([
+            for (var i = 0; i < 3; i++)
+              fetch(client).timeout(const Duration(seconds: 1)),
+          ]),
+          [
+            [1],
+            [1],
+            [1],
+          ],
+        );
+        expect(calls, 6);
+        for (var i = 0; i < replies.length; i++) {
+          replies[i].complete(http.StreamedResponse(bodies[i].stream, 200));
+        }
+        await Future<void>.delayed(Duration.zero);
+        expect(cancelledBodies, 3);
+      },
+    );
+  }
+
   test('three streamed requests per origin; queued cancellation/deadline never send', () async {
     final bodies = <StreamController<List<int>>>[];
     var active = 0, peak = 0;
