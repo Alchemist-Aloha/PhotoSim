@@ -37,37 +37,37 @@ class _TimeSliderState extends State<TimeSlider> {
         (enabled
             ? 'Local day ${day.date} · ${clock.zoneId}. Daylight-saving gaps are skipped; repeated hours include their timezone abbreviation.'
             : 'Local-day slider unavailable at timezone-rule boundary; use UTC controls.');
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('00:00'),
-        Expanded(
-          child: Tooltip(
-            message: message,
-            child: Slider(
-              key: const ValueKey('local-day-slider'),
-              min: 0,
-              max: enabled ? day.minutes : 1440,
-              value: enabled ? day.position(state.timestamp) : 0,
-              label: enabled
-                  ? day.label(day.position(state.timestamp))
-                  : message,
-              semanticFormatterCallback: enabled ? day.label : (_) => message,
-              // Keep the date fixed during a drag: 24:00 must not advance a day on every pointer update.
-              onChangeStart: enabled
-                  ? (_) => setState(() => dragDay = day)
-                  : null,
-              onChangeEnd: enabled
-                  ? (_) => setState(() => dragDay = null)
-                  : null,
-              onChanged: enabled
-                  ? (value) => widget.onChanged(
-                      widget.state.copyWith(timestamp: day.utcAt(value)),
-                    )
-                  : null,
-            ),
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(child: Text('00:00')),
+            Flexible(child: Text('24:00 local', textAlign: TextAlign.end)),
+          ],
+        ),
+        Tooltip(
+          message: message,
+          child: Slider(
+            key: const ValueKey('local-day-slider'),
+            min: 0,
+            max: enabled ? day.minutes : 1440,
+            value: enabled ? day.position(state.timestamp) : 0,
+            label: enabled ? day.label(day.position(state.timestamp)) : message,
+            semanticFormatterCallback: enabled ? day.label : (_) => message,
+            // Keep the date fixed during a drag: 24:00 must not advance a day on every pointer update.
+            onChangeStart: enabled
+                ? (_) => setState(() => dragDay = day)
+                : null,
+            onChangeEnd: enabled ? (_) => setState(() => dragDay = null) : null,
+            onChanged: enabled
+                ? (value) => widget.onChanged(
+                    widget.state.copyWith(timestamp: day.utcAt(value)),
+                  )
+                : null,
           ),
         ),
-        const Text('24:00 local'),
       ],
     );
   }

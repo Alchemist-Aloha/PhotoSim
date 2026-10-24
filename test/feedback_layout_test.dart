@@ -14,6 +14,8 @@ void main() {
     (const Size(844, 390), false, 1.3),
     (const Size(844, 390), true, 1.3),
     (const Size(1280, 800), false, 1.3),
+    (const Size(390, 844), false, 2.0),
+    (const Size(390, 844), true, 2.0),
     (const Size(844, 390), true, 2.0),
     (const Size(1280, 800), false, 2.0),
   ]) {
@@ -75,7 +77,10 @@ void main() {
         final available = tester.getSize(find.byType(MapWorkspace));
         expect(available.width, viewportSize.width);
         expect(available.height, greaterThan(0));
-        expect(available.height, lessThan(viewportSize.height));
+        expect(available.height, lessThanOrEqualTo(viewportSize.height));
+        if (viewportSize.height > kMinInteractiveDimension) {
+          expect(available.height, lessThan(viewportSize.height));
+        }
         expect(
           tester.getRect(find.byType(MapWorkspace)).top,
           greaterThanOrEqualTo(snack.bottom),

@@ -990,6 +990,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                                 MediaQuery.textScalerOf(context).scale(16) /
                                 16
                         ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               controls,
                               const SizedBox(width: 16),

@@ -4,6 +4,60 @@ import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/time_slider.dart';
 
 void main() {
+  for (final width in [320.0, 390.0]) {
+    testWidgets('large-text phone slider keeps a usable track at $width', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      var state = SimulationState(timestamp: DateTime.utc(2026, 6, 21, 19));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: StatefulBuilder(
+                builder: (context, setState) => TimeSlider(
+                  state: state,
+                  onChanged: (next) => setState(() => state = next),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      final slider = find.byKey(const ValueKey('local-day-slider'));
+      final track = tester.getRect(slider);
+      expect(track.width, greaterThanOrEqualTo(width - 48));
+      for (final label in ['00:00', '24:00 local']) {
+        final bounds = tester.getRect(find.text(label));
+        expect(bounds.left, greaterThanOrEqualTo(24));
+        expect(bounds.right, lessThanOrEqualTo(width - 24));
+        expect(bounds.overlaps(track), isFalse);
+      }
+      final before = state;
+      await tester.tapAt(
+        Offset(track.left + track.width * 0.75, track.center.dy),
+      );
+      await tester.pump();
+      expect(state.timestamp, isNot(before.timestamp));
+      expect(state.timestamp.isUtc, isTrue);
+      expect(state.location, before.location);
+      expect(state.focalLength, before.focalLength);
+      expect(
+        tester.widget<Slider>(slider).semanticFormatterCallback!(720),
+        '12:00 PDT',
+      );
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('slider spans 00:00–24:00 local and preserves camera state', (
     tester,
   ) async {

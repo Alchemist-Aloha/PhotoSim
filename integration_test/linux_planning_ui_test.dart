@@ -11,6 +11,7 @@ import 'package:photosim/data/raster_cache.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/ui/camera_inspector.dart';
 import 'package:photosim/ui/time_slider.dart';
+import 'package:photosim/ui/map_workspace.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -181,7 +182,7 @@ void main() {
       );
       await tester.tap(find.byTooltip('Later by one hour'));
       await tester.pumpAndSettle();
-      final composed = inspector().state;
+      var composed = inspector().state;
       expect(
         composed.timestamp,
         edited.timestamp.add(const Duration(hours: 1)),
@@ -191,6 +192,32 @@ void main() {
       expect(find.text('Retry'), findsOneWidget);
       expect(checkpoint.file.readAsStringSync(), previousCheckpoint);
       await capture('linux-session-error-feedback');
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      final slider = find.byKey(const ValueKey('local-day-slider'));
+      await tester.ensureVisible(slider);
+      await tester.pumpAndSettle();
+      final track = tester.getRect(slider);
+      expect(track.width, tester.getSize(find.byType(TimeSlider)).width);
+      expect(tester.getRect(find.text('00:00')).overlaps(track), isFalse);
+      expect(tester.getRect(find.text('24:00 local')).overlaps(track), isFalse);
+      final beforeScrub = composed;
+      await tester.tapAt(
+        Offset(track.left + track.width * 0.75, track.center.dy),
+      );
+      await tester.pumpAndSettle();
+      composed = tester.widget<MapWorkspace>(find.byType(MapWorkspace)).state;
+      expect(composed.timestamp, isNot(beforeScrub.timestamp));
+      expect(composed.location, beforeScrub.location);
+      expect(composed.focalLength, beforeScrub.focalLength);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(checkpoint.file.readAsStringSync(), previousCheckpoint);
+      await capture('linux-phone-large-text-timeline');
       blocked.deleteSync();
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
@@ -202,7 +229,10 @@ void main() {
         ).encode(),
         SavedPlan('Session', composed).encode(),
       );
-      expect(inspector().state, same(composed));
+      expect(
+        tester.widget<MapWorkspace>(find.byType(MapWorkspace)).state,
+        same(composed),
+      );
       expect((await store.loadAll()).plans.length, 2);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
