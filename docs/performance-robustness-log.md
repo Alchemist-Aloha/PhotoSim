@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 252 tests
+flutter test                                       # currently 253 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,43 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — camera edit validation
+
+### `6082f88` fix: reject nonfinite camera edits before clamping
+
+`SimulationState` rejected nonfinite constructor parameters, but `copyWith`
+clamped pitch/focal length first. Dart's `clamp` converted NaN into the upper
+limit and ±infinity into a range endpoint, silently accepting invalid edits
+(e.g. pitch 85° or focal length 600 mm). Added an explicit finite check for
+these two optional inputs before retaining the existing finite-value clamps.
+
+Files: `lib/models/simulation_state.dart`, `test/camera_test.dart`. The new
+regression failed on the original implementation and passes after the fix,
+covering NaN and both infinities for both fields. Call sites were inspected:
+inspector numeric fields already validate finite values, sliders provide bounded
+values, and gestures/celestial aiming continue using finite camera values.
+Other fields still pass through the existing constructor validation; this is
+one fix in the larger input-validation sweep, not a claim that it is complete.
+
+Finite behavior is fingerprint-proven: an ignored probe at
+`build/validation/copy_with_fingerprint_test.dart` covers 128 combinations of
+omitted/normal/boundary/extreme finite pitch and focal-length edits across two
+compositions (including APS-C/portrait, elevation overrides and weather/optics).
+Running hash over all encoded plan JSON bytes is identical before and after:
+**128 samples / 124880 bytes / 5960327357299264**. Before/after probe logs are
+`build/validation/copy-with-{before,after}.log`. Finite out-of-range clamping
+and normal edits are unchanged; invalid nonfinite programmatic edits now throw
+`ArgumentError` instead of unexpectedly changing the composition.
+
+Verified: analyzer 0 issues; format clean; **253 unit/widget tests pass**;
+`integration_test/linux_spec_photography_test.dart` passes on the real Linux GPU
+with a 180-second command bound, exercising optics, portrait/roll, fullscreen,
+quick PNG export and Export workspace metadata. Native log:
+`build/validation/copy-with-finite-native.log`. No performance gain is claimed;
+no new Android device validation was performed.
 
 ---
 
