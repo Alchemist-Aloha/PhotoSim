@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 286 tests
+flutter test                                       # currently 290 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,57 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — fullscreen-failure priority
+
+### `70e5f96` fix: prioritize fullscreen failure feedback
+
+A rejected window-fullscreen request queued “Window fullscreen unavailable: …”
+behind persistent camera Undo. Because the clean preview still opens, the user
+could be left in fullscreen with no explanation and no visible route to the
+failure. Reused the established active-feedback replacement policy in that
+existing `PlatformException` handler: remove current feedback, then show the
+unchanged message. Message copy, MissingPluginException tolerance, preview state,
+layout, session writes and composition stay unchanged; Undo is intentionally
+replaced. Recovery guidance in that copy remains a separate open question.
+
+Files: `lib/app/app.dart`, `test/fullscreen_feedback_test.dart`,
+`integration_test/linux_spec_photography_test.dart`. Four compact/desktop cases
+at 390×844 and 1600×960 with 1.3 text scaling failed before editing, because the
+message was absent behind Undo. They now cover rejection while entering and while
+exiting clean preview: message and Undo replacement before and after Escape,
+working exit control, two expected channel calls, and unchanged composition back
+on the map. No notification is dismissed or waited out to make them pass.
+
+Native Linux photography/spec workflow now installs a real channel handler that
+throws `PlatformException` for fullscreen entry. It first treats the native-test
+setup gap honestly: the new camera move schedules a debounced terrain reload, so
+export readiness had to be awaited before tapping export. Checked the exact HEAD~
+application and test sources first — the unchanged baseline passed, proving the
+failure belonged to the new sequence, not a pre-existing defect or product bug.
+
+A first capture was also taken before MaterialBanner's entry animation finished,
+so it looked empty. The test now waits for the banner's own animation state, then
+requires at least a minimum-interactive-height banner that does not overlap the
+exit-fullscreen control, before capturing. It verifies Undo is gone, the message
+is present, the exit control is reachable, the scene object is unchanged,
+Escape restores the app bar, and location/time/focal length/roll/portrait all
+match. The unchanged PNG export phase then still succeeds. Inspected
+`build/validation/linux-fullscreen-error-feedback.png`: message and close control
+sit above the canvas with the exit-fullscreen affordance visible.
+
+Verified: analyzer 0 issues; format clean; **290 tests pass**. Native Linux
+photography/spec and camera/GPU workflow tests pass separately with 180-second
+bounds. Normal session round-trip fingerprint remains exactly **8 sessions /
+15850 JSON bytes / 7707460953092100**. Evidence: ignored
+`build/validation/fullscreen-feedback-{before,after,unit,native,baseline-native,
+final-unit,fingerprint,workflow}.log` and the existing session probe. Notification
+timing intentionally changes; no pixel-identical or performance claim.
+
+Automatic startup warnings, constellation-load failures and general pending-queue
+priority remain unaudited, as do physical Android/Windows window-manager behavior.
 
 ---
 
