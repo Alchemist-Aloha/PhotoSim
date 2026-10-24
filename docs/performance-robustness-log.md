@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 265 tests
+flutter test                                       # currently 267 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,52 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — checkpoint-save error priority
+
+### `13c54c7` fix: surface checkpoint failures ahead of camera undo
+
+The common `saveSession` failure handler queued its storage guidance and Retry
+behind the ten-second “Camera moved” / Undo prompt. A failed automatic checkpoint
+could therefore appear unacknowledged while the user's latest edits were not
+recoverable after a crash. Reused the existing plan-error policy: remove active
+feedback before showing the unchanged warning. No persistence, message copy,
+retry, duration, deduplication, layout, theme, dependency or framework changes.
+As with plan errors, this deliberately replaces the transient Undo notification.
+
+Files: `lib/app/app.dart`, `test/session_restoration_test.dart`,
+`integration_test/linux_planning_ui_test.dart`. Inspected timer, lifecycle,
+exit-consent and Retry callers of the shared handler. Two widget regressions
+at 390×844 and 1600×960, both with 1.3 text scaling, failed before editing:
+the save warning was absent behind Undo. They now observe the warning and Retry
+without advancing through Undo's lifetime, verify the exact previous checkpoint
+JSON and unchanged live composition, remove a real blocking staging directory,
+and verify Retry saves every composition field without marking the plan clean.
+
+Native Linux planning now uses a real SessionStore and injects the same staging
+path obstruction during a lifecycle flush after an inspector move. It checks
+immediate warning replacement, unchanged checkpoint/live state, successful Retry,
+cleared warning icon and both named plans still readable. Inspected
+`build/validation/linux-session-error-feedback.png`: storage guidance and Retry
+are visible; **the pre-existing timeline overlap remains visible and unfixed**.
+
+Verified before committing: analyzer 0 issues; format clean; **267 tests pass**;
+`linux_planning_ui_test` and `linux_workflow_test` each pass on the real Linux
+GPU device with separate 180-second bounds. Normal session round-trip output
+matches the prior baseline exactly: **8 sessions / 15850 JSON bytes /
+7707460953092100**. Evidence: ignored
+`build/validation/session-feedback-{before,after,unit,native,workflow,fingerprint}.log`;
+reused `session_restore_fingerprint_test.dart`. Notification timing intentionally
+changes; no performance or identical-pixel claim is made.
+
+Reflection: failing-first tests, fingerprints and native workflows are productive;
+footer-only experiments are not. This iteration takes a distinct bounded
+failure-path fix, not a retry of the rejected layout. Layout protecting timeline
+and inspector remains the highest open UI item. Startup/manual warning display,
+fullscreen and constellation-load queueing remain unaudited. No actual disk-full
+fault or Android/Windows hardware validation was performed.
 
 ---
 
