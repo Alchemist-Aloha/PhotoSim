@@ -31,6 +31,12 @@ class TileId {
   }
 
   static Vector2 coordinates(LatLng location, int zoom) {
+    if (zoom < 0 ||
+        zoom > 15 ||
+        !location.latitude.isFinite ||
+        !location.longitude.isFinite) {
+      throw ArgumentError('Invalid terrain coordinates or zoom');
+    }
     final lat = location.latitude.clamp(-85.05112878, 85.05112878) * radians;
     final n = (1 << zoom).toDouble();
     return Vector2(
