@@ -146,9 +146,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   }
 
   Future<void> initialize() async {
-    final boot = Stopwatch()..start();
-    void mark(String label) => debugPrint('BOOT ${boot.elapsedMilliseconds}ms $label');
-    mark('initialize start');
     try {
       final budget =
           widget.rasterCache ??
@@ -159,10 +156,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           );
       // Publish the scene independently; only geographic data needs the disk index.
       await (initializeScene(), initializeSources(budget)).wait;
-      mark('scene+sources ready');
       if (!mounted) return;
       await loadTerrain();
-      mark('loadTerrain done');
     } catch (failure, stack) {
       debugPrint('PhotoSim 3D initialization failed: $failure\n$stack');
       if (mounted) {
@@ -435,7 +430,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         )) {
       return;
     }
-    final terrainWatch = Stopwatch()..start();
     wantedTiles = wanted;
     terrainOrigin = origin;
     if (cancellation != null && !cancellation!.isCompleted) {
@@ -555,17 +549,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         nearbyImagery = loadImagery(token, stop, detail: false);
       }
     }
-    debugPrint('BOOT terrain ${missing.length} tiles in ${terrainWatch.elapsedMilliseconds}ms');
     if (mounted && token == generation) {
       setState(() => loading = false);
-      debugPrint('BOOT terrain meshes visible at ${terrainWatch.elapsedMilliseconds}ms');
       await Future.wait([
         if (centerImagery != null) centerImagery!,
         ?nearbyImagery,
       ]);
-      debugPrint('BOOT 256 imagery done at ${terrainWatch.elapsedMilliseconds}ms');
       await loadImagery(token, stop, retry: retry);
-      debugPrint('BOOT detail imagery done at ${terrainWatch.elapsedMilliseconds}ms');
     }
   }
 

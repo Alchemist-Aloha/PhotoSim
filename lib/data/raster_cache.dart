@@ -158,36 +158,37 @@ class RasterCache {
 
   Future<void> _index() async {
     if (_indexed) return;
-    final watch = Stopwatch()..start();
-    var files = 0;
     _entries.clear();
     _bytes = 0;
+    // Synchronous on purpose: thousands of awaited list/stat/exists calls each
+    // cost an event-loop round trip (~13 s for 3.2 k files in a debug Linux build,
+    // versus ~75 ms here), and startup blocks on the result before any terrain
+    // loads. Keep this one pass short and allocation-light instead.
     for (final folder in _directories) {
-      if (await FileSystemEntity.type(folder.path, followLinks: false) !=
+      if (FileSystemEntity.typeSync(folder.path, followLinks: false) !=
           FileSystemEntityType.directory) {
         continue;
       }
-      await for (final entry in folder.list(followLinks: false)) {
+      for (final entry in folder.listSync(followLinks: false)) {
         if (entry is! File) continue;
         final name = entry.uri.pathSegments.last;
         if (_stagingName.hasMatch(name) ||
             (_orphanMetadata.hasMatch(name) &&
-                !await File(entry.path.substring(0, entry.path.length - 5))
-                    .exists())) {
-          await entry.delete();
+                !File(entry.path.substring(0, entry.path.length - 5))
+                    .existsSync())) {
+          entry.deleteSync();
           continue;
         }
         if (!_rasterName.hasMatch(name)) continue;
-        final stat = await entry.stat();
+        final stat = entry.statSync();
         final metadata = File('${entry.path}.json');
         final size =
-            stat.size + (await metadata.exists() ? await metadata.length() : 0);
+            stat.size + (metadata.existsSync() ? metadata.lengthSync() : 0);
         _entries[_key(entry)] = (bytes: size, used: stat.modified);
         _bytes += size;
       }
     }
     _indexed = true;
-    debugPrint('BOOT cache index $files files in ${watch.elapsedMilliseconds}ms bytes=$_bytes');
   }
 
   Future<void> _delete(File file) async {
