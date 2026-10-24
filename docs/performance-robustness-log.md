@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 280 tests
+flutter test                                       # currently 284 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,55 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — large-text local-day slider
+
+### `f53a765` fix: keep the local-day slider usable with large text
+
+The inline endpoint labels could exceed phone width at 200% text scaling,
+overflowing the Row and starving its Expanded slider. Give the native slider
+its own full-width row, with flexible endpoint labels in a separate legend row.
+No text scaling clamp, hidden labels, breakpoint, dependency or new setting.
+Align the desktop transport row to the bottom so its controls still line up
+with the track; the existing strict alignment test passes unchanged.
+
+Files: `lib/ui/time_slider.dart`, `lib/app/app.dart`,
+`test/{time_slider,feedback_layout}_test.dart`,
+`integration_test/linux_planning_ui_test.dart`. Four new regressions failed first:
+320/390px standalone sliders with 24px side padding, plus collapsed/expanded
+390×844 timelines with live feedback, all at 200% text. They now verify usable
+track width, visible separate labels, successful scrubbing, UTC output, semantic
+formatting and unchanged location/optics. The expanded short-landscape geometry
+check now allows an already-minimum 48px canvas to remain at its minimum while
+the timeline scrolls; strict shrink remains required above that minimum.
+
+Preserved the actual slider/drag callbacks, supported-year guards and semantic
+formatter. Before/after fingerprint over ordinary, spring-gap, fall-fold,
+Lord Howe half-hour-shift and Nepal fractional-offset drags matches exactly:
+**45 sampled drag/end states / 51859 JSON bytes / 5379452141715050**.
+The probe hashes full encoded composition plus range/value/tooltip/semantic
+labels, including repeated 24:00 updates and release into the next local day.
+Evidence: ignored `build/validation/time_slider_fingerprint_test.dart` and
+`time-slider-fingerprint-{before,after}.log`. Layout intentionally changes;
+no pixel-identical UI or performance claim.
+
+Native Linux planning additionally resizes the test viewport to 390×844 with
+200% text during a real blocked checkpoint write. It checks label/track separation,
+scrubs without changing location/optics, keeps the previous checkpoint untouched,
+and successfully retries the exact edited composition. Inspected both native
+captures: `linux-phone-large-text-timeline.png` and `linux-session-error-feedback.png`
+under `build/validation/`. This is Linux-rendered phone emulation, not physical
+Android evidence; it does not complete the broader mobile/accessibility audit.
+
+Verified: analyzer 0 issues; format clean; **284 tests pass**. Seven affected native
+Linux workflows pass, each with a separate 180-second bound: planning, photography
+spec/export, map/GPU camera workflow, WASD, terrain panel, calendar and perf.
+Logs: `build/validation/time-slider-{layout-before,layout-after,unit,final-unit,
+native-planning,*_test}.log` and `time-slider-integration-summary.txt`.
+Remaining startup/manual warning, fullscreen and constellation-load message
+priority candidates are still open. Android/Windows hardware remains untested.
 
 ---
 
