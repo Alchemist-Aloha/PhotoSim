@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 257 tests
+flutter test                                       # currently 260 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,46 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — tile projection validation
+
+### `ad52361` fix: validate tile coordinates and zoom before projection
+
+`TileId.coordinates` clamped latitude before checking finiteness, so a NaN or
+infinite latitude became a valid-looking northern/southern edge projection.
+Nonfinite longitude reached integer conversion in `TileId.at`; unsupported zooms
+were shifted before the `TileId` constructor could reject them. Added a shared
+finite-coordinate/0–15 zoom guard before projection. The zoom range already
+belonged to the tile constructor; the helper now enforces the same contract.
+
+Files: `lib/core/terrain_geo.dart`, `test/terrain_geo_test.dart`. Checked direct
+projection callers, `TileId.at`, `TileId.uv`, terrain coverage/LOD, terrain
+building/ground lookup and workspace tile selection. All production callers use
+supported zooms and validated camera state, so no caller/interface/configuration
+change is required. The map engine's independent zoom range is unchanged.
+
+Two invalid-input regressions failed before the fix: nonfinite coordinates
+returned a projection instead of `ArgumentError`, and zoom 16 was accepted by
+the helper. Tests now cover NaN/±infinity in either coordinate through
+projection/tile selection/UV lookup, and zooms −1/16/64/2³¹ through projection
+and tile selection. A third test preserves finite pole clamping and date-line
+world-copy wrapping at zooms 0/13/15. This does not add stricter bounds to
+otherwise finite latitude/longitude values or change Mercator clamping.
+
+Unchanged valid behavior is fingerprint-proven across 180 combinations of
+supported zoom, finite latitude (including ±90°), and longitude (including
+unwrapped world copies): raw projection, selected key and UV coordinate JSON
+matches **13626 bytes / hash 1307761529637644** before/after. Ignored artifacts:
+`build/validation/tile_coordinates_fingerprint_test.dart`,
+`tile-coordinates-{before,after}.log`.
+
+Verified: analyzer 0 issues; format clean; **260 unit/widget tests pass**.
+`linux_wasd_test` and `terrain_panel_test` pass on the real Linux GPU with
+180-second command bounds; logs `build/validation/tile-coordinates-*_test.log`.
+Only invalid programmatic inputs intentionally change. No performance gain,
+Android hardware validation or completion of the broader sweep is claimed.
 
 ---
 
