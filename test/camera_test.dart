@@ -44,6 +44,18 @@ void main() {
     expect(original.focalLength, 24);
   });
 
+  test('copyWith rejects nonfinite pitch and focal length before clamping', () {
+    final state = SimulationState(timestamp: DateTime.utc(2026));
+    for (final value in [
+      double.nan,
+      double.infinity,
+      double.negativeInfinity,
+    ]) {
+      expect(() => state.copyWith(pitch: value), throwsArgumentError);
+      expect(() => state.copyWith(focalLength: value), throwsArgumentError);
+    }
+  });
+
   test('focal length uses one range and sensor changes preserve it', () {
     final state = SimulationState(focalLength: 200);
     expect(state.copyWith(sensor: Sensor.apsC).focalLength, 200);

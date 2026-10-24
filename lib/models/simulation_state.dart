@@ -372,6 +372,10 @@ class SimulationState {
     double? focusDistance,
     DateTime? timestamp,
   }) {
+    if ((pitch != null && !pitch.isFinite) ||
+        (focalLength != null && !focalLength.isFinite)) {
+      throw ArgumentError('Invalid camera parameters');
+    }
     return SimulationState(
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
