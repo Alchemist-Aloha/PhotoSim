@@ -11,9 +11,11 @@ LatLng destination(LatLng origin, double bearing, double distance) {
   final lon = origin.longitude * radians;
   final angle = distance / earthRadius;
   final direction = bearing * radians;
+  // Roundoff at a pole can put the sine just outside asin's valid domain.
   final nextLat = math.asin(
-    math.sin(lat) * math.cos(angle) +
-        math.cos(lat) * math.sin(angle) * math.cos(direction),
+    (math.sin(lat) * math.cos(angle) +
+            math.cos(lat) * math.sin(angle) * math.cos(direction))
+        .clamp(-1.0, 1.0),
   );
   final nextLon =
       lon +

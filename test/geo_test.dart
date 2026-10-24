@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' show Distance, LatLng;
 import 'package:photosim/core/geo.dart';
 
 void main() {
@@ -15,6 +15,28 @@ void main() {
       expect(distance(origin, point), closeTo(1000, 2));
     }
   });
+  test('exact polar destinations tolerate floating-point roundoff', () {
+    for (final latitude in [
+      89.914,
+      89.919,
+      89.926,
+      -89.914,
+      -89.919,
+      -89.926,
+    ]) {
+      final pole = latitude > 0 ? 90.0 : -90.0;
+      final distance = (pole - latitude).abs() * radians * earthRadius;
+      final point = destination(
+        LatLng(latitude, 179.999),
+        latitude > 0 ? 0 : 180,
+        distance,
+      );
+      expect(point.latitude, closeTo(pole, 1e-9));
+      expect(point.longitude.isFinite, isTrue);
+      expect(point.longitude, inInclusiveRange(-180, 180));
+    }
+  });
+
   test('dateline wraps and FOV wedge boundaries match camera optics', () {
     final point = destination(const LatLng(0, 179.999), 90, 1000);
     expect(point.longitude, lessThan(-179));
