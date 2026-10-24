@@ -12,7 +12,9 @@ class SavedPlan {
   final String name;
   final SimulationState state;
 
-  String encode() => const JsonEncoder.withIndent('  ').convert({
+  /// Shared by [encode] and [AppSession], which nests this map directly instead of
+  /// pretty-printing to a string and parsing it back on every session save.
+  Map<String, Object?> toJson() => {
     'version': 2,
     'name': name,
     'timestamp': state.timestamp.toIso8601String(),
@@ -53,7 +55,10 @@ class SavedPlan {
     'depthOfField': state.depthOfField,
     'aperture': state.aperture,
     'focusDistance': state.focusDistance,
-  });
+  };
+
+  String encode() =>
+      const JsonEncoder.withIndent('  ').convert(toJson());
 
   static SavedPlan decode(String source) {
     if (utf8.encode(source).length > 32768) {

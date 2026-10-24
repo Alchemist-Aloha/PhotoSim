@@ -37,7 +37,7 @@ class AppSession {
 
   String encode() => jsonEncode({
     'version': 1,
-    'composition': jsonDecode(SavedPlan('Session', state).encode()),
+    'composition': SavedPlan('Session', state).toJson(),
     'cleanComposition': jsonDecode(cleanComposition),
     'planName': planName,
     'workspace': workspace,
