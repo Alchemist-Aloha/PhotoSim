@@ -84,36 +84,33 @@ void main() {
       expect(occlusion.enabled, isFalse);
     }
   });
-  test(
-    'High geometry doubles mesh sampling and distant tiles step down with apparent size',
-    () {
-      const place = LatLng(37.744, -119.59);
-      final center = TileId.at(place);
-      final neighbor = TileId(center.z, center.x + 1, center.y);
-      final far = TileId(11, center.x ~/ 4, center.y ~/ 4);
-      // 4 and 9 of its own widths out: past the full-detail band, so the mesh
-      // steps down instead of spending near-camera samples on distant ridges.
-      final near = TileId(center.z, center.x + 3, center.y);
-      final distant = TileId(center.z, center.x + 8, center.y);
-      for (final quality in RenderQuality.values) {
-        final state = SimulationState(
-          latitude: place.latitude,
-          longitude: place.longitude,
-          renderQuality: quality,
-        );
-        final factor = quality == RenderQuality.high ? 2 : 1;
-        expect(terrainMeshResolution(center, state), 128 * factor);
-        expect(terrainMeshResolution(neighbor, state), 64 * factor);
-        expect(terrainMeshResolution(far, state), 32 * factor);
-        expect(terrainMeshResolution(near, state), 32 * factor);
-        expect(terrainMeshResolution(distant, state), 16 * factor);
-        expect(
-          terrainMeshResolution(distant, state),
-          lessThan(terrainMeshResolution(neighbor, state)),
-        );
-      }
-    },
-  );
+  test('High geometry doubles mesh sampling and distant tiles step down with apparent size', () {
+    const place = LatLng(37.744, -119.59);
+    final center = TileId.at(place);
+    final neighbor = TileId(center.z, center.x + 1, center.y);
+    final far = TileId(11, center.x ~/ 4, center.y ~/ 4);
+    // 4 and 9 of its own widths out: past the full-detail band, so the mesh
+    // steps down instead of spending near-camera samples on distant ridges.
+    final near = TileId(center.z, center.x + 3, center.y);
+    final distant = TileId(center.z, center.x + 8, center.y);
+    for (final quality in RenderQuality.values) {
+      final state = SimulationState(
+        latitude: place.latitude,
+        longitude: place.longitude,
+        renderQuality: quality,
+      );
+      final factor = quality == RenderQuality.high ? 2 : 1;
+      expect(terrainMeshResolution(center, state), 128 * factor);
+      expect(terrainMeshResolution(neighbor, state), 64 * factor);
+      expect(terrainMeshResolution(far, state), 32 * factor);
+      expect(terrainMeshResolution(near, state), 32 * factor);
+      expect(terrainMeshResolution(distant, state), 16 * factor);
+      expect(
+        terrainMeshResolution(distant, state),
+        lessThan(terrainMeshResolution(neighbor, state)),
+      );
+    }
+  });
   test('full DEM geometry retains narrow peaks, valid uint32 indices and unit normals', () {
     final id = TileId.at(const LatLng(37.744, -119.59));
     final heights = Float32List(256 * 256)..[100 * 256 + 100] = 1000;

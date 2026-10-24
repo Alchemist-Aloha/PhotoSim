@@ -309,9 +309,7 @@ TerrainPatch buildTerrainPatch(
   // fresh Vector3s inside it churned ~7 objects per triangle; Vector3.cross also
   // allocates. These are the same expressions in the same order as Vector3.cross.
   for (var i = 0; i < indices.length; i += 3) {
-    final i0 = indices[i] * 3,
-        i1 = indices[i + 1] * 3,
-        i2 = indices[i + 2] * 3;
+    final i0 = indices[i] * 3, i1 = indices[i + 1] * 3, i2 = indices[i + 2] * 3;
     final ax = positions[i1] - positions[i0];
     final ay = positions[i1 + 1] - positions[i0 + 1];
     final az = positions[i1 + 2] - positions[i0 + 2];

@@ -57,8 +57,7 @@ class SavedPlan {
     'focusDistance': state.focusDistance,
   };
 
-  String encode() =>
-      const JsonEncoder.withIndent('  ').convert(toJson());
+  String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
 
   static SavedPlan decode(String source) {
     if (utf8.encode(source).length > 32768) {

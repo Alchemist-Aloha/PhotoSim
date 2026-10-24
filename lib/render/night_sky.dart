@@ -67,7 +67,8 @@ scene.MeshGeometry _milkyWayGeometry() {
       final ra = (x / columns * 360 - 180) * radians;
       final i = y * (columns + 1) + x;
       positions[i * 3] = cosDec * math.cos(ra) * NightSkyRenderer.bandDistance;
-      positions[i * 3 + 1] = cosDec * math.sin(ra) * NightSkyRenderer.bandDistance;
+      positions[i * 3 + 1] =
+          cosDec * math.sin(ra) * NightSkyRenderer.bandDistance;
       positions[i * 3 + 2] = sinDec * NightSkyRenderer.bandDistance;
       uvs[i * 2] = x / columns;
       uvs[i * 2 + 1] = y / rows;
