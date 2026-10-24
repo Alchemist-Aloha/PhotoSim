@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 284 tests
+flutter test                                       # currently 286 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,49 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — requested session-warning priority
+
+### `96791bc` fix: prioritize requested session recovery warnings
+
+Clicking “Session recovery warning” appended its explanation behind active
+camera Undo feedback. Since Undo is persistent in the current SDK, a deliberate
+request for recovery guidance could appear to do nothing indefinitely. Reused
+the established active-feedback replacement policy in that button callback:
+remove current feedback, then show the unchanged warning. This intentionally
+replaces Undo; message copy, Retry eligibility, duration/persistence, layout,
+checkpoint writes, warning deduplication and exit consent remain unchanged.
+
+Files: `lib/app/app.dart`, `test/session_restoration_test.dart`,
+`integration_test/linux_planning_ui_test.dart`. Four compact/desktop cases at
+390×844 and 1600×960, with 1.3 text scaling, failed before editing: requested
+warning text was absent behind Undo. Two new startup-warning cases inject the
+same disabled-store contract as main's storage-error handler and verify no Retry,
+unchanged live edits, and exact old checkpoint JSON through disposal. Two
+strengthened checkpoint-failure cases make another camera move while the warning
+remains set, request its explanation, then repair the staging path and verify
+Retry writes the latest full composition without changing the clean marker.
+
+Native Linux planning additionally clicks the warning icon after another move
+during a real blocked staging-path failure. Guidance replaces Undo immediately,
+Retry is available, camera/checkpoint remain intact, and the existing phone-scale
+scrubbing/retry flow still saves the exact subsequent composition. Inspected
+`build/validation/linux-manual-session-warning.png`; controls remain unobscured.
+
+Verified: analyzer 0 issues; format clean; **286 tests pass**. Native
+`linux_planning_ui_test` and `linux_workflow_test` pass separately with 180-second
+bounds. Normal session round-trip fingerprint remains exactly
+**8 sessions / 15850 JSON bytes / 7707460953092100**. Evidence: ignored
+`build/validation/manual-warning-{before,after,unit,final-unit,fingerprint,
+linux_planning_ui_test,linux_workflow_test}.log` and the existing session probe.
+Notification timing intentionally changes; no pixel-identical/performance claim.
+
+Automatic startup warning, fullscreen failure and constellation-load arbitration
+remain unaudited candidates, as does more general pending-queue priority. This is
+not a completed messenger/failure-path audit. No actual disk-full fault or physical
+Android/Windows validation was performed.
 
 ---
 
