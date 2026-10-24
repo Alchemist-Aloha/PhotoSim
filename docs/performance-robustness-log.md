@@ -36,6 +36,29 @@ relative deltas as the signal and absolutes as pessimistic.
 
 ---
 
+## 2026-10-24 — hardening loop
+
+### `1e7e640` test: wait for a real render before capturing GPU pixels
+
+`integration_test/atmosphere_test.dart` mutated the scene (fog, light
+intensity, environment, ambient occlusion, shadows), pumped a fixed 100 ms, then
+captured the `RepaintBoundary`. That is only valid while the preview renders
+every single frame: a pump schedules a frame but the ticker decides whether to
+draw it, so the capture could silently observe the previous scene state as soon
+as frame output is gated for any reason.
+
+Added `pumpUntilRendered(tester, world, {frames})` to
+`integration_test/workspace_navigation.dart`. It waits on
+`Scene.renderStats.frameCount`, which only advances when a frame actually
+rendered, and converted the seven capture sites that relied on one fixed pump.
+
+Verified: `atmosphere_test` passes on `-d linux`, 247 unit tests pass.
+
+This is the prerequisite for the idle frame-rate cap: the cap was previously
+rejected only because nine tests depended on render-per-pump determinism.
+
+---
+
 ## 2026-10-24 — test suite repair, export quality, terrain LOD
 
 ### `08a5509` style: apply dart format to files touched by the perf commits
