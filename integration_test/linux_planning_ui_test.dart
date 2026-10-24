@@ -100,6 +100,50 @@ void main() {
             .timestamp,
         original.timestamp,
       );
+      if (Platform.isLinux) {
+        final planFile = (await store.directory.list().toList())
+            .whereType<File>()
+            .first;
+        final beforeFailure = inspector().state;
+        final moved = beforeFailure.copyWith(
+          latitude: beforeFailure.latitude + 0.001,
+        );
+        inspector().onChanged(moved);
+        await tester.pumpAndSettle();
+        expect(find.text('Camera moved'), findsOneWidget);
+        expect(
+          (await Process.run('chmod', ['000', store.directory.path])).exitCode,
+          0,
+        );
+        try {
+          if (!await planFile.exists()) {
+            await tester.tap(find.byTooltip('Photography plans'));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('Open plan'));
+            await tester.pumpAndSettle();
+            expect(find.text('Camera moved'), findsNothing);
+            expect(
+              find.textContaining('Check storage space and folder permissions'),
+              findsOneWidget,
+            );
+            expect(inspector().state, same(moved));
+            await capture('linux-plan-error-feedback');
+          } else {
+            debugPrint(
+              'Permission-denial phase skipped: directory access remains available to this user.',
+            );
+          }
+        } finally {
+          expect(
+            (await Process.run('chmod', [
+              '700',
+              store.directory.path,
+            ])).exitCode,
+            0,
+          );
+        }
+        expect((await store.loadAll()).plans.length, 2);
+      }
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

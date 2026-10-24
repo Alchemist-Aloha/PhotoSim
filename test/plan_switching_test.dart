@@ -7,6 +7,7 @@ import 'package:photosim/app/app.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/map_workspace.dart';
 
 class MemoryPlans extends PlanRepository {
   MemoryPlans() : super(Directory('/unused'));
@@ -53,10 +54,16 @@ void main() {
       await tester.pumpWidget(PhotoSimApp(plans: store));
       CameraInspector inspector() =>
           tester.widget<CameraInspector>(find.byType(CameraInspector));
-      final original = inspector().state.copyWith(focalLength: 50);
+      final original = inspector().state.copyWith(
+        focalLength: 50,
+        latitude: action == 'failed save' ? 35.68 : null,
+      );
       inspector().onChanged(original);
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Unsaved changes'), findsOneWidget);
+      if (action == 'failed save') {
+        expect(find.text('Camera moved'), findsOneWidget);
+      }
       await tester.tap(find.byTooltip('Photography plans'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Open plan'));
@@ -127,44 +134,55 @@ void main() {
     });
   }
 
-  testWidgets(
-    'failed plan listing preserves edits and offers storage guidance',
-    (tester) async {
-      tester.view.physicalSize = const Size(1600, 960);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final store = MemoryPlans()..failLoad = true;
-      await tester.pumpWidget(PhotoSimApp(plans: store));
-      CameraInspector inspector() =>
-          tester.widget<CameraInspector>(find.byType(CameraInspector));
-      final original = inspector().state.copyWith(focalLength: 50);
-      inspector().onChanged(original);
-      await tester.pump();
-      await tester.tap(find.byTooltip('Photography plans'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Open plan'));
-      await tester.pumpAndSettle();
-      expect(find.text('No saved plans found.'), findsNothing);
-      expect(
-        find.textContaining('Check storage space and folder permissions'),
-        findsOneWidget,
-      );
-      expect(find.text('Unsaved changes'), findsOneWidget);
-      expect(inspector().state, same(original));
-      store.failLoad = false;
-      await tester.tap(find.byTooltip('Photography plans'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Open plan'));
-      await tester.pumpAndSettle();
-      expect(find.text('Mountain morning'), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-      expect(inspector().state, same(original));
-      await tester.pumpWidget(const SizedBox());
-      expect(tester.takeException(), isNull);
-    },
-  );
+  for (final size in [const Size(390, 844), const Size(1600, 960)]) {
+    testWidgets(
+      'plan listing errors preempt camera undo and preserve edits at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final store = MemoryPlans()..failLoad = true;
+        await tester.pumpWidget(PhotoSimApp(plans: store));
+        MapWorkspace map() =>
+            tester.widget<MapWorkspace>(find.byType(MapWorkspace));
+        final before = map().state;
+        final moved = before.copyWith(
+          latitude: before.latitude + 0.001,
+          focalLength: 50,
+        );
+        map().onChanged(moved);
+        map().onMoveCompleted!(before);
+        await tester.pumpAndSettle();
+        expect(find.text('Camera moved'), findsOneWidget);
+        await tester.tap(find.byTooltip('Photography plans'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Open plan'));
+        await tester.pumpAndSettle();
+        expect(find.text('No saved plans found.'), findsNothing);
+        expect(find.text('Camera moved'), findsNothing);
+        expect(
+          find.textContaining('Check storage space and folder permissions'),
+          findsOneWidget,
+        );
+        expect(find.text('Unsaved changes'), findsOneWidget);
+        expect(map().state, same(moved));
+        store.failLoad = false;
+        await tester.tap(find.byTooltip('Photography plans'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Open plan'));
+        await tester.pumpAndSettle();
+        expect(find.text('Mountain morning'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(map().state, same(moved));
+        await tester.pumpWidget(const SizedBox());
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'dirty status ignores derived terrain and clears when edits are reverted',

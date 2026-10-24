@@ -460,13 +460,15 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Could not save or open the plan. Your current composition is unchanged. Check storage space and folder permissions, then try again.',
+        ScaffoldMessenger.of(context)
+          ..removeCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Could not save or open the plan. Your current composition is unchanged. Check storage space and folder permissions, then try again.',
+              ),
             ),
-          ),
-        );
+          );
       }
     } finally {
       if (mounted) setState(() => planBusy = false);
