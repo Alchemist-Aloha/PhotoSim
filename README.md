@@ -158,6 +158,11 @@ plus correctness/async lints (including dynamic-call and discarded-future checks
 Warnings and lint infos are fatal in the analysis command above; tests and native
 integration tests are analyzed too. No extra lint dependency is required.
 
+Linux prefers X11 (XWayland on Wayland desktops), falling back to native Wayland.
+This avoids a reproduced NVIDIA/native-Wayland presentation freeze where terrain
+loads internally but the whole window stays on an old frame. `GDK_BACKEND=wayland`
+explicitly opts back into native Wayland; `GDK_BACKEND=x11` forces XWayland.
+
 Ship the **entire bundle directory**, not just its executable. The integration
 test requires a live Linux graphical session and internet access on its first
 terrain/imagery visit. Subsequent visits reuse the source-separated disk caches within the shared size limit. It writes screenshots to
