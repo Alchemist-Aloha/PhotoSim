@@ -23,6 +23,7 @@ import '../ui/camera_inspector.dart';
 import '../ui/map_workspace.dart';
 import '../ui/simulation_workspace.dart';
 import '../ui/time_slider.dart';
+import '../ui/workspace_feedback.dart';
 
 class PhotoSimApp extends StatelessWidget {
   const PhotoSimApp({
@@ -199,8 +200,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           ScaffoldMessenger.of(context)
-            ..removeCurrentSnackBar()
-            ..showSnackBar(
+            ..removeWorkspaceFeedback()
+            ..showWorkspaceFeedback(
               SnackBar(
                 content: const Text(warning),
                 action: SnackBarAction(label: 'Retry', onPressed: saveSession),
@@ -280,7 +281,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       // Unit-test/embedded hosts can still show the clean content viewport.
     } on PlatformException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showWorkspaceFeedback(
           SnackBar(
             content: Text('Window fullscreen unavailable: ${error.message}'),
           ),
@@ -346,8 +347,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     // A save confirmation outranks the transient undo prompt; without this the
     // messenger queues it behind that snackbar's ten-second duration.
     ScaffoldMessenger.of(context)
-      ..removeCurrentSnackBar()
-      ..showSnackBar(
+      ..removeWorkspaceFeedback()
+      ..showWorkspaceFeedback(
         SnackBar(
           content: Text(
             hasUnsavedChanges
@@ -447,7 +448,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             if (decision == 'save' && !await savePlan(store)) return;
             if (!mounted) return;
           }
-          ScaffoldMessenger.of(context).removeCurrentSnackBar();
+          ScaffoldMessenger.of(context).removeWorkspaceFeedback();
           setState(() {
             state = selected.state;
             cleanComposition = composition;
@@ -463,8 +464,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-          ..removeCurrentSnackBar()
-          ..showSnackBar(
+          ..removeWorkspaceFeedback()
+          ..showWorkspaceFeedback(
             SnackBar(
               content: const Text(
                 'Could not save or open the plan. Your current composition is unchanged. Check storage space and folder permissions, then try again.',
@@ -506,8 +507,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       if (!mounted) return;
       if (saved?.cleanPreview == true) unawaited(setCleanPreview(true));
       if (widget.sessionWarning != null) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(widget.sessionWarning!)));
+        ScaffoldMessenger.of(context).showWorkspaceFeedback(
+          SnackBar(content: Text(widget.sessionWarning!)),
+        );
       }
       // Map and calendar do not need the disk index on their startup path.
       if (workspace == Workspace.simulation || workspace == Workspace.export) {
@@ -577,8 +579,8 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
-    messenger.removeCurrentSnackBar();
-    messenger.showSnackBar(
+    messenger.removeWorkspaceFeedback();
+    messenger.showWorkspaceFeedback(
       SnackBar(
         content: const Text('Camera moved'),
         duration: const Duration(seconds: 10),
@@ -1151,17 +1153,18 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                   IconButton(
                     tooltip: 'Session recovery warning',
                     icon: const Icon(Icons.warning_amber),
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(sessionWarning!),
-                        action: widget.sessionStore == null
-                            ? null
-                            : SnackBarAction(
-                                label: 'Retry',
-                                onPressed: saveSession,
-                              ),
-                      ),
-                    ),
+                    onPressed: () =>
+                        ScaffoldMessenger.of(context).showWorkspaceFeedback(
+                          SnackBar(
+                            content: Text(sessionWarning!),
+                            action: widget.sessionStore == null
+                                ? null
+                                : SnackBarAction(
+                                    label: 'Retry',
+                                    onPressed: saveSession,
+                                  ),
+                          ),
+                        ),
                   ),
                 PopupMenuButton<bool>(
                   tooltip: 'Photography plans',
@@ -1325,6 +1328,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           children: [
             if (!cleanPreview && !compact) ...[
               NavigationRail(
+                scrollable: true,
                 selectedIndex: workspace.index,
                 labelType: NavigationRailLabelType.all,
                 onDestinationSelected: changeWorkspace,
@@ -1354,27 +1358,45 @@ class _WorkspaceShellState extends State<WorkspaceShell>
               const VerticalDivider(width: 1),
             ],
             Expanded(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(child: viewport),
-                        if (!cleanPreview &&
-                            editingScene &&
-                            dockedInspector &&
-                            inspectorVisible) ...[
-                          const VerticalDivider(width: 1),
-                          SizedBox(width: 310, child: inspector),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Column(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(child: viewport),
+                          if (!cleanPreview &&
+                              editingScene &&
+                              dockedInspector &&
+                              inspectorVisible) ...[
+                            const VerticalDivider(width: 1),
+                            SizedBox(width: 310, child: inspector),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  if (!cleanPreview && editingScene) ...[
-                    const Divider(height: 1),
-                    timeline(compactTimeline),
+                    if (!cleanPreview && editingScene)
+                      // Keep canvas space; scroll details when feedback leaves a short window.
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight:
+                              constraints.maxHeight > kMinInteractiveDimension
+                              ? constraints.maxHeight - kMinInteractiveDimension
+                              : 0,
+                        ),
+                        child: SingleChildScrollView(
+                          primary: false,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Divider(height: 1),
+                              timeline(compactTimeline),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
-                ],
+                ),
               ),
             ),
           ],

@@ -32,6 +32,7 @@ import '../core/sunlight.dart';
 import '../data/image_export.dart';
 import '../data/enhancement_prompt.dart';
 import 'export_panel.dart';
+import 'workspace_feedback.dart';
 import '../data/raster_cache.dart';
 import 'rain_overlay.dart';
 import 'photography_overlays.dart';
@@ -259,7 +260,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     } catch (failure, stack) {
       debugPrint('PhotoSim constellation load failed: $failure\n$stack');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showWorkspaceFeedback(
           const SnackBar(
             content: Text(
               'Constellation guides unavailable. Toggle guides to retry.',
@@ -769,8 +770,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           () => exportError = 'Render failed: $failure. Try rendering again.',
         );
         ScaffoldMessenger.of(context)
-          ..removeCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(exportError!)));
+          ..removeWorkspaceFeedback()
+          ..showWorkspaceFeedback(SnackBar(content: Text(exportError!)));
       }
     } finally {
       if (mounted) setState(() => exporting = false);
@@ -795,8 +796,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         );
         if (!mounted) return;
         ScaffoldMessenger.of(context)
-          ..removeCurrentSnackBar()
-          ..showSnackBar(
+          ..removeWorkspaceFeedback()
+          ..showWorkspaceFeedback(
             const SnackBar(content: Text('Saved PNG to Pictures/PhotoSim.')),
           );
         return;
@@ -848,8 +849,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       final file = await savePreview(destination, bytes);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..removeCurrentSnackBar()
-        ..showSnackBar(
+        ..removeWorkspaceFeedback()
+        ..showWorkspaceFeedback(
           SnackBar(content: SelectableText('Exported PNG · ${file.path}')),
         );
     } catch (failure) {
@@ -859,8 +860,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               'Save failed: $failure. Choose another path or retry.',
         );
         ScaffoldMessenger.of(context)
-          ..removeCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(exportError!)));
+          ..removeWorkspaceFeedback()
+          ..showWorkspaceFeedback(SnackBar(content: Text(exportError!)));
       }
     } finally {
       if (mounted) setState(() => saving = false);

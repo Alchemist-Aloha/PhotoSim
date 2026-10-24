@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'workspace_feedback.dart';
+
 /// The PNG shown here is the same byte buffer passed to the native saver.
 class ExportPanel extends StatelessWidget {
   const ExportPanel({
@@ -103,15 +105,15 @@ class ExportPanel extends StatelessWidget {
                       await Clipboard.setData(ClipboardData(text: prompt.text));
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context)
-                        ..removeCurrentSnackBar()
-                        ..showSnackBar(
+                        ..removeWorkspaceFeedback()
+                        ..showWorkspaceFeedback(
                           const SnackBar(content: Text('Prompt copied.')),
                         );
                     } catch (failure) {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context)
-                        ..removeCurrentSnackBar()
-                        ..showSnackBar(
+                        ..removeWorkspaceFeedback()
+                        ..showWorkspaceFeedback(
                           SnackBar(
                             content: Text(
                               'Could not copy prompt: $failure. Select and copy the text manually.',

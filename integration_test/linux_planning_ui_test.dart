@@ -10,6 +10,7 @@ import 'package:photosim/data/app_session.dart';
 import 'package:photosim/data/raster_cache.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/time_slider.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -169,6 +170,26 @@ void main() {
       );
       expect(inspector().state, same(edited));
       expect(checkpoint.file.readAsStringSync(), previousCheckpoint);
+      final feedback = tester.getRect(find.byType(MaterialBanner));
+      expect(
+        feedback.overlaps(tester.getRect(find.byType(TimeSlider))),
+        isFalse,
+      );
+      expect(
+        feedback.overlaps(tester.getRect(find.byType(CameraInspector))),
+        isFalse,
+      );
+      await tester.tap(find.byTooltip('Later by one hour'));
+      await tester.pumpAndSettle();
+      final composed = inspector().state;
+      expect(
+        composed.timestamp,
+        edited.timestamp.add(const Duration(hours: 1)),
+      );
+      expect(composed.location, edited.location);
+      expect(composed.focalLength, edited.focalLength);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(checkpoint.file.readAsStringSync(), previousCheckpoint);
       await capture('linux-session-error-feedback');
       blocked.deleteSync();
       await tester.tap(find.text('Retry'));
@@ -179,9 +200,9 @@ void main() {
           'Session',
           AppSession.decode(checkpoint.file.readAsStringSync()).state,
         ).encode(),
-        SavedPlan('Session', edited).encode(),
+        SavedPlan('Session', composed).encode(),
       );
-      expect(inspector().state, same(edited));
+      expect(inspector().state, same(composed));
       expect((await store.loadAll()).plans.length, 2);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();

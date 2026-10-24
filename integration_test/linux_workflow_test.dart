@@ -19,6 +19,7 @@ import 'package:photosim/core/night_sky.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/workspace_feedback.dart';
 import 'package:photosim/render/moon.dart';
 
 Future<double> viewportBrightness(WidgetTester tester, GlobalKey key) async {
@@ -271,6 +272,7 @@ void main() {
     await tester.tap(find.text('Rendering'));
     await tester.pump(const Duration(milliseconds: 400));
     await tester.ensureVisible(find.text('Approximate relighting'));
+    await tester.pump();
     await tester.tap(find.text('Approximate relighting'));
     await tester.pump();
     await tester.scrollUntilVisible(
@@ -304,7 +306,7 @@ void main() {
     // this tap; dismiss it so the time controls are hittable.
     tester
         .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).first)
-        .removeCurrentSnackBar();
+        .removeWorkspaceFeedback();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byTooltip('Later by one hour'));
     await tester.pump(const Duration(seconds: 1));
