@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/app/app.dart';
+import 'package:photosim/data/app_session.dart';
 import 'package:photosim/data/raster_cache.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/ui/camera_inspector.dart';
@@ -20,6 +21,7 @@ void main() {
       'photosim-planning-ui-',
     );
     final store = PlanRepository(Directory('${directory.path}/plans'));
+    final checkpoint = SessionStore(File('${directory.path}/session.json'));
     final captureKey = GlobalKey();
     Future<void> capture(String name) async {
       final boundary =
@@ -39,6 +41,7 @@ void main() {
           key: captureKey,
           child: PhotoSimApp(
             plans: store,
+            sessionStore: checkpoint,
             rasterCache: RasterCache(Directory('${directory.path}/cache')),
           ),
         ),
@@ -144,6 +147,42 @@ void main() {
         }
         expect((await store.loadAll()).plans.length, 2);
       }
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      final previousCheckpoint = checkpoint.file.readAsStringSync();
+      final blocked = Directory('${checkpoint.file.path}.tmp')..createSync();
+      final beforeCheckpointFailure = inspector().state;
+      final edited = beforeCheckpointFailure.copyWith(
+        latitude: beforeCheckpointFailure.latitude + 0.001,
+        focalLength: 135,
+      );
+      inspector().onChanged(edited);
+      await tester.pump();
+      expect(find.text('Camera moved'), findsOneWidget);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Camera moved'), findsNothing);
+      expect(
+        find.textContaining('Session could not be saved. Check storage'),
+        findsOneWidget,
+      );
+      expect(inspector().state, same(edited));
+      expect(checkpoint.file.readAsStringSync(), previousCheckpoint);
+      await capture('linux-session-error-feedback');
+      blocked.deleteSync();
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Session recovery warning'), findsNothing);
+      expect(
+        SavedPlan(
+          'Session',
+          AppSession.decode(checkpoint.file.readAsStringSync()).state,
+        ).encode(),
+        SavedPlan('Session', edited).encode(),
+      );
+      expect(inspector().state, same(edited));
+      expect((await store.loadAll()).plans.length, 2);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

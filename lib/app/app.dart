@@ -198,12 +198,14 @@ class _WorkspaceShellState extends State<WorkspaceShell>
         super.setState(() => sessionWarning = warning);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(warning),
-              action: SnackBarAction(label: 'Retry', onPressed: saveSession),
-            ),
-          );
+          ScaffoldMessenger.of(context)
+            ..removeCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: const Text(warning),
+                action: SnackBarAction(label: 'Retry', onPressed: saveSession),
+              ),
+            );
         });
       }
       return false;

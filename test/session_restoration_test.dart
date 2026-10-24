@@ -185,6 +185,68 @@ void main() {
     },
   );
 
+  for (final size in [const Size(390, 844), const Size(1600, 960)]) {
+    testWidgets('checkpoint errors preempt camera undo and retry at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final store = SessionStore(File('${support.path}/session.json'));
+      final original = sessionFixture(workspace: 'map', inspectorVisible: true);
+      store.save(original.encode());
+      await tester.pumpWidget(
+        PhotoSimApp(
+          sessionStore: store,
+          initialSession: original,
+          rasterCache: RasterCache(Directory('${support.path}/cache')),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      final checkpoint = store.file.readAsStringSync();
+      final blocked = Directory('${store.file.path}.tmp')..createSync();
+      MapWorkspace map() =>
+          tester.widget<MapWorkspace>(find.byType(MapWorkspace));
+      final before = map().state;
+      final moved = before.copyWith(
+        latitude: before.latitude + 0.001,
+        focalLength: 135,
+      );
+      map().onChanged(moved);
+      map().onMoveCompleted!(before);
+      await tester.pump();
+      expect(find.text('Camera moved'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Session could not be saved. Check storage'),
+        findsOneWidget,
+      );
+      expect(find.text('Camera moved'), findsNothing);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.byTooltip('Session recovery warning'), findsOneWidget);
+      expect(map().state, same(moved));
+      expect(store.file.readAsStringSync(), checkpoint);
+      blocked.deleteSync();
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Session recovery warning'), findsNothing);
+      final saved = AppSession.decode(store.file.readAsStringSync());
+      expect(
+        SavedPlan('Session', saved.state).encode(),
+        SavedPlan('Session', moved).encode(),
+      );
+      expect(saved.cleanComposition, original.cleanComposition);
+      expect(map().state, same(moved));
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'backgrounding flushes without waiting for autosave and save errors stay visible',
     (tester) async {
