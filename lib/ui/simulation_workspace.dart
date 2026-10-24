@@ -79,6 +79,16 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   int? exportWidth, exportHeight;
   String? exportError;
   final prompt = TextEditingController();
+  Timer? renderActivity;
+  final renderActive = ValueNotifier(true);
+
+  void wakeRenderer() {
+    renderActive.value = true;
+    renderActivity?.cancel();
+    renderActivity = Timer(const Duration(seconds: 1), () {
+      renderActive.value = false;
+    });
+  }
 
   /// The saved photograph is rendered again at this multiple of the device pixel
   /// ratio, so it carries real geometry and shading at every output pixel
@@ -128,6 +138,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   @override
   void initState() {
     super.initState();
+    wakeRenderer();
     ownsClient = widget.httpClient == null;
     client = widget.httpClient ?? http.Client();
     unawaited(initialize());
@@ -265,6 +276,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   void didUpdateWidget(covariant SimulationWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
     final old = oldWidget.state, next = widget.state;
+    if (!identical(old, next) ||
+        oldWidget.cleanPreview != widget.cleanPreview ||
+        oldWidget.exportMode != widget.exportMode) {
+      wakeRenderer();
+    }
     if ((!old.showConstellations && next.showConstellations) ||
         (oldWidget.cleanPreview && !widget.cleanPreview)) {
       unawaited(loadConstellations());
@@ -854,6 +870,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   @override
   void dispose() {
     prompt.dispose();
+    renderActivity?.cancel();
+    renderActive.dispose();
     coverageDebounce?.cancel();
     generation++;
     if (cancellation != null && !cancellation!.isCompleted) {
@@ -1167,20 +1185,34 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                     // Scene's +Z-forward camera reverses east/west in our ENU axes.
                                     child: Transform.flip(
                                       flipX: true,
-                                      child: scene.SceneView(
-                                        active,
-                                        onTick: (_, _) => updateCameraLight(),
-                                        camera: scene.PerspectiveCamera(
-                                          position: eye,
-                                          target: eye + direction,
-                                          up: cameraUp,
-                                          fovRadiansY: previewVerticalFov(
-                                            state,
-                                            constraints.biggest,
-                                          ),
-                                          fovNear: 0.5,
-                                          fovFar: previewFarDistanceMeters,
-                                        ),
+                                      child: ValueListenableBuilder<bool>(
+                                        valueListenable: renderActive,
+                                        builder: (context, activeRefresh, _) =>
+                                            scene.SceneView(
+                                              active,
+                                              // Keep edits/loading/export responsive; static scenes need no vsync-rate redraw.
+                                              maxFrameRate:
+                                                  loading ||
+                                                      imageryLoading ||
+                                                      exporting ||
+                                                      activeRefresh
+                                                  ? null
+                                                  : 5,
+                                              onTick: (_, _) =>
+                                                  updateCameraLight(),
+                                              camera: scene.PerspectiveCamera(
+                                                position: eye,
+                                                target: eye + direction,
+                                                up: cameraUp,
+                                                fovRadiansY: previewVerticalFov(
+                                                  state,
+                                                  constraints.biggest,
+                                                ),
+                                                fovNear: 0.5,
+                                                fovFar:
+                                                    previewFarDistanceMeters,
+                                              ),
+                                            ),
                                       ),
                                     ),
                                   ),
