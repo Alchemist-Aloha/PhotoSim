@@ -15,6 +15,8 @@ import 'package:photosim/render/atmosphere_sky.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
+import 'workspace_navigation.dart';
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
@@ -128,14 +130,14 @@ void main() {
         );
         final hazed = await pixels('haze');
         world.fog.enabled = false;
-        await tester.pump(const Duration(milliseconds: 100));
+        await pumpUntilRendered(tester, world);
         final unhazed = await pixels('no-haze');
         expect(hazed, isNot(orderedEquals(unhazed)));
         world.directionalLight!.intensity = 0;
-        await tester.pump(const Duration(milliseconds: 100));
+        await pumpUntilRendered(tester, world);
         final skyLit = await pixels('sky-lit');
         world.environmentIntensity = 0;
-        await tester.pump(const Duration(milliseconds: 100));
+        await pumpUntilRendered(tester, world);
         expect(await pixels('no-sky-light'), isNot(orderedEquals(skyLit)));
         world.environmentIntensity = 1;
 
@@ -152,12 +154,12 @@ void main() {
           ),
         )..position = camera.position + forward * 20;
         world.add(probe);
-        await tester.pump(const Duration(milliseconds: 100));
+        await pumpUntilRendered(tester, world);
         final beforeFog = img.decodePng(await pixels())!;
         world.fog
           ..enabled = true
           ..density = 1;
-        await tester.pump(const Duration(milliseconds: 100));
+        await pumpUntilRendered(tester, world);
         final afterFog = img.decodePng(await pixels())!;
         final viewRect = tester.getRect(find.byType(scene.SceneView));
         final origin = tester.getTopLeft(find.byKey(capture));
@@ -357,7 +359,7 @@ void main() {
         expect(world.ambientOcclusion.bentNormals, isTrue);
         final shadowed = await pixels('high-terrain-shadows');
         world.ambientOcclusion.enabled = false;
-        await tester.pump(const Duration(milliseconds: 100));
+        await pumpUntilRendered(tester, world);
         expect(
           await pixels('high-terrain-no-ao'),
           isNot(orderedEquals(shadowed)),
@@ -366,7 +368,7 @@ void main() {
         world.directionalLight!
           ..castsShadow = false
           ..contactShadows = false;
-        await tester.pump(const Duration(milliseconds: 100));
+        await pumpUntilRendered(tester, world);
         expect(
           await pixels('high-terrain-no-shadows'),
           isNot(orderedEquals(shadowed)),
