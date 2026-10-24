@@ -36,6 +36,48 @@ relative deltas as the signal and absolutes as pessimistic.
 
 ---
 
+## 2026-10-24 — requested export workspace
+
+### `11cb0c6` fix: give image exports a dedicated review workspace
+
+The user's requested export review/AI-context workflow took priority over the
+hardening backlog for this iteration. The old save shortcut offered no dedicated
+review surface and no reusable capture metadata for an external image model.
+
+Added the Export bar/rail destination, session destination validation, a PNG
+preview using the exact buffer passed to the existing native saver, and an
+editable/copyable enhancement prompt. The prompt includes the complete captured
+composition, coordinates, UTC and estimated local time, elevations (explicitly
+unknown where unavailable), camera/optics/exposure, weather, Sun/Moon/galactic
+center positions, render settings, output size and source credits. Privacy and
+simulation/forecast/AI limitations are visible; nothing calls an AI service.
+
+Files: `lib/app/app.dart`, `lib/data/app_session.dart`,
+`lib/data/enhancement_prompt.dart`, `lib/ui/export_panel.dart`,
+`lib/ui/simulation_workspace.dart`, related unit/widget/integration tests and
+`README.md`. Existing quick export, quality presets, credit stamp and
+no-overwrite saver remain in use. Drafts survive 3D/Export switching, not
+Map/Calendar/restart; re-rendering explicitly resets the prompt.
+
+Verification: analyzer 0 issues; format clean; **252 tests pass**. Both
+`integration_test/export_workspace_test.dart` and
+`integration_test/linux_spec_photography_test.dart` pass on the real Linux GPU
+when invoked separately. The new test proves saved bytes equal preview bytes,
+output exceeds screen size (fixture capture: **2266×1511** after crop from a
+**2518×2042** 2× render), editable clipboard output, stale capture handling and
+re-rendering. The hidden scene's frame counter stays unchanged across ten
+30 ms pumps after capture (not a wall-clock frame-rate benchmark).
+
+Inspected `build/validation/linux-export-workspace.png` (real geographic imagery,
+portrait/roll capture); fixture screenshot `linux-export-tab.png` is deliberately
+synthetic. Compact/expanded layouts and 1.3 text scaling are widget-tested.
+No Android device/emulator was connected, so fresh native Android screenshots
+and MediaStore validation were unavailable. The combined two-file integration
+invocation failed to attach to its second app; rerunning that test alone passed.
+No performance claim beyond the tested hidden-render stop is made.
+
+---
+
 ## 2026-10-24 — hardening loop
 
 ### `1e7e640` test: wait for a real render before capturing GPU pixels
