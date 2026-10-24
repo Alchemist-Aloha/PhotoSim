@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 264 tests
+flutter test                                       # currently 265 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,50 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — plan-error snackbar priority
+
+### `e704570` fix: surface plan errors ahead of camera undo feedback
+
+The shared plan save/open error handler called `showSnackBar` without removing
+an active snackbar. After a camera move, actionable storage failures waited
+behind the **ten-second** “Camera moved” / Undo prompt. The user could see no
+failure acknowledgement while trying to save or open a plan.
+
+Files: `lib/app/app.dart`, `test/plan_switching_test.dart`,
+`integration_test/linux_planning_ui_test.dart`. Reused the existing save-success
+pattern: remove the current snackbar, then display the unchanged actionable
+plan-error message. One change to the common handler covers save and open
+failures. This intentionally replaces the transient Undo prompt; no composition,
+save format, message copy, style, dependency or notification framework changes.
+
+Strengthened the failed-save regression to start with a real camera move, and
+covered load-error preemption at 390×844 and 1600×960 with 1.3 text scaling.
+All three cases failed before the fix (Undo still visible / error absent), and
+now pass immediately after settling animations, without advancing through the
+undo duration. Tests preserve the same immutable dirty composition and confirm
+retry still works. Native Linux planning also changes real plan-directory
+permissions to `000`, verifies the error replaces Undo and leaves the camera
+state untouched, restores access in `finally`, and reopens the two saved plans.
+The native permission phase ran, not skipped, and produced the inspected
+`build/validation/linux-plan-error-feedback.png`.
+
+Verified: analyzer 0 issues; format clean; **265 unit/widget tests pass**;
+`linux_planning_ui_test` passes on the native Linux device with a 180-second
+bound. Normal persisted-plan output still fingerprints identically:
+**4 plans / 2 unreadable / 3868 JSON bytes / 4680595913886116**; see
+`build/validation/plan-feedback-{unit,native,valid}.log` and the existing
+`plan_listing_fingerprint_test.dart` probe. Notification timing intentionally
+changes; no pixel-identical UI claim is made.
+
+The call-site scan found remaining queueing candidates in session warnings,
+fullscreen failure and constellation-load failure. The native screenshot also
+confirms that the fixed snackbar obscures the lowest timeline controls, even
+on the desktop capture. **That layout issue is not fixed here and is the next
+iteration's target.** This is not a completed messenger/compact-layout audit;
+Android hardware feedback/layout remains unverified.
 
 ---
 
