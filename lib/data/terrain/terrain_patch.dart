@@ -283,36 +283,55 @@ TerrainPatch buildTerrainPatch(
     for (final u in us) {
       // shortcut: source vertical datum is uncorrected, add geoid conversion before precise horizon astronomy.
       final point = frame.project(id.point(u, v), field.sample(u, v));
-      positions.addAll([point.x, point.y, point.z]);
-      uvs.addAll([u, v]);
+      positions
+        ..add(point.x)
+        ..add(point.y)
+        ..add(point.z);
+      uvs
+        ..add(u)
+        ..add(v);
     }
   }
   for (var y = 0; y < vs.length - 1; y++) {
     for (var x = 0; x < us.length - 1; x++) {
       final a = y * us.length + x, b = a + 1, c = a + us.length;
-      indices.addAll([a, c, b, b, c, c + 1]);
+      indices
+        ..add(a)
+        ..add(c)
+        ..add(b)
+        ..add(b)
+        ..add(c)
+        ..add(c + 1);
     }
   }
   final normals = List<double>.filled(positions.length, 0, growable: true);
+  // The accumulate loop runs once per triangle (132k at r256). Building a closure and
+  // fresh Vector3s inside it churned ~7 objects per triangle; Vector3.cross also
+  // allocates. These are the same expressions in the same order as Vector3.cross.
   for (var i = 0; i < indices.length; i += 3) {
-    Vector3 vertex(int index) => Vector3(
-      positions[index * 3],
-      positions[index * 3 + 1],
-      positions[index * 3 + 2],
-    );
-    final normal = (vertex(indices[i + 1]) - vertex(indices[i])).cross(
-      vertex(indices[i + 2]) - vertex(indices[i]),
-    );
+    final i0 = indices[i] * 3,
+        i1 = indices[i + 1] * 3,
+        i2 = indices[i + 2] * 3;
+    final ax = positions[i1] - positions[i0];
+    final ay = positions[i1 + 1] - positions[i0 + 1];
+    final az = positions[i1 + 2] - positions[i0 + 2];
+    final bx = positions[i2] - positions[i0];
+    final by = positions[i2 + 1] - positions[i0 + 1];
+    final bz = positions[i2 + 2] - positions[i0 + 2];
+    final nx = ay * bz - az * by;
+    final ny = az * bx - ax * bz;
+    final nz = ax * by - ay * bx;
     for (var k = 0; k < 3; k++) {
       final index = indices[i + k] * 3;
-      normals[index] += normal.x;
-      normals[index + 1] += normal.y;
-      normals[index + 2] += normal.z;
+      normals[index] += nx;
+      normals[index + 1] += ny;
+      normals[index + 2] += nz;
     }
   }
+  final normal = Vector3.zero();
   for (var i = 0; i < normals.length; i += 3) {
-    final normal = Vector3(normals[i], normals[i + 1], normals[i + 2])
-      ..normalize();
+    normal.setValues(normals[i], normals[i + 1], normals[i + 2]);
+    normal.normalize();
     normals[i] = normal.x;
     normals[i + 1] = normal.y;
     normals[i + 2] = normal.z;
@@ -327,18 +346,34 @@ TerrainPatch buildTerrainPatch(
   final low = <int>[];
   for (final index in perimeter) {
     low.add(positions.length ~/ 3);
-    positions.addAll([
-      positions[index * 3],
-      positions[index * 3 + 1] - 150,
-      positions[index * 3 + 2],
-    ]);
-    normals.addAll(normals.sublist(index * 3, index * 3 + 3));
-    uvs.addAll(uvs.sublist(index * 2, index * 2 + 2));
+    positions
+      ..add(positions[index * 3])
+      ..add(positions[index * 3 + 1] - 150)
+      ..add(positions[index * 3 + 2]);
+    normals
+      ..add(normals[index * 3])
+      ..add(normals[index * 3 + 1])
+      ..add(normals[index * 3 + 2]);
+    uvs
+      ..add(uvs[index * 2])
+      ..add(uvs[index * 2 + 1]);
   }
   for (var i = 0; i < perimeter.length; i++) {
     final next = (i + 1) % perimeter.length;
     final a = perimeter[i], b = perimeter[next], c = low[i], d = low[next];
-    indices.addAll([a, b, c, b, d, c, a, c, b, b, c, d]);
+    indices
+      ..add(a)
+      ..add(b)
+      ..add(c)
+      ..add(b)
+      ..add(d)
+      ..add(c)
+      ..add(a)
+      ..add(c)
+      ..add(b)
+      ..add(b)
+      ..add(c)
+      ..add(d);
   }
   return TerrainPatch(
     id: id,
