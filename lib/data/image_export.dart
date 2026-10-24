@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -23,6 +24,9 @@ Future<Uint8List> encodePreview(
     throw ArgumentError('Invalid photo crop');
   }
   final width = source.width.round(), heightPixels = source.height.round();
+  // Keep the attribution legible when the photo is rendered above screen
+  // density; a fixed 11 px line shrinks relative to the image as it grows.
+  final scale = math.max(1.0, width / 1000);
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder)
     ..drawImageRect(
@@ -34,16 +38,16 @@ Future<Uint8List> encodePreview(
   final text = TextPainter(
     text: TextSpan(
       text: credits,
-      style: const TextStyle(color: Colors.white, fontSize: 11),
+      style: TextStyle(color: Colors.white, fontSize: 11 * scale),
     ),
     textDirection: TextDirection.ltr,
-  )..layout(maxWidth: (width - 16.0).clamp(0, double.infinity));
-  final height = text.height + 12;
+  )..layout(maxWidth: (width - 16.0 * scale).clamp(0, double.infinity));
+  final height = text.height + 12 * scale;
   canvas.drawRect(
     Rect.fromLTWH(0, heightPixels - height, width.toDouble(), height),
     Paint()..color = const Color(0xBB000000),
   );
-  text.paint(canvas, Offset(8, heightPixels - height + 6));
+  text.paint(canvas, Offset(8 * scale, heightPixels - height + 6 * scale));
   text.dispose();
   final picture = recorder.endRecording();
   final stamped = await picture.toImage(width, heightPixels);

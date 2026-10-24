@@ -69,6 +69,13 @@ class SimulationWorkspace extends StatefulWidget {
 class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   final photoKey = GlobalKey();
   bool exporting = false;
+
+  /// The saved photograph is rendered again at this multiple of the device pixel
+  /// ratio, so it carries real geometry and shading at every output pixel
+  /// instead of an upscaled screen copy.
+  static const exportOversample = 2.0;
+  static const maxExportPixels = 20000000;
+  static const maxExportSide = 6144;
   scene.Scene? world;
   CloudRenderer? cloudRenderer;
   TerrainSources? repository;
@@ -655,6 +662,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     widget.onPausePlayback?.call();
     setState(() => exporting = true);
     try {
+      // First frame applies the export render scale, second renders the scene
+      // into the larger target; capturing before that would upscale the screen copy.
+      await WidgetsBinding.instance.endOfFrame;
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
       final snapshot = widget.state;
@@ -667,12 +677,20 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       if (region.shortestSide < 32) {
         throw StateError('Photo region is too small to export');
       }
-      final ratio = math.min(
-        MediaQuery.devicePixelRatioOf(context),
-        math.min(
-          4096 / boundary.size.longestSide,
-          math.sqrt(12000000 / (boundary.size.width * boundary.size.height)),
+      final limit = math.min(
+        maxExportSide / boundary.size.longestSide,
+        math.sqrt(
+          maxExportPixels / (boundary.size.width * boundary.size.height),
         ),
+      );
+      final ratio = math.min(
+        MediaQuery.devicePixelRatioOf(context) * exportOversample,
+        limit,
+      );
+      debugPrint(
+        'PhotoSim export: ${(boundary.size.width * ratio).round()}x'
+        '${(boundary.size.height * ratio).round()} '
+        '@${ratio.toStringAsFixed(2)}x (render scale $exportOversample)',
       );
       final image = await boundary.toImage(pixelRatio: ratio);
       late final Uint8List bytes;
@@ -731,7 +749,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'Exports the framed photo region with weather, depth of field and source credits; no frame, lens label, crosshair or controls. Maximum 4096 px / 12 MP. Existing files are never overwritten.',
+                    'Exports the framed photo region with weather, depth of field and source credits; no frame, lens label, crosshair or controls. Rendered again at twice the screen pixel density for the saved file. Maximum 6144 px / 20 MP. Existing files are never overwritten.',
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -924,6 +942,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final sky = state.sky;
     // shortcut: Auto meters the whole context canvas; add backend ROI metering for photo-only Auto.
     configurePhotography(active, state, sky: sky);
+    // An export re-renders the frame above the device pixel ratio before it is
+    // captured; configurePhotography has just reset renderScale to the on-screen
+    // tier, so raise it again for the exported frame only.
+    if (exporting) {
+      active.renderScale = math.max(active.renderScale, exportOversample);
+    }
     final sun = sky.sun;
     // Mean J2000 lunar pole; the texture's near side stays Earth-facing without libration.
     final lunarPole = state.observerFrame.direction(

@@ -183,7 +183,10 @@ void main() {
       same(world),
     );
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pump(const Duration(seconds: 1));
+    // Exiting the clean preview is frame-driven; wait for it rather than assume one second is enough.
+    for (var i = 0; i < 40 && find.byType(AppBar).evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
     expect(find.byType(AppBar), findsOneWidget);
     expect(state().roll, beforeFullscreen.roll);
     expect(state().portrait, isTrue);
@@ -216,6 +219,13 @@ void main() {
     final bytes = await File(path).readAsBytes();
     final image = img.decodePng(bytes)!;
     expect(image.width / image.height, closeTo(2 / 3, 0.005));
+    // The saved file is rendered above screen density rather than upscaled from
+    // the preview, so it must carry more pixels than the on-screen photo region.
+    final saved = photoRegion(
+      tester.getSize(find.byType(scene.SceneView)),
+      state().sensorWidth / state().sensorHeight,
+    );
+    expect(image.height, greaterThan(saved.height));
     await Directory('build/validation').create(recursive: true);
     await File('build/validation/linux-portrait-exposure-export.png')
         .writeAsBytes(bytes);

@@ -222,6 +222,12 @@ void main() {
           .widget<Slider>(find.byKey(const ValueKey('Visibility')))
           .onChanged!(100);
       await tester.pump(const Duration(milliseconds: 400));
+      // 100 km is still below clear-air visibility, so haze stays on.
+      expect(world.fog.enabled, isTrue);
+      tester
+          .widget<Slider>(find.byKey(const ValueKey('Visibility')))
+          .onChanged!(Weather.clear.visibilityKm);
+      await tester.pump(const Duration(milliseconds: 400));
       expect(world.fog.enabled, isFalse);
       await toggleSection('Weather');
       await toggleSection('Rendering');
@@ -232,10 +238,11 @@ void main() {
             )
             .onChanged!(quality);
         await tester.pump(const Duration(seconds: 1));
-        expect(
-          world.renderScale,
-          quality == RenderQuality.performance ? 0.7 : 1,
-        );
+        expect(world.renderScale, switch (quality) {
+          RenderQuality.performance => 0.7,
+          RenderQuality.balanced => 1.0,
+          RenderQuality.high => 1.25,
+        });
         expect(
           world.directionalLight!.shadowMapResolution,
           quality == RenderQuality.performance
@@ -363,8 +370,14 @@ void main() {
       final size = tester.getSize(find.byType(scene.SceneView));
       expect(exported.width / exported.height, closeTo(1.5, 0.01));
       final region = photoRegion(size, state.sensorWidth / state.sensorHeight);
-      expect(exported.width, closeTo(region.width, 1));
-      expect(exported.height, closeTo(region.height, 1));
+      // The saved file is the framed region at export density, so assert a
+      // uniform scale above screen size rather than one output pixel per
+      // screen pixel.
+      expect(
+        exported.width / region.width,
+        closeTo(exported.height / region.height, 0.01),
+      );
+      expect(exported.width, greaterThanOrEqualTo(region.width));
       await File('build/validation/linux-export.png')
           .writeAsBytes(await File(path).readAsBytes());
       expect(tester.takeException(), isNull);
