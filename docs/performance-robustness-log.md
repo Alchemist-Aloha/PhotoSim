@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 267 tests
+flutter test                                       # currently 280 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,76 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — layout-occupying workspace feedback
+
+### `a7a6839` fix: reserve workspace space for feedback
+
+Fixed snackbars covered timeline controls; the rejected footer-only prototype
+moved that obstruction onto the inspector. Replaced the presentation, not the
+messages, with native zero-elevation MaterialBanners. Scaffold now allocates
+space above the body instead of overlaying controls. Existing queue/preemption
+calls route through one shared adapter; content, actions, persistence and visible
+durations remain specified by the existing SnackBar values. Close uses the native
+localized affordance and banners provide native live-region/dismiss semantics.
+Expiry starts when visible, cancels on replacement/disposal, and uses no
+workspace-wide timer rebuild. Long selectable paths/errors scroll within one
+third of the window; short expanded timelines scroll while keeping canvas space.
+Pane scrollers do not steal the page's primary scroll controller. NavigationRail
+uses its native scrolling support when reduced height cannot fit destinations.
+
+Files: `lib/ui/workspace_feedback.dart`, `lib/app/app.dart`,
+`lib/ui/{simulation_workspace,export_panel}.dart`,
+`test/{feedback_layout,workspace_feedback}_test.dart`, and
+`integration_test/{linux_planning_ui,linux_workflow}_test.dart`.
+All production snackbar call sites were migrated; no pixel offsets, dependency,
+custom notification queue, persistence schema or renderer-quality changes.
+
+The original five compact/desktop overlap cases failed before editing. Seven
+passing cases cover collapsed/expanded timelines, safe-area insets, 1.3 scaling,
+and 2.0 scaling on landscape/desktop. They click the local-day slider and playback
+while feedback stays visible, check inspector/navigation separation, and retain
+location/optics. Viewport height intentionally adapts; pixel-identical UI is not
+claimed. Six lifecycle cases cover visible-duration expiry, native persistence
+with/without accessible navigation, action callbacks, queue/preemption, timer
+disposal, dismissal and long selectable content.
+
+**SDK contract correction:** this Flutter's SnackBar defaults `persist` to true
+when it has an action. Thus the configured ten-second Undo was already persistent,
+not guaranteed to expire after ten seconds as older entries assumed. The adapter
+preserves that actual native behavior, including persistent Retry, rather than
+quietly shortening acknowledgement time or hiding notifications to pass tests.
+
+Native planning injects a real blocked checkpoint staging path, verifies separate
+banner/inspector/timeline bounds, clicks “Later by one hour” during the error,
+preserves location/optics and old checkpoint bytes, then retries the exact edited
+composition. Inspected `build/validation/linux-session-error-feedback.png`:
+message, Retry, inspector, attribution and timeline controls are unobscured.
+
+The GPU workflow initially hit a clipped relighting control after `ensureVisible`.
+Checked exact HEAD~ application/test sources first: baseline passed. With allocated
+banner space, the scroll jump needs a rendered frame before hit-testing. Added
+only `pump()` after `ensureVisible`, not a timed wait, dismissal or weaker material
+assertion. The same physically-based-material check and entire workflow now pass.
+
+Verified: analyzer 0 issues; format clean; **280 tests pass**. Every integration
+file ran separately with a 180-second bound on Linux: **23 successful invocations /
+20 executed / 3 expected platform skips**. After final pane-controller isolation,
+planning and WASD passed again. Session round-trip fingerprint matches exactly:
+**8 sessions / 15850 JSON bytes / 7707460953092100**. Evidence: ignored
+`build/validation/feedback-{layout-before,space-*}.log`,
+`feedback-space-integration-summary.txt`, and retained session fingerprint probe.
+No performance or physical Android/Windows validation claim.
+
+**Next distinct defect:** a 390px phone at 200% scaling overflows the unchanged
+TimeSlider row even before feedback is shown. Isolated it without any feedback
+adapter in `build/validation/time_slider_200_percent_probe_test.dart`; that
+expected-failing probe and `time-slider-200-percent-before.log` are ignored/local,
+not part of the passing suite. Address its label/track width next; do not mark
+all large-text/mobile layouts audited. Remaining message-priority candidates
+(startup/manual warnings, fullscreen and constellation failure) are still open.
 
 ---
 
