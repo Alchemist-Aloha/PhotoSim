@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # 247 tests
+flutter test                                       # currently 252 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,61 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — idle renderer cap
+
+### `391aa7e` perf: cap idle scene rendering at five frames per second
+
+`SimulationWorkspace` rendered a static frame at every display refresh. Added a
+one-second activity window after composition/fullscreen/workspace changes;
+`SceneView.maxFrameRate` is 5 outside that window, and null during loading,
+imagery loading and export. Repeated edits/playback keep the renderer uncapped.
+Only a local `ValueListenableBuilder` rebuilds when the activity window ends;
+photography configuration and imperative scene overrides remain untouched.
+The activity timer and notifier are disposed with the workspace.
+
+Files: `lib/ui/simulation_workspace.dart`,
+`integration_test/idle_render_test.dart`.
+
+Measured with real engine vsync (`fullyLive` binding), deterministic offline
+terrain/imagery fixtures, a fixed UTC composition and the Linux NVIDIA GPU in a
+debug build. For each quality tier: wait two wall-clock seconds, then divide the
+actual `renderStats.frameCount` delta by elapsed time over two seconds; separately
+measure camera edits for two seconds. Baseline was captured before the production
+change using `--dart-define=IDLE_CAP_BASELINE=true`; that test flag changes only
+assertions/output filenames, not application behavior.
+
+| Tier | Before idle fps | After idle fps | After active edits fps |
+|---|---:|---:|---:|
+| Balanced | 59.45 | 5.00 | 58.60 |
+| High | 58.94 | 4.99 | 59.73 |
+
+This is roughly **12× fewer idle scene renders**, not a measured power or GPU-time
+claim. Baseline active rates were 50.49/55.96 fps in the earlier run; active rates
+vary with test driving and system load, so no interaction speedup is claimed.
+The renderer has no configured cap during edits. Returning the camera to its
+original pose reproduces the same image after settling back to idle.
+
+Fingerprint proof: running hash over every rendered raw RGBA byte before/after
+matches exactly at both tiers: Balanced **5612850919298858**, High
+**8863014974402700**. The final test rerun reproduced both hashes. Captures include
+the same native window size and fixed fixture state; no quality settings changed.
+Artifacts: `build/validation/idle-render-{before,after}.json`,
+`idle-cap-final-idle_render_test.log`, `idle-cap-final-summary.txt`.
+
+Verification: analyzer 0 issues; format clean; **252 unit/widget tests pass**.
+All **23 integration-file invocations** succeeded individually on `-d linux`:
+20 executed, while Android workflow and the two Windows files platform-skipped.
+This includes atmosphere, camera light, clouds, imagery, terrain, Moon/Milky Way,
+loading/startup, navigation, quick export, Export workspace and profile harness.
+An initial sequential run stalled attaching to startup; it was terminated, and
+startup plus the full final suite passed with a per-file 180-second bound.
+No Android hardware/frame-rate or power measurement was performed.
+
+The rejected whole-workspace timer variant and its baseline checks are recorded
+below so it is not reintroduced.
 
 ---
 
@@ -257,7 +312,14 @@ thousands of files. Named `static final` patterns now compile once per isolate.
 Recorded so the same ground is not re-covered. Each was measured; each was
 rejected for a stated reason.
 
-### Idle rendering: ~60 fps of identical frames
+### Idle rendering: initial rejection, resolved by `391aa7e`
+
+The historical rejection below is now resolved: frame-aware atmosphere captures,
+an uncapped activity window, local renderer-only cadence updates and the full
+Linux integration suite passed. The shipped cap is 5 fps; see the measurements
+above. Keep the history as the reason not to reintroduce naïve gating.
+
+#### Original observation: ~60 fps of identical frames
 
 `SceneView` is built with no `maxFrameRate` and default `autoTick: true`, so it
 repaints every vsync frame. Measured with `Scene.renderStats.frameCount` deltas
@@ -275,6 +337,17 @@ snapshot GPU pixels after a single `pump(100 ms)`, so they go red.
 Correct sequence if this is revisited: first add a "pump until a new frame
 lands" helper to those tests, then enable the cap. ~12× idle GPU reduction is
 available and pixel-identical.
+
+### Whole-workspace idle timer rebuild (rejected while implementing `391aa7e`)
+
+Calling `setState` on `SimulationWorkspace` when the idle timeout expired caused
+`configurePhotography` and `NightSkyRenderer.update` to run again. That silently
+restored explicit test scene overrides (AO/shadows and hidden stars), breaking
+`atmosphere_test` and `linux_workflow_test`. Both tests were rerun with the exact
+pre-cap source from HEAD/HEAD~ and passed, proving the regression belonged to the
+candidate. Replaced the parent rebuild with a notifier scoped to `SceneView`;
+both tests and the entire integration suite then passed. Do not move the cadence
+notification back into the workspace's `setState`.
 
 ### Shadow pass is re-rendered from scratch every frame
 
