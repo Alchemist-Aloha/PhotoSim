@@ -97,13 +97,15 @@ class TileCache {
     return _writes = _writes.then((_) => persist());
   }
 
+  // Hoisted: Dart re-compiles a RegExp literal at every evaluation.
+  static final _rasterName = RegExp(r'^\d+-\d+-\d+\.png$');
+
   Future<void> _evict() async {
     final files = <({File file, FileStat stat, int bytes})>[];
     var total = 0;
     await for (final entry in directory.list(followLinks: false)) {
       if (entry is! File ||
-          !RegExp(r'^\d+-\d+-\d+\.png$')
-              .hasMatch(entry.uri.pathSegments.last)) {
+          !_rasterName.hasMatch(entry.uri.pathSegments.last)) {
         continue;
       }
       final stat = await entry.stat();

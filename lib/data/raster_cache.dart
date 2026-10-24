@@ -26,6 +26,11 @@ class RasterCache {
   static String _key(File file) =>
       file.absolute.uri.normalizePath().toFilePath();
 
+  // Hoisted: Dart re-compiles a RegExp literal at every evaluation.
+  static final _stagingName = RegExp(r'^\d+-\d+-\d+\.png(?:\.json)?\.tmp$');
+  static final _orphanMetadata = RegExp(r'^\d+-\d+-\d+\.png\.json$');
+  static final _rasterName = RegExp(r'^\d+-\d+-\d+\.png$');
+
   Iterable<Directory> get _directories sync* {
     for (final provider in TerrainProvider.values) {
       yield Directory('${directory.path}/${provider.cacheKey}');
@@ -163,14 +168,14 @@ class RasterCache {
       await for (final entry in folder.list(followLinks: false)) {
         if (entry is! File) continue;
         final name = entry.uri.pathSegments.last;
-        if (RegExp(r'^\d+-\d+-\d+\.png(?:\.json)?\.tmp$').hasMatch(name) ||
-            (RegExp(r'^\d+-\d+-\d+\.png\.json$').hasMatch(name) &&
+        if (_stagingName.hasMatch(name) ||
+            (_orphanMetadata.hasMatch(name) &&
                 !await File(entry.path.substring(0, entry.path.length - 5))
                     .exists())) {
           await entry.delete();
           continue;
         }
-        if (!RegExp(r'^\d+-\d+-\d+\.png$').hasMatch(name)) continue;
+        if (!_rasterName.hasMatch(name)) continue;
         final stat = await entry.stat();
         final metadata = File('${entry.path}.json');
         final size =
