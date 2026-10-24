@@ -131,14 +131,76 @@ All 230 unit/widget tests, all three Linux integration tests above, and the
 profile benchmark passed. The workflow test now waits for guides to load on
 first enable and retains its rendering/occlusion checks.
 
+## 2026-10-24: idle GPU work and 24-hour commit review
+
+Reviewed the 50 commits from `d3669a2` through `33c5a8e` in the preceding
+24 hours. Two renderer-lifetime issues matter; reverting the feature commits is
+not necessary:
+
+- `391aa7e` reduced idle **scene** draws to 5 FPS, but kept the vsync ticker
+  alive. It also disabled the cap throughout terrain/imagery downloads, even
+  when there was no new data to draw. The scene now uses `TickerMode` to sleep
+  after one second without changes. Local scene updates (including downloaded
+  tiles), camera edits and export wake it. A separate repaint boundary keeps
+  animated rain from repainting the static 3D scene.
+- `d3b276e` added above-screen-density exports. The existing export flag stayed
+  true through the save-path dialog; `11cb0c6` split rendering/saving state but
+  retained that lifetime. This kept drawing at export scale while waiting for
+  a filename. Rendering now ends as soon as the PNG capture is ready; saving
+  no longer holds the oversampled renderer open.
+
+Other reviewed changes: `d05999c` adds seven small planet markers and one label
+node, hidden in daylight, with renderer ephemerides refreshed at most hourly.
+The export supersampling override is otherwise limited to active capture.
+`41b9bcf` lowers distant terrain detail. The cache, allocation, coordinate,
+feedback and session changes do not introduce continuous GPU work. The expensive
+cloud shader (up to 64 view steps plus light samples), High's 1.25 render scale,
+GTAO and four 4096-pixel shadow cascades predate this 24-hour window and remain
+unchanged. High-quality interaction can still saturate the GPU; this fix removes
+unnecessary work, not image detail.
+
+Measurement: RTX 3070, Linux XWayland, Flutter 3.47.7. An ordinary release launch
+with the saved High/cloudy scene was allowed eight seconds to settle, then
+sampled eight times, once per second, using `nvidia-smi pmon -s um -d 1 -c 8`.
+Before: PhotoSim's seven numeric SM-utilization samples ranged **4–24%** (one
+sample was `-`). After: all eight samples were `-`, i.e. no measurable process
+activity, not proof of exactly zero whole-device utilization. Other desktop
+processes continue to use the GPU. Device-wide utilization is not app attribution.
+
+The profile idle regression now includes cumulonimbus clouds and asserts zero
+scene draws **and zero app ticker callbacks** after settling. Its fully-live
+Flutter test binding forces compositor frames itself, so engine-frame counts
+from that harness must not be mistaken for ordinary app idle FPS.
+
+| Profile test, cloudy fixture | Before | After |
+|---|---:|---:|
+| Balanced idle scene FPS | 4.96 | 0 |
+| High idle scene FPS | 4.96 | 0 |
+| Balanced active aim FPS | 52.1 | 51.0 |
+| High active aim FPS | 20.6 | 20.6 |
+| Rain over a settled scene | not measured | 0 scene FPS; rain still animates |
+
+These are single-run observations, not hardware-independent FPS guarantees.
+Within the updated test, returning to the same camera preserves its settled
+RGBA hash. No cross-version pixel-identity claim is made: the settling schedule
+has changed. Quality presets, cloud samples and export resolution are unchanged.
+
+Regressions also hold imagery responses pending and verify that the renderer
+sleeps and wakes when data arrives, and keep a quick-export save dialog open
+while checking that preview scale is restored and the scene ticker is muted.
+Validation: 297 unit/widget tests, strict analysis, debug native idle/loading/
+startup/export/clouds/camera-light workflows, and the profile idle benchmark.
+Android/Windows hardware and active GPU shader optimizations were not tested.
+
 ## Remaining bottlenecks and limits
 
 - One `calculateSky` still costs roughly 5–10 ms in profile whenever simulation
   time changes. It is the remaining main-isolate spike during time scrubbing.
   Moving it to an isolate or using a cheaper ephemeris for previews would be the
   next step.
-- GPU raster is 1–3 ms in these scenes, so lowering mesh/quality settings would
-  not improve frame rate here; High quality geometry and shadows were kept.
+- The earlier 1–3 ms raster figures measure Flutter's raster thread, not GPU
+  execution. They do not rule out GPU-bound High/cloudy scenes; geometry,
+  shadows and shader quality have not been reduced.
 - Numbers cover one x86_64 desktop and X11. Wayland, Android phones/tablets,
   integrated GPUs, large High-quality networks and network-bound loading remain
   unmeasured.

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -14,7 +15,6 @@ import 'package:photosim/ui/simulation_workspace.dart';
 
 import '../test/imagery_fixture.dart';
 import '../test/terrain_fixture.dart';
-import 'workspace_navigation.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +22,6 @@ void main() {
   testWidgets(
     'idle rendering is bounded without changing pixels or active refresh',
     (tester) async {
-      const baseline = bool.fromEnvironment('IDLE_CAP_BASELINE');
       final directory = await Directory.systemTemp.createTemp('photosim-idle-');
       final terrain = terrainWebpFixture(), imagery = imageryFixture(256);
       final client = MockClient(
@@ -36,6 +35,8 @@ void main() {
         timestamp: DateTime.utc(2026, 6, 21, 19),
         height: 100,
         pitch: -15,
+        cloudType: CloudType.cumulonimbus,
+        cloudAmount: 0.1355,
       );
       late StateSetter rebuild;
       addTearDown(() async {
@@ -84,7 +85,6 @@ void main() {
           .widget<scene.SceneView>(find.byType(scene.SceneView))
           .scene!;
       Future<int> fingerprint() async {
-        await pumpUntilRendered(tester, world, frames: 2);
         final image =
             await (capture.currentContext!.findRenderObject()!
                     as RenderRepaintBoundary)
@@ -107,7 +107,6 @@ void main() {
       }
 
       Future<double> idleFps() async {
-        // Let the engine drive real vsync frames, not a test-pump count.
         await Future<void>.delayed(const Duration(seconds: 2));
         final start = world.renderStats.frameCount;
         final watch = Stopwatch()..start();
@@ -124,8 +123,17 @@ void main() {
           if (find.text('Imagery 9/9').evaluate().isNotEmpty) break;
         }
         final fps = await idleFps();
-        expect(fps, baseline ? greaterThan(30) : inInclusiveRange(3.5, 6.5));
+        expect(fps, 0);
+        // The live test binding itself drives frames; inspect app tickers instead.
+        expect(SchedulerBinding.instance.transientCallbackCount, 0);
+        expect(
+          TickerMode.valuesOf(tester.element(find.byType(scene.SceneView)))
+              .enabled,
+          isFalse,
+        );
         results['${quality.name}IdleFps'] = fps;
+        results['${quality.name}IdleTickers'] =
+            SchedulerBinding.instance.transientCallbackCount;
         final hash = await fingerprint();
         results['${quality.name}RgbaHash'] = hash;
         final start = world.renderStats.frameCount;
@@ -141,14 +149,29 @@ void main() {
             (world.renderStats.frameCount - start) /
             (watch.elapsedMicroseconds / 1e6);
         results['${quality.name}ActiveFps'] = activeFps;
-        expect(activeFps, greaterThan(20));
+        expect(
+          activeFps,
+          greaterThan(5),
+          reason:
+              'Camera edits must resume rendering above the former idle cap',
+        );
         rebuild(() => state = state.copyWith(azimuth: 0));
         await Future<void>.delayed(const Duration(seconds: 2));
         expect(await fingerprint(), hash);
       }
+      rebuild(
+        () => state = state.copyWith(weather: Weather.rain, rainIntensity: 0.6),
+      );
+      final rainFps = await idleFps();
+      expect(
+        rainFps,
+        0,
+        reason: 'Animated rain must reuse the static 3D layer',
+      );
+      expect(SchedulerBinding.instance.transientCallbackCount, greaterThan(0));
+      results['rainIdleSceneFps'] = rainFps;
       await Directory('build/validation').create(recursive: true);
-      final path =
-          'build/validation/idle-render-${baseline ? 'before' : 'after'}.json';
+      const path = 'build/validation/idle-render-after.json';
       await File(path)
           .writeAsString(const JsonEncoder.withIndent('  ').convert(results));
       debugPrint('Idle render measurement: $results');

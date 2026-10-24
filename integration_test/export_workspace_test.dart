@@ -178,6 +178,23 @@ void main() {
       await tester.tap(find.text('Re-render preview & reset prompt'));
       await until(() => !panel().busy && !panel().stale);
       expect(panel().prompt.text, contains('"focalLength": 35.0'));
+
+      rebuild(() => exportMode = false);
+      await tester.pump();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Export PNG'));
+      await until(() => find.byType(AlertDialog).evaluate().isNotEmpty);
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await tester.pump();
+      expect(world.renderScale, 1);
+      expect(
+        TickerMode.valuesOf(tester.element(find.byType(scene.SceneView)))
+            .enabled,
+        isFalse,
+        reason:
+            'Choosing a save path must not keep oversampled rendering alive',
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
       expect(tester.takeException(), isNull);
     },
   );

@@ -114,6 +114,14 @@ void main() {
         for (final node in nodes) node.mesh!.primitives.single.geometry,
       ];
       expect(nodes.length, 9);
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await tester.pump();
+      expect(
+        TickerMode.valuesOf(tester.element(find.byType(scene.SceneView)))
+            .enabled,
+        isFalse,
+        reason: 'Waiting for network imagery must not keep the GPU rendering',
+      );
       imagesReady.complete();
       for (
         var i = 0;

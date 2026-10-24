@@ -91,6 +91,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     });
   }
 
+  @override
+  void setState(VoidCallback fn) {
+    wakeRenderer();
+    super.setState(fn);
+  }
+
   /// The saved photograph is rendered again at this multiple of the device pixel
   /// ratio, so it carries real geometry and shading at every output pixel
   /// instead of an upscaled screen copy.
@@ -755,6 +761,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         );
         if (!mounted) return;
         setState(() {
+          exporting = false;
           exportBytes = bytes;
           exportState = snapshot;
           exportWidth = width;
@@ -775,7 +782,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           ..showWorkspaceFeedback(SnackBar(content: Text(exportError!)));
       }
     } finally {
-      if (mounted) setState(() => exporting = false);
+      if (mounted && exporting) setState(() => exporting = false);
     }
   }
 
@@ -1187,34 +1194,38 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                     // Scene's +Z-forward camera reverses east/west in our ENU axes.
                                     child: Transform.flip(
                                       flipX: true,
-                                      child: ValueListenableBuilder<bool>(
-                                        valueListenable: renderActive,
-                                        builder: (context, activeRefresh, _) =>
-                                            scene.SceneView(
-                                              active,
-                                              // Keep edits/loading/export responsive; static scenes need no vsync-rate redraw.
-                                              maxFrameRate:
-                                                  loading ||
-                                                      imageryLoading ||
-                                                      exporting ||
-                                                      activeRefresh
-                                                  ? null
-                                                  : 5,
-                                              onTick: (_, _) =>
-                                                  updateCameraLight(),
-                                              camera: scene.PerspectiveCamera(
-                                                position: eye,
-                                                target: eye + direction,
-                                                up: cameraUp,
-                                                fovRadiansY: previewVerticalFov(
-                                                  state,
-                                                  constraints.biggest,
+                                      child: RepaintBoundary(
+                                        child: ValueListenableBuilder<bool>(
+                                          valueListenable: renderActive,
+                                          builder:
+                                              (
+                                                context,
+                                                activeRefresh,
+                                                _,
+                                              ) => TickerMode(
+                                                // A draw-rate cap leaves the vsync ticker running even when nothing changes.
+                                                enabled:
+                                                    exporting || activeRefresh,
+                                                child: scene.SceneView(
+                                                  active,
+                                                  onTick: (_, _) =>
+                                                      updateCameraLight(),
+                                                  camera: scene.PerspectiveCamera(
+                                                    position: eye,
+                                                    target: eye + direction,
+                                                    up: cameraUp,
+                                                    fovRadiansY:
+                                                        previewVerticalFov(
+                                                          state,
+                                                          constraints.biggest,
+                                                        ),
+                                                    fovNear: 0.5,
+                                                    fovFar:
+                                                        previewFarDistanceMeters,
+                                                  ),
                                                 ),
-                                                fovNear: 0.5,
-                                                fovFar:
-                                                    previewFarDistanceMeters,
                                               ),
-                                            ),
+                                        ),
                                       ),
                                     ),
                                   ),
