@@ -21,6 +21,8 @@ import 'celestial_material.dart';
   final positions = Float32List(stars.length * 9 * 3);
   final colors = Float32List(stars.length * 9 * 4);
   final indices = <int>[];
+  // Indexed writes: setRange with a list literal built ~130k throwaway lists for the
+  // bundled 5k-star catalog, all on the UI isolate during scene creation.
   for (var i = 0; i < stars.length; i++) {
     final star = stars[i], d = star.direction;
     final u = d
@@ -30,6 +32,7 @@ import 'celestial_material.dart';
     // shortcut: unresolved stars use exaggerated fixed-angular disks, not a calibrated PSF/exposure model.
     final flux = math.pow(10, -0.2 * star.magnitude).toDouble();
     final radius = NightSkyRenderer.starDistance * (0.0005 + 0.0008 * flux);
+    final brightness = 0.25 + flux;
     for (var j = 0; j < 9; j++) {
       final angle = (j - 1) * math.pi / 4;
       final p =
@@ -38,13 +41,14 @@ import 'celestial_material.dart';
               ? Vector3.zero()
               : (u * math.cos(angle) + v * math.sin(angle)) * radius);
       final vertex = i * 9 + j;
-      positions.setRange(vertex * 3, vertex * 3 + 3, [p.x, p.y, p.z]);
-      colors.setRange(vertex * 4, vertex * 4 + 4, [
-        0.25 + flux,
-        0.25 + flux,
-        0.25 + flux,
-        1,
-      ]);
+      positions[vertex * 3] = p.x;
+      positions[vertex * 3 + 1] = p.y;
+      positions[vertex * 3 + 2] = p.z;
+      final color = vertex * 4;
+      colors[color] = brightness;
+      colors[color + 1] = brightness;
+      colors[color + 2] = brightness;
+      colors[color + 3] = 1;
       if (j > 0) indices.addAll([i * 9, i * 9 + j % 8 + 1, vertex]);
     }
   }
@@ -58,15 +62,15 @@ scene.MeshGeometry _milkyWayGeometry() {
   final indices = <int>[];
   for (var y = 0; y <= rows; y++) {
     final dec = (90 - y / rows * 180) * radians;
+    final cosDec = math.cos(dec), sinDec = math.sin(dec);
     for (var x = 0; x <= columns; x++) {
       final ra = (x / columns * 360 - 180) * radians;
       final i = y * (columns + 1) + x;
-      positions.setRange(i * 3, i * 3 + 3, [
-        math.cos(dec) * math.cos(ra) * NightSkyRenderer.bandDistance,
-        math.cos(dec) * math.sin(ra) * NightSkyRenderer.bandDistance,
-        math.sin(dec) * NightSkyRenderer.bandDistance,
-      ]);
-      uvs.setRange(i * 2, i * 2 + 2, [x / columns, y / rows]);
+      positions[i * 3] = cosDec * math.cos(ra) * NightSkyRenderer.bandDistance;
+      positions[i * 3 + 1] = cosDec * math.sin(ra) * NightSkyRenderer.bandDistance;
+      positions[i * 3 + 2] = sinDec * NightSkyRenderer.bandDistance;
+      uvs[i * 2] = x / columns;
+      uvs[i * 2 + 1] = y / rows;
       if (x < columns && y < rows) {
         final b = i + columns + 1;
         indices.addAll([i, i + 1, b, b, i + 1, b + 1]);
