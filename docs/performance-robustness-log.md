@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 262 tests
+flutter test                                       # currently 264 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,47 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — saved-plan permission contract (tests only)
+
+### `067c8ed` fix: add regression coverage for unreadable plan storage
+
+Audited whether `PlanRepository.loadAll` might repeat the session-recovery bug
+from `cf271d6`. The proposed production rewrite was unnecessary: on this Linux
+system, `Directory.exists` already throws `PathAccessException` / errno 13 for
+a plans folder beneath an inaccessible ancestor. The existing UI catches that
+failure and explains storage space/permissions without replacing the current
+composition. **No production code was changed.** The rejected rewrite is also
+recorded below so this audit is not repeated without new evidence.
+
+Files: `test/saved_plans_test.dart`, `test/plan_switching_test.dart`. Added a
+real Linux `chmod 000` regression verifying that listing propagates the error,
+restored access reveals the original plan, saved bytes are identical, and no
+extra files appeared. It ran unskipped as the normal Linux user; other platforms
+or users for whom permission bits are not enforced skip that test. Added a
+widget regression for the existing actionable storage message, no misleading
+“No saved plans found,” unchanged unsaved state, and successful retry after the
+injected load failure clears. Only the existing in-memory test fixture gained
+a failure switch.
+
+The initial test probe wrongly assumed `Directory.exists` would behave like
+`File.exists`; it threw before reaching the repository assertion. After using
+the known `File.exists` behavior solely to detect unenforced permission bits,
+the permission test correctly passed against the unchanged production code.
+This is regression coverage of a working failure path, not a newly fixed runtime
+bug or an intentionally failing-before/passing-after production change.
+
+Verified: analyzer 0 issues; format clean; **264 unit/widget tests pass**;
+`linux_planning_ui_test` passes on the native Linux device within a 180-second
+command bound. Plan listing also retains its exact output fingerprint:
+**4 plans / 2 unreadable neighbors / 3868 JSON bytes / hash 4680595913886116**,
+and each normal on-disk plan matches its original bytes. Ignored evidence:
+`build/validation/plan_listing_fingerprint_test.dart`,
+`plan-listing-{before,after}.log`, `plan-permissions-unit.log`,
+`plan-permissions-native.log`. Non-Linux permissions and actual disk-full faults
+remain unchecked; no performance gain or broad-audit completion is claimed.
 
 ---
 
@@ -521,6 +562,16 @@ thousands of files. Named `static final` patterns now compile once per isolate.
 
 Recorded so the same ground is not re-covered. Each was measured; each was
 rejected for a stated reason.
+
+### Saved-plan directory existence rewrite (rejected by `067c8ed` audit)
+
+A proposed SessionStore-style replacement of `PlanRepository.loadAll`'s
+`Directory.exists` guard was not needed. A real Linux mode-000 ancestor caused
+`Directory.exists` to throw `PathAccessException` (errno 13), unlike the
+`File.exists` false result in `cf271d6`. The existing repository and UI already
+report the failure and preserve data/state. No production edit was made; retain
+the added permission/retry regressions instead of duplicating error-policy code.
+Revisit only with evidence from another platform or a different failure mode.
 
 ### Idle rendering: initial rejection, resolved by `391aa7e`
 
