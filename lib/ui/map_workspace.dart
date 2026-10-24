@@ -93,6 +93,11 @@ class _MapWorkspaceState extends State<MapWorkspace> {
       ('Moon', sky.moon, const Color(0xFFADD8FF)),
       ('Galactic center', state.galacticCenter, const Color(0xFFD4ADFF)),
     ];
+    // Each body's short bearing leg is drawn twice below; resolve it once per build.
+    final handles = [
+      for (final body in bodies)
+        (body: body, point: destination(state.location, body.$2.azimuth, 1000)),
+    ];
     return Stack(
       children: [
         FlutterMap(
@@ -153,17 +158,14 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                   color: const Color(0xFF169B7C),
                   strokeWidth: 2,
                 ),
-                for (final body in bodies)
+                for (final handle in handles)
                   Polyline(
-                    points: [
-                      state.location,
-                      destination(state.location, body.$2.azimuth, 1000),
-                    ],
-                    color: body.$3,
+                    points: [state.location, handle.point],
+                    color: handle.body.$3,
                     strokeWidth: 3,
                     borderColor: const Color(0xFF16232B),
                     borderStrokeWidth: 1,
-                    pattern: body.$2.altitude > 0
+                    pattern: handle.body.$2.altitude > 0
                         ? const StrokePattern.solid()
                         : StrokePattern.dashed(segments: [8, 5]),
                   ),
@@ -181,17 +183,17 @@ class _MapWorkspaceState extends State<MapWorkspace> {
             ),
             MarkerLayer(
               markers: [
-                for (final body in bodies)
+                for (final handle in handles)
                   Marker(
-                    point: destination(state.location, body.$2.azimuth, 1000),
+                    point: handle.point,
                     width: 210,
                     height: 40,
                     child: IgnorePointer(
                       child: Semantics(
                         label:
-                            '${body.$1} bearing ${body.$2.azimuth.toStringAsFixed(1)} degrees, '
-                            'altitude ${body.$2.altitude.toStringAsFixed(1)} degrees. '
-                            '${body.$2.altitude > 0 ? 'Above' : 'Below'} horizontal; terrain visibility unknown.',
+                            '${handle.body.$1} bearing ${handle.body.$2.azimuth.toStringAsFixed(1)} degrees, '
+                            'altitude ${handle.body.$2.altitude.toStringAsFixed(1)} degrees. '
+                            '${handle.body.$2.altitude > 0 ? 'Above' : 'Below'} horizontal; terrain visibility unknown.',
                         excludeSemantics: true,
                         child: Center(
                           child: DecoratedBox(
@@ -202,8 +204,8 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                             child: Padding(
                               padding: const EdgeInsets.all(6),
                               child: Text(
-                                '${body.$1} alt ${body.$2.altitude.toStringAsFixed(1)}°',
-                                style: TextStyle(color: body.$3),
+                                '${handle.body.$1} alt ${handle.body.$2.altitude.toStringAsFixed(1)}°',
+                                style: TextStyle(color: handle.body.$3),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),

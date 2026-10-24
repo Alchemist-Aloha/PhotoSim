@@ -282,7 +282,10 @@ class SimulationState {
   }
 
   /// ENU camera basis; positive roll rotates the camera clockwise looking forward.
-  ({Vector3 forward, Vector3 right, Vector3 up}) get cameraFrame {
+  /// Cached: several widgets read this per build and each access built 7 Vector3s.
+  late final ({Vector3 forward, Vector3 right, Vector3 up}) cameraFrame =
+      _cameraFrame();
+  ({Vector3 forward, Vector3 right, Vector3 up}) _cameraFrame() {
     final yaw = azimuth * radians, tilt = pitch * radians;
     final forward = Vector3(
       math.sin(yaw) * math.cos(tilt),
