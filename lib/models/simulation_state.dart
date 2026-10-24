@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../core/astronomy.dart';
 import '../core/geo.dart' show radians;
 import '../core/night_sky.dart';
+import '../core/planets.dart';
 
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 
@@ -13,10 +14,28 @@ enum CelestialTarget {
   none('No target'),
   sun('Sun'),
   moon('Moon'),
+  mercury('Mercury'),
+  venus('Venus'),
+  mars('Mars'),
+  jupiter('Jupiter'),
+  saturn('Saturn'),
+  uranus('Uranus'),
+  neptune('Neptune'),
   galacticCenter('Galactic center');
 
   const CelestialTarget(this.label);
   final String label;
+
+  Planet? get planet => switch (this) {
+    CelestialTarget.mercury => Planet.mercury,
+    CelestialTarget.venus => Planet.venus,
+    CelestialTarget.mars => Planet.mars,
+    CelestialTarget.jupiter => Planet.jupiter,
+    CelestialTarget.saturn => Planet.saturn,
+    CelestialTarget.uranus => Planet.uranus,
+    CelestialTarget.neptune => Planet.neptune,
+    _ => null,
+  };
 }
 
 enum Sensor {
@@ -264,11 +283,31 @@ class SimulationState {
   );
   late final CelestialPosition galacticCenter = observerFrame.galacticCenter;
 
+  /// Geocentric planet positions; slow enough to reuse until the timestamp moves.
+  late final List<PlanetPosition> planets = planetPositions(timestamp);
+
+  /// Planet as seen from this observer, using the same frame as stars.
+  CelestialPosition planetPosition(Planet planet) {
+    final body = planets.firstWhere((entry) => entry.planet == planet);
+    final sky = observerFrame.position(body.ra, body.dec);
+    return CelestialPosition(
+      sky.azimuth,
+      sky.altitude,
+      body.distanceKm,
+      body.angularRadius,
+      sky.direction,
+    );
+  }
+
   CelestialPosition? get targetPosition => switch (target) {
     CelestialTarget.none => null,
     CelestialTarget.sun => sky.sun,
     CelestialTarget.moon => sky.moon,
     CelestialTarget.galacticCenter => galacticCenter,
+    _ => switch (target.planet) {
+      final planet? => planetPosition(planet),
+      null => null,
+    },
   };
 
   double? get targetAngularOffset {

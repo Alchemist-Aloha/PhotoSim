@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart' as scene;
@@ -8,6 +7,7 @@ import 'package:vector_math/vector_math.dart' as vm;
 import '../core/constellations.dart';
 import '../models/simulation_state.dart';
 import 'celestial_material.dart';
+import 'label_atlas.dart';
 
 class ConstellationRenderer {
   ConstellationRenderer._(this.catalog, scene.Texture2D atlas) {
@@ -43,44 +43,12 @@ class ConstellationRenderer {
 
   static Future<ConstellationRenderer> create(
     List<Constellation> catalog,
-  ) async {
-    const width = 192, height = 40;
-    final rows = (catalog.length / 8).ceil();
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    for (var i = 0; i < catalog.length; i++) {
-      final text = TextPainter(
-        text: TextSpan(
-          text: catalog[i].name,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFFBBDDFF),
-            shadows: [Shadow(color: Colors.black, blurRadius: 3)],
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: width - 8);
-      text.paint(
-        canvas,
-        Offset(
-          i % 8 * width + (width - text.width) / 2,
-          i ~/ 8 * height + (height - text.height) / 2,
-        ),
-      );
-      text.dispose();
-    }
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(width * 8, height * rows);
-    try {
-      return ConstellationRenderer._(
-        catalog,
-        await scene.Texture2D.fromImage(image),
-      );
-    } finally {
-      image.dispose();
-      picture.dispose();
-    }
-  }
+  ) async => ConstellationRenderer._(
+    catalog,
+    await buildLabelAtlas([
+      for (final constellation in catalog) constellation.name,
+    ], color: const Color(0xFFBBDDFF)),
+  );
 
   /// Called in the sensor viewport's layout so text keeps a readable pixel size.
   void update(SimulationState state, Size viewport, vm.Matrix3 rotation) {

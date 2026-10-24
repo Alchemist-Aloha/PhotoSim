@@ -233,6 +233,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     world!.add(moonRenderer!.node);
     nightRenderer = NightSkyRenderer(parseStarCatalog(starCatalog), band);
     world!.add(nightRenderer!.root);
+    await nightRenderer!.loadPlanetLabels();
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(loadConstellations());

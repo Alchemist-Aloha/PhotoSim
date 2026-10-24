@@ -99,9 +99,9 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Collapsible inspector with weather/quality/relighting in the right panel; camera-local date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
-- 5,044 bundled stars and licensed simplified Milky Way brightness contours.
+- 5,044 bundled stars, licensed simplified Milky Way brightness contours, and the seven naked-eye planets from offline VSOP87 ephemerides (light-time corrected).
 - Time/location-driven sky rotation, approximate twilight/moonlight visibility and terrain occlusion.
-- Sun/Moon/Galactic-center targeting, aim action and rectangular lens-FOV readout.
+- Sun/Moon/planet/Galactic-center targeting, aim action and rectangular lens-FOV readout; planet names label in 3D.
 - Toggleable constellation names and blue connecting figures in 3D, depth-tested against terrain.
 - Named versioned JSON snapshots, with local save/open and restoration after app restart.
 - **Export** tab: render and review the high-resolution PNG before saving, with an editable, copyable AI-enhancement prompt containing the captured location, UTC/estimated local time, optics, weather, astronomy, render settings and source credits. Rendering uses the current quality preset at twice screen pixel density, bounded to 6144 px / 20 MP. The preview and saved file use identical PNG bytes. No AI service is called; attach the saved PNG to your own model. Review precise GPS/time before sharing. Prompt edits are temporary (retained between 3D and Export, not across Map/Calendar or app restart); re-rendering resets them.

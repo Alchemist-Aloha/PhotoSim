@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_scene/scene.dart' as scene;
-import 'package:flutter/material.dart' show Size;
+import 'package:flutter/material.dart' show Color, Size;
 
 import 'constellations.dart';
 
@@ -12,8 +12,10 @@ import 'package:vector_math/vector_math_64.dart' show Vector3;
 import '../core/astronomy.dart';
 import '../core/geo.dart';
 import '../core/night_sky.dart';
+import '../core/planets.dart';
 import '../models/simulation_state.dart';
 import 'celestial_material.dart';
+import 'label_atlas.dart';
 
 ({Float32List positions, Float32List colors, List<int> indices}) starMesh(
   List<Star> stars,
@@ -115,10 +117,11 @@ class NightSkyRenderer {
         CelestialMaterial()..baseColorFactor = vm.Vector4(0.65, 0.3, 1, 1),
       ),
     )..shadowCastingMode = scene.ShadowCastingMode.off;
+    // Sgr A*, matching ObserverSkyFrame.galacticCenter.
     final center = Star(
       1,
-      266.4051 * radians,
-      -28.936175 * radians,
+      266.416817 * radians,
+      -29.007825 * radians,
       0,
     ).direction;
     marker.position = vm.Vector3(center.x, center.y, center.z) * 28000;
@@ -126,22 +129,124 @@ class NightSkyRenderer {
       ..add(starNode)
       ..add(bandNode)
       ..add(marker);
+    for (final planet in Planet.values) {
+      final colour = _planetColour[planet]!;
+      planets[planet] = scene.Node(
+        name: planet.label,
+        mesh: scene.Mesh(
+          scene.SphereGeometry(radius: 1, segments: 12, rings: 6),
+          CelestialMaterial()..baseColorFactor = colour,
+        ),
+      )..shadowCastingMode = scene.ShadowCastingMode.off;
+      root.add(planets[planet]!);
+    }
   }
+
+  /// Planet label names, drawn by [labelAtlasForPlanets].
+  static List<String> get planetLabels => [
+    for (final planet in Planet.values) planet.label,
+  ];
+
+  static Future<scene.Texture2D> labelAtlasForPlanets() =>
+      buildLabelAtlas(planetLabels, color: const Color(0xFFFFE9B8));
+
+  /// Marker tints; brightness comes from apparent magnitude, as with stars.
+  static final _planetColour = <Planet, vm.Vector4>{
+    Planet.mercury: vm.Vector4(0.86, 0.83, 0.78, 1),
+    Planet.venus: vm.Vector4(1, 0.97, 0.86, 1),
+    Planet.mars: vm.Vector4(0.93, 0.53, 0.36, 1),
+    Planet.jupiter: vm.Vector4(0.94, 0.87, 0.72, 1),
+    Planet.saturn: vm.Vector4(0.93, 0.85, 0.6, 1),
+    Planet.uranus: vm.Vector4(0.68, 0.88, 0.93, 1),
+    Planet.neptune: vm.Vector4(0.6, 0.71, 0.95, 1),
+  };
   ConstellationRenderer? constellations;
+  final planets = <Planet, scene.Node>{};
+  scene.Node? planetLabelNode;
+  scene.BillboardGeometry? planetLabelGeometry;
+
+  /// Planet names reuse the constellation label budget so guides stay one node.
+  Future<void> loadPlanetLabels() async {
+    if (planetLabelNode != null) return;
+    final geometry = scene.BillboardGeometry(capacity: Planet.values.length)
+      ..flipbookColumns = 8
+      ..flipbookRows = 1;
+    final node = scene.Node(
+      name: 'Planet names',
+      mesh: scene.Mesh(
+        geometry,
+        scene.SpriteMaterial(colorTexture: await labelAtlasForPlanets()),
+      ),
+    )..shadowCastingMode = scene.ShadowCastingMode.off;
+    planetLabelGeometry = geometry;
+    planetLabelNode = node;
+    root.add(node);
+  }
 
   void addConstellations(ConstellationRenderer renderer) {
     constellations = renderer;
     root.add(renderer.root);
   }
 
-  void updateLabels(SimulationState state, Size viewport) =>
-      constellations?.update(state, viewport, _rotation);
+  void updateLabels(SimulationState state, Size viewport) {
+    constellations?.update(state, viewport, _rotation);
+    _updatePlanetLabels(state, viewport);
+  }
+
+  /// Same framing test as constellation names, but planets move, so anchors come
+  /// from the current ephemeris rather than a static catalog.
+  void _updatePlanetLabels(SimulationState state, Size viewport) {
+    final geometry = planetLabelGeometry,
+        node = planetLabelNode,
+        direction = _planetDirections;
+    if (geometry == null || node == null || direction == null) return;
+    final frame = state.cameraFrame;
+    final forward = vm.Vector3(
+      frame.forward.x,
+      frame.forward.y,
+      frame.forward.z,
+    );
+    final up = vm.Vector3(frame.up.x, frame.up.y, frame.up.z);
+    final right = vm.Vector3(frame.right.x, frame.right.y, frame.right.z);
+    final visible = starMaterial.baseColorFactor.x > 0 && viewport.height > 0;
+    node.visible = visible;
+    if (!visible) return;
+    geometry.worldUp = up;
+    var count = 0;
+    for (var i = 0; i < Planet.values.length; i++) {
+      final anchor = direction[Planet.values[i]]!;
+      final d = _rotation.transformed(vm.Vector3(anchor.x, anchor.y, anchor.z));
+      final depth = d.dot(forward);
+      if (d.y <= 0 || depth <= 0) continue;
+      if (d.dot(right).abs() > depth * math.tan(state.horizontalFov / 2) ||
+          d.dot(up).abs() > depth * math.tan(state.verticalFov / 2)) {
+        continue;
+      }
+      final unitsPerPixel =
+          2 *
+          planetDistance *
+          depth *
+          math.tan(state.verticalFov / 2) /
+          viewport.height;
+      geometry.setInstance(
+        count++,
+        center: vm.Vector3(anchor.x, anchor.y, anchor.z) * planetDistance,
+        width: 192 * unitsPerPixel,
+        height: 40 * unitsPerPixel,
+        frame: i.toDouble(),
+      );
+    }
+    geometry.commit(count);
+  }
 
   static const starDistance = 40000.0, bandDistance = 45000.0;
+  static const planetDistance = 39500.0;
   late final scene.Node root, starNode, bandNode, marker;
   late final scene.MeshGeometry starGeometry;
   late final scene.UnlitMaterial starMaterial, bandMaterial;
   (DateTime, double, double)? _lastObserver;
+  DateTime? _planetStamp;
+  Map<Planet, vm.Vector3>? _planetDirections;
   vm.Matrix3 _rotation = vm.Matrix3.identity();
 
   void update(
@@ -163,6 +268,29 @@ class NightSkyRenderer {
       );
       _lastObserver = observer;
     }
+    // Positions drift at most a few arcminutes per hour; skip per-playback-tick work.
+    if (_planetStamp == null ||
+        state.timestamp.difference(_planetStamp!).abs() >
+            const Duration(hours: 1)) {
+      _planetStamp = state.timestamp;
+      _planetDirections = {
+        for (final body in state.planets)
+          body.planet: vm.Vector3(
+            math.cos(body.dec) * math.cos(body.ra),
+            math.cos(body.dec) * math.sin(body.ra),
+            math.sin(body.dec),
+          ),
+      };
+      for (final body in state.planets) {
+        final anchor = _planetDirections![body.planet]!;
+        final flux = math.pow(10, -0.2 * body.magnitude).toDouble();
+        // Bright planets read slightly larger than a star of equal magnitude.
+        final radius = planetDistance * (0.0007 + 0.0011 * flux);
+        planets[body.planet]!
+          ..position = anchor * planetDistance
+          ..scale = vm.Vector3.all(radius);
+      }
+    }
     root.localTransform = vm.Matrix4.identity()
       ..setRotation(_rotation)
       ..setTranslation(eye);
@@ -176,6 +304,9 @@ class NightSkyRenderer {
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);
     bandMaterial.baseColorFactor = vm.Vector4(1, 1, 1, band);
     marker.visible = state.target == CelestialTarget.galacticCenter;
+    for (final node in planets.values) {
+      node.visible = stars > 0;
+    }
     constellations?.root.visible = state.showConstellations;
   }
 }

@@ -77,8 +77,10 @@ requirements separately from excluded platform work.
   backgrounding, disposal or the date limit; UTC remains authoritative.
 - 5,044 offline XHIP stars and five licensed Milky Way brightness contours;
   J2000 precession/nutation/sidereal rotation, immutable GPU batches and terrain depth tests.
+- Seven naked-eye planets from bundled VSOP87 series with light-time correction and
+  apparent magnitude, drawn as tinted markers with names inside the frame.
 - Approximate solar/lunar night-sky visibility, Galactic-center map/3D markers,
-  Sun/Moon/Galactic-center selection, explicit aim action and rectangular FOV checks.
+  Sun/Moon/planet/Galactic-center selection, explicit aim action and rectangular FOV checks.
 - Toggleable 3D constellation names and connecting figures, default off; a shared
   sky rotation, two GPU batches, terrain depth tests and saved layer preference.
 - Named version-2 JSON photography snapshots (legacy version-1 files remain readable): camera, optics, UTC, selected target
@@ -116,7 +118,8 @@ requirements separately from excluded platform work.
 - `lib/core/astronomy.dart`: offline ephemerides and observer/renderer transforms.
 - `lib/core/local_time.dart`: approximate offline zone lookup and local presentation.
 - `lib/core/night_sky.dart`: catalog parsing, rigid observer sky frame and visibility model.
-- `lib/render/night_sky.dart`: immutable star/band geometry and target marker.
+- `lib/core/planets.dart`: VSOP87 planet ephemerides in the same J2000 frame.
+- `lib/render/night_sky.dart`: immutable star/band geometry, planet markers/labels and target marker.
 - `lib/data/saved_plans.dart`: bounded versioned JSON and native snapshot repository.
 - `lib/app/app.dart`: authoritative shared state, playback timer and lifecycle cleanup.
 - `lib/render/moon.dart`: lunar geometry/texture, cached phase shading and approximate moonlight.

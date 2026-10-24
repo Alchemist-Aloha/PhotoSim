@@ -36,6 +36,78 @@ void main() {
     );
   });
 
+  test('bundled star coordinates match SIMBAD ICRS positions', () {
+    final stars = parseStarCatalog(
+      File('assets/sky/stars.json').readAsStringSync(),
+    );
+    // SIMBAD ICRS J2000, queried 2026-10-24 via the TAP service.
+    const simbad = <int, (double, double)>{
+      32349: (101.287155, -16.716116), // Sirius
+      91262: (279.234735, 38.783689), // Vega
+      11767: (37.954561, 89.264109), // Polaris
+      27989: (88.792939, 7.407064), // Betelgeuse
+    };
+    for (final entry in simbad.entries) {
+      final star = stars.singleWhere((s) => s.id == entry.key);
+      expect(
+        ((star.ra / radians - entry.value.$1 + 540) % 360 - 180).abs(),
+        lessThan(0.002),
+        reason: 'HIP ${entry.key} right ascension',
+      );
+      expect(
+        (star.dec / radians - entry.value.$2).abs(),
+        lessThan(0.002),
+        reason: 'HIP ${entry.key} declination',
+      );
+    }
+  });
+
+  test('Milky Way raster sits on the galactic plane, not merely near it', () {
+    final map = img.decodePng(
+      File('assets/sky/milky_way.png').readAsBytesSync(),
+    )!;
+    const poleRa = 192.85948 * radians, poleDec = 27.12825 * radians;
+    var lit = 0, nearPlane = 0, sumLatitude = 0.0;
+    for (var y = 0; y < map.height; y++) {
+      for (var x = 0; x < map.width; x++) {
+        final alpha = map.getPixel(x, y).a.toInt();
+        if (alpha == 0) continue;
+        lit++;
+        // Mesh mapping: u spans RA -180..180, v spans Dec +90..-90.
+        final ra = (-180 + (x + 0.5) / map.width * 360) * radians;
+        final dec = (90 - (y + 0.5) / map.height * 180) * radians;
+        final sinLatitude =
+            math.sin(dec) * math.sin(poleDec) +
+            math.cos(dec) * math.cos(poleDec) * math.cos(ra - poleRa);
+        final latitude = math.asin(sinLatitude.clamp(-1.0, 1.0)) / radians;
+        sumLatitude += latitude.abs();
+        if (latitude.abs() <= 20) nearPlane++;
+      }
+    }
+    // A misplaced band shows up as lit pixels far from b=0.
+    expect(nearPlane / lit, greaterThan(0.98));
+    expect(sumLatitude / lit, lessThan(8));
+  });
+
+  test('galactic center marker uses the Sgr A* ICRS position', () {
+    final frame = ObserverSkyFrame(
+      timestamp: DateTime.utc(2026, 6, 21, 9),
+      latitude: 37.744,
+      longitude: -119.59,
+    );
+    final center = frame.galacticCenter;
+    // SIMBAD: NAME Sgr A* = 266.416817, -29.007825.
+    final expected = frame.position(266.416817 * radians, -29.007825 * radians);
+    expect(center.azimuth, closeTo(expected.azimuth, 1e-9));
+    expect(center.altitude, closeTo(expected.altitude, 1e-9));
+    // 4.4' away from the IAU l=b=0 origin the old constant used.
+    final legacy = frame.position(266.4051 * radians, -28.936175 * radians);
+    final separation =
+        math.acos(center.direction.dot(legacy.direction).clamp(-1.0, 1.0)) /
+        radians;
+    expect(separation * 60, closeTo(4.4, 0.3));
+  });
+
   test('catalog parser rejects malformed and nonphysical rows', () {
     for (final source in [
       '{}',

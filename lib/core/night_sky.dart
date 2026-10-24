@@ -172,9 +172,9 @@ class ObserverSkyFrame {
     );
   }
 
-  /// ICRS position of Sgr A*; not exactly the IAU Galactic-coordinate origin.
+  /// ICRS position of Sgr A* (SIMBAD), about 4.4' from the IAU l=b=0 origin.
   CelestialPosition get galacticCenter =>
-      position(266.4051 * radians, -28.936175 * radians);
+      position(266.416817 * radians, -29.007825 * radians);
 }
 
 /// Artistic clear-sky visibility, not calibrated sky radiance or exposure.
