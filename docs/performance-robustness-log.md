@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 290 tests
+flutter test                                       # currently 297 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,83 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — planets and sky-model verification
+
+### `d05999c` feat: add VSOP87 planets to the 3D sky map
+
+Added Mercury–Neptune to the 3D sky, using the VSOP87 series already bundled with
+`astronomia`. Positions are heliocentric J2000 vectors combined with Earth's,
+iterated once at the retarded time for light-time, converted to J2000 equatorial,
+and rotated by the existing `ObserverSkyFrame` so planets share the star frame.
+Each planet draws as a magnitude-scaled tinted marker plus a name in the existing
+label billboard budget (labels extracted into `lib/render/label_atlas.dart`, reused
+by constellations with identical styling). `CelestialTarget` gained the seven
+planets, so selection, aiming, FOV offset, saved plans/sessions and the target menu
+all work without further UI changes. Planet names are only drawn for bodies above
+the horizon and inside the sensor frame.
+
+Also corrected the galactic-center constant: the code used the IAU `l=b=0`
+origin (266.4051, -28.936175) while calling it Sgr A*. It now uses the SIMBAD ICRS
+position of Sgr A* (266.416817, -29.007825), which matters for framing: the old
+value was 4.4' off.
+
+Verification used authoritative external services, not just green tests.
+
+| Check | This model | Reference | Difference |
+|---|---|---|---|
+| Mercury RA/Dec, 2026-06-21 19:00Z | 115.33433°, 21.22138° | JPL Horizons 115.33408°, 21.22150° | ~1" |
+| Venus | 132.29186°, 19.83258° | Horizons 132.29142°, 19.83381° | ~4" |
+| Mars | 52.34307°, 18.52185° | Horizons 52.34275°, 18.52175° | ~1" |
+| Jupiter | 120.02462°, 21.01049° | Horizons 120.02446°, 21.01050° | ~1" |
+| Saturn | 13.20006°, 3.11190° | Horizons 13.20000°, 3.11189° | <1" |
+| Uranus | 60.84407°, 20.57428° | Horizons 60.84438°, 20.57433° | ~1" |
+| Neptune | 4.19180°, 0.33476° | Horizons 4.19142°, 0.33458° | ~2" |
+| Jupiter azimuth/elevation (site −119.59, 37.744) | 100.427°, 47.802° | Horizons 100.4301°, 47.8061° | 11", 15" |
+| Mars azimuth/elevation | 232.251°, 62.480° | Horizons 232.2565°, 62.4756° | 20", 16" |
+| Saturn azimuth/elevation | 254.548°, 24.027° | Horizons 254.5483°, 24.0254° | 1", 6" |
+| Sun azimuth/elevation | 133.692°, 70.743° | Horizons 133.7005°, 70.7454° | 31", 9" |
+| Moon azimuth/elevation | 83.490°, −12.034° | Horizons 83.4911°, −12.0299° | 4", 15" |
+| Moon distance / illumination | 389 015 km / 49.65% | Horizons 389 053 km / 49.6457% | 38 km / 0.004 pp |
+
+Moon phase instants (geocentric apparent longitude opposition/conjunction, the
+USNO definition) also line up with the USNO phase table and NASA eclipse canon:
+full Moon 2026-03-03 at **11:37 UTC** (USNO 11:38); full Moon 2026-06-29 at
+**23:56 UTC** (published 23:56); new Moon 2026-08-12 at **17:35 UTC** (~17:37).
+Greatest-eclipse geometry: the model's minimum Sun–Moon separation at the
+2026-08-12 total solar eclipse track is **17:45:40 UTC** (NASA 17:47:06 TD, i.e.
+~17:45:57 UTC), and its geocentric lunar alignment for the 2026-03-03 total lunar
+eclipse is **11:33:50 UTC** (NASA 11:34:52 TD, i.e. ~11:33:43 UTC).
+
+Stars: bundled XHIP coordinates match SIMBAD ICRS within 0.3" for Sirius, Vega,
+Polaris and Betelgeuse (new regression), and the observer rotation is already
+pinned to ERFA/SOFA reference directions in `test/fixtures/sky_rotation.json`.
+Milky Way: the licensed contour raster has **99.77%** of its lit pixels within
+|b| ≤ 20° of the IAU galactic plane (mean |b| = 6.06°), and a new native check
+samples the rendered frame: mean luminance within |b| ≤ 8° is **2.49×** the
+23–38° control band, so the drawn band follows the computed plane rather than a
+mirrored/rotated copy. Both aimed screenshots were inspected:
+`build/validation/linux-planets-night-sky.png` (Saturn and Neptune labels at the
+crosshair, stars present) and `linux-milkyway-aim.png`.
+
+Cost: `planetPositions` evaluates seven VSOP87 series in **2.3 ms**, and the
+renderer recomputes only when simulated time moves more than an hour, so playback
+and terrain loading are unaffected on the normal path; a selected planet target
+costs ~1.2% of one core during playback. No new dependency, asset or network call.
+
+Verified: analyzer 0 issues; format clean; **297 unit/widget tests pass**; native
+`linux_planets_test`, `atmosphere_test`, `calendar_test`, `linux_workflow_test`,
+`startup_test`, `cloud_photo_test`, `milkyway_photo_test` and
+`linux_spec_photography_test` pass on the real GPU. Two native runs (`milkyway_photo`
+harness listener, and one clean-preview Escape wait in `linux_spec_photography`)
+failed once and passed unchanged on rerun; neither is claimed fixed here.
+
+Limits: planets use light-time and VSOP87 truncation but no aberration,
+relativistic deflection or apparent-place reduction; Saturn's marker size ignores
+ring tilt; magnitude formulas drive size only. Physical Android/Windows rendering
+was not exercised.
 
 ---
 
