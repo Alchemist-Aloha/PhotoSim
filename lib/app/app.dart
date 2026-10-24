@@ -281,11 +281,13 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       // Unit-test/embedded hosts can still show the clean content viewport.
     } on PlatformException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showWorkspaceFeedback(
-          SnackBar(
-            content: Text('Window fullscreen unavailable: ${error.message}'),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+          ..removeWorkspaceFeedback()
+          ..showWorkspaceFeedback(
+            SnackBar(
+              content: Text('Window fullscreen unavailable: ${error.message}'),
+            ),
+          );
       }
     }
   }

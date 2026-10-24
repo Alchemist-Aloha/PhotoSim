@@ -197,6 +197,118 @@ void main() {
     for (final entry in geometry.entries) {
       expect(entry.key.mesh!.primitives.single.geometry, same(entry.value));
     }
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(window, (
+      call,
+    ) async {
+      if (call.method == 'fullscreen' && call.arguments == true) {
+        throw PlatformException(
+          code: 'denied',
+          message: 'Window manager rejected request',
+        );
+      }
+      return null;
+    });
+    try {
+      change(state().copyWith(latitude: state().latitude + 0.000001));
+      await tester.pump();
+      for (var i = 0; i < 240; i++) {
+        if (tester
+                .widget<OutlinedButton>(
+                  find.widgetWithText(OutlinedButton, 'Export PNG'),
+                )
+                .onPressed !=
+            null) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Export PNG'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      final beforeRejection = state();
+      expect(find.text('Camera moved'), findsOneWidget);
+      await tester.tap(find.byTooltip('Fullscreen preview'));
+      await tester.pump();
+      await pumpUntilRendered(tester, world, frames: 2);
+      expect(find.text('Camera moved'), findsNothing);
+      expect(
+        find.text(
+          'Window fullscreen unavailable: Window manager rejected request',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Exit fullscreen preview (Esc)'), findsOneWidget);
+      for (var i = 0; i < 80; i++) {
+        if (tester
+            .widget<MaterialBanner>(find.byType(MaterialBanner))
+            .animation!
+            .isCompleted) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(
+        tester
+            .widget<MaterialBanner>(find.byType(MaterialBanner))
+            .animation!
+            .isCompleted,
+        isTrue,
+      );
+      expect(
+        tester.getRect(find.byType(MaterialBanner)).height,
+        greaterThanOrEqualTo(kMinInteractiveDimension),
+      );
+      expect(
+        tester
+            .getRect(find.byType(MaterialBanner))
+            .overlaps(
+              tester.getRect(find.byTooltip('Exit fullscreen preview (Esc)')),
+            ),
+        isFalse,
+      );
+      await pumpUntilRendered(tester, world, frames: 2);
+      expect(
+        tester.widget<scene.SceneView>(find.byType(scene.SceneView)).scene,
+        same(world),
+      );
+      final failureImage =
+          await (capture.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary)
+              .toImage();
+      try {
+        final bytes = (await failureImage.toByteData(
+          format: ui.ImageByteFormat.png,
+        ))!;
+        await Directory('build/validation').create(recursive: true);
+        await File('build/validation/linux-fullscreen-error-feedback.png')
+            .writeAsBytes(bytes.buffer.asUint8List());
+      } finally {
+        failureImage.dispose();
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      await pumpUntilRendered(tester, world, frames: 2);
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(state().location, beforeRejection.location);
+      expect(state().timestamp, beforeRejection.timestamp);
+      expect(state().focalLength, beforeRejection.focalLength);
+      expect(state().roll, beforeRejection.roll);
+      expect(state().portrait, beforeRejection.portrait);
+      expect(
+        tester.widget<scene.SceneView>(find.byType(scene.SceneView)).scene,
+        same(world),
+      );
+    } finally {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        window,
+        null,
+      );
+    }
     final directory = await Directory.systemTemp.createTemp(
       'photosim-portrait-export-',
     );
