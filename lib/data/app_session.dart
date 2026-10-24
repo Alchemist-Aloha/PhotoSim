@@ -146,7 +146,6 @@ class SessionStore {
 
   Future<({AppSession? session, String? warning})> restore() async {
     try {
-      if (!await file.exists()) return (session: null, warning: null);
       if (await file.length() > maxBytes) {
         throw const FormatException('Oversized session');
       }
@@ -154,6 +153,13 @@ class SessionStore {
         session: AppSession.decode(await file.readAsString()),
         warning: null,
       );
+    } on FileSystemException catch (error) {
+      final code = error.osError?.errorCode;
+      // ENOENT / Windows path-not-found are first launch; permission failures must disable autosave.
+      if (code == 2 || (Platform.isWindows && code == 3)) {
+        return (session: null, warning: null);
+      }
+      rethrow;
     } on FormatException {
       // Keep the damaged checkpoint for recovery instead of silently overwriting it.
       final quarantine = await file.parent.createTemp('unreadable-session-');

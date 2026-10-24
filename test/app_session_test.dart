@@ -148,6 +148,52 @@ void main() {
     expect(() => store.save(source), throwsA(isA<FileSystemException>()));
     expect(await file.readAsString(), source);
   });
+  test('a missing session directory is a normal first launch', () async {
+    final root = await Directory.systemTemp.createTemp(
+      'photosim-missing-session-',
+    );
+    addTearDown(() => root.delete(recursive: true));
+    final file = File('${root.path}/missing/session.json');
+    final restored = await SessionStore(file).restore();
+    expect(restored.session, isNull);
+    expect(restored.warning, isNull);
+    expect(await file.parent.exists(), isFalse);
+  });
+
+  test(
+    'inaccessible session directories are not treated as missing checkpoints',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'photosim-denied-session-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final folder = await Directory('${root.path}/private').create();
+      final file = File('${folder.path}/session.json');
+      final original = utf8.encode(sessionFixture().encode());
+      await file.writeAsBytes(original);
+      expect((await Process.run('chmod', ['000', folder.path])).exitCode, 0);
+      try {
+        if (await file.exists()) {
+          markTestSkipped(
+            'Directory permission bits are not enforced for this user.',
+          );
+          return;
+        }
+        await expectLater(
+          SessionStore(file).restore(),
+          throwsA(isA<FileSystemException>()),
+        );
+      } finally {
+        expect((await Process.run('chmod', ['700', folder.path])).exitCode, 0);
+      }
+      expect(await file.readAsBytes(), original);
+      expect((await folder.list().toList()).map((entry) => entry.uri), [
+        file.uri,
+      ]);
+    },
+    skip: !Platform.isLinux,
+  );
+
   test(
     'unreadable and oversized sessions are preserved before starting fresh',
     () async {
