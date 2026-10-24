@@ -8,9 +8,40 @@ import 'terrain_geo.dart';
 
 const terrainTileBudget = 256;
 
-int terrainMeshResolution(TileId id, TileId center, RenderQuality quality) {
-  final base = id.key == center.key ? 128 : (id.z == 13 ? 64 : 32);
-  return quality == RenderQuality.high ? base * 2 : base;
+/// Floor for distant meshes: four times coarser than a nearby tile, but dense
+/// enough that a horizon ridge keeps its silhouette instead of flattening.
+const minTerrainMeshSamples = 16;
+
+/// Camera-to-tile-centre distance in that tile's own widths, wrapped across the
+/// date line. Cheap proxy for the tile's apparent size on screen.
+double terrainCameraDistanceInTileWidths(TileId id, SimulationState state) {
+  final camera = TileId.coordinates(state.location, id.z);
+  final span = (1 << id.z).toDouble();
+  var dx = camera.x - (id.x + 0.5);
+  if (dx > span / 2) dx -= span;
+  if (dx < -span / 2) dx += span;
+  final dy = camera.y - (id.y + 0.5);
+  return math.sqrt(dx * dx + dy * dy);
+}
+
+/// Mesh samples follow a tile's apparent size, not just its zoom level.
+///
+/// A tile keeps the neighbourhood resolution until it is more than
+/// [fullDetailTileWidths] of its own widths from the camera; past that each
+/// further doubling halves the mesh. A distant ridge covers a fraction of the
+/// pixels a nearby one does, so its extra vertices are wasted work. High quality
+/// still doubles the result, as before.
+int terrainMeshResolution(TileId id, SimulationState state) {
+  final high = state.renderQuality == RenderQuality.high;
+  if (id.key == TileId.at(state.location).key) return high ? 256 : 128;
+  final base = id.z == 13 ? 64 : 32;
+  const fullDetailTileWidths = 2.5;
+  final widths = terrainCameraDistanceInTileWidths(id, state);
+  final step = widths <= fullDetailTileWidths
+      ? 0
+      : (math.log(widths / fullDetailTileWidths) / math.ln2).floor() + 1;
+  final lod = math.max(base >> math.min(step, 3), minTerrainMeshSamples);
+  return lod * (high ? 2 : 1);
 }
 
 /// Refine the camera tile, or at most nine nearest rendered tiles in High.

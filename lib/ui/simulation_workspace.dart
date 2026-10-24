@@ -386,8 +386,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final tiles = terrainCoverage(widget.state);
     final wanted = tiles.map((tile) => tile.key).toSet();
     final center = TileId.at(origin);
-    final quality = widget.state.renderQuality;
-    int resolution(TileId tile) => terrainMeshResolution(tile, center, quality);
+    int resolution(TileId tile) => terrainMeshResolution(tile, widget.state);
     if (!rebase &&
         !retry &&
         wanted.length == wantedTiles.length &&
