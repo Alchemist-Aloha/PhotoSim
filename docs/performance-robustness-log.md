@@ -36,6 +36,65 @@ relative deltas as the signal and absolutes as pessimistic.
 
 ---
 
+## 2026-10-24 — warm-cache startup index
+
+### `cee1cb1` perf: index the raster cache in one synchronous pass
+
+Reopening the app on the restored 3D Preview showed no terrain or imagery for
+about 14 seconds even though all required rasters were already cached.
+Instrumented the real Linux app (`flutter run -d linux`, debug JIT) around the
+startup path. With 1 625 cached tiles (212 MiB):
+
+| Phase | Before | After |
+|---|---|---|
+| `RasterCache` index | **13 342 ms** | **67 ms** |
+| Scene + sources ready | 13 307 ms | 481 ms |
+| 15 terrain meshes + 256 px imagery | ~14.2 s | ~1.0 s |
+| 1024 px detail imagery complete | 14 888 ms | 2 135 ms |
+
+Root cause was the index alone, not decoding, network access or GPU work: terrain
+loading is gated on `budget.initialize()`, and `_index()` awaited `list`,
+`stat`, `exists` and `length` for every directory entry. In the running engine
+each awaited `dart:io` call costs an event-loop round trip (~3.6 ms per entry),
+so 3 241 files became 13 s of wall time for ~20 ms of actual disk work. The same
+scan through the plain Dart VM (`dart run`, and `flutter test`) took 64–198 ms,
+which is why this never showed up in unit tests.
+
+Files: `lib/data/raster_cache.dart`, plus `integration_test/linux_cache_index_test.dart`.
+Replaced the awaited scan with one synchronous `typeSync`/`listSync`/`statSync`/
+`existsSync` pass. Entries, sizes, staging-file cleanup, orphan-metadata cleanup,
+link/non-directory handling and `FileSystemException` propagation to the existing
+warning path are unchanged; only the IO call style and the removal of temporary
+`BOOT` instrumentation (swept into an unrelated auto-commit) changed. Reads,
+writes, eviction, budget accounting and network fallback are untouched.
+
+Cost of the fix: the scan now blocks the UI isolate for its duration — **67 ms**
+for 1 625 tiles, **75 ms** for 3 241 entries. That runs once during startup in
+place of a 13 s blank preview. It was not measured on Android storage, where a
+large cache could block for longer; that remains an open risk, and the accepted
+trade-off is stated here rather than assumed.
+
+New native regression (`flutter test integration_test/linux_cache_index_test.dart
+-d linux`) builds 660 cached tiles with metadata and asserts the index finishes
+under 2 s on the real engine. Against the old awaited implementation it measured
+**3 058 ms and failed**; with the synchronous pass it measures **41 ms** and
+passes. The bound is loose on purpose so a loaded machine does not flake, while
+still ordering the two implementations by two orders of magnitude.
+
+Verified: analyzer 0 issues; format clean; **290 tests pass**; native
+`linux_cache_index_test`, `linux_loading_test`, `startup_test`,
+`linux_spec_photography_test` and `linux_workflow_test` pass separately with
+180-second bounds. Session round-trip fingerprint is unchanged:
+**8 sessions / 15850 JSON bytes / 7707460953092100**. Evidence: ignored
+`build/validation/boot-{run,run2,run3,run4,final}.log`,
+`cache-index-native*.log` and `index_speed.dart`.
+
+No change to what is cached, eviction order, or download behavior, so this is a
+pure startup-latency fix. Release/profile timing and Android/Windows storage
+characteristics were not measured.
+
+---
+
 ## 2026-10-24 — fullscreen-failure priority
 
 ### `70e5f96` fix: prioritize fullscreen failure feedback
