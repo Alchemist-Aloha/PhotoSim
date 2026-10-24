@@ -15,7 +15,7 @@ Every commit in this log passed, before being committed:
 ```sh
 flutter analyze                                    # 0 issues
 dart format --output=none --set-exit-if-changed lib test integration_test
-flutter test                                       # currently 260 tests
+flutter test                                       # currently 262 tests
 ```
 
 Changes touching rendering, GPU state or widgets also run the relevant
@@ -33,6 +33,51 @@ Green tests alone do not prove a mesh or an encoder still emits the same data.
 Linux desktop, Flutter 3.47.7 / Dart 3.13.5 profile-capable build, NVIDIA GPU
 with X11. Absolute timings are debug-JIT unless stated otherwise, so treat
 relative deltas as the signal and absolutes as pessimistic.
+
+---
+
+## 2026-10-24 — unreadable session directory safety
+
+### `cf271d6` fix: distinguish unreadable session storage from first launch
+
+`SessionStore.restore` used `File.exists` to decide whether a checkpoint was
+missing. On Linux, an existing checkpoint inside a directory with mode `000`
+returns false from that call. Recovery therefore silently returned
+`(session: null, warning: null)`, allowing the app to start with defaults and
+leaving autosave eligible to replace the previous composition if permissions
+later recovered.
+
+Files: `lib/data/app_session.dart`, `test/app_session_test.dart`. Remove the
+ambiguous existence check and use the existing size/read operations. Only a
+real missing-file/path error is treated as first launch (ENOENT 2; Windows
+path-not-found 3 on Windows). Other filesystem failures propagate to the
+existing `lib/main.dart` startup handler, which clears the session store,
+disables automatic checkpoint writes and displays “Check folder permissions
+and restart.” No new UI, save format, API, dependency or concurrency policy.
+
+The new regression creates a valid checkpoint, removes all directory access
+with Linux `chmod 000`, and verifies that restore fails rather than reporting
+an absent session. It failed before the fix with the silent-null result and
+passes after it. Permissions are restored in `finally`; the original file's
+bytes are unchanged and no quarantine/staging file appeared. This ran as the
+normal non-root Linux user, not a simulated filesystem. The permission test
+explicitly skips other platforms and users for whom those bits are not enforced.
+A second test confirms a genuinely missing parent directory remains a normal,
+non-mutating first launch. Existing corrupt/oversized quarantine, failed-write
+preservation and startup-warning/exit-consent tests still pass.
+
+Normal recovery is fingerprint-proven across all four workspaces and both
+inspector visibility settings: **8 sessions / 15850 encoded JSON bytes / hash
+7707460953092100**, identical before/after. The probe also compares restored
+encoding and on-disk checkpoint bytes directly to the original. Ignored evidence:
+`build/validation/session_restore_fingerprint_test.dart`,
+`session-permissions-{before,after}.log`, `session-permissions-unit.log`.
+
+Verified: analyzer 0 issues; format clean; **262 unit/widget tests pass**.
+No GPU integration run was required: this change touches only checkpoint I/O
+and its tests, not widgets/rendering/export. Windows/Android permissions and
+actual disk-full faults were not newly exercised; the broader persistence audit
+remains open. No performance claim is made.
 
 ---
 
