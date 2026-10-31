@@ -70,22 +70,53 @@ double julianEphemerisDay(DateTime utc) {
 /// Heliocentric VSOP87 positions with light-time iteration, so the planets land
 /// in the same J2000 frame that [ObserverSkyFrame] rotates for stars.
 List<PlanetPosition> planetPositions(DateTime timestamp) {
+  final ephemeris = planetEphemeris(timestamp);
+  return [for (final planet in Planet.values) ephemeris.of(planet)];
+}
+
+/// Geocentric anchor shared by every planet at one instant.
+///
+/// Evaluating one planet costs ~14 % of the full set, so callers that need a
+/// single body use [of] instead of [planetPositions].
+class PlanetEphemeris {
+  PlanetEphemeris._(
+    this.jde,
+    this.earthDistance,
+    this.earthX,
+    this.earthY,
+    this.earthZ,
+  );
+
+  final double jde, earthDistance, earthX, earthY, earthZ;
+
+  PlanetPosition of(Planet planet) =>
+      _geocentric(planet, jde, earthDistance, earthX, earthY, earthZ);
+}
+
+DateTime? _cachedStamp;
+PlanetEphemeris? _cachedEphemeris;
+
+/// Earth's position for [timestamp], reused while the instant is unchanged.
+PlanetEphemeris planetEphemeris(DateTime timestamp) {
   final utc = timestamp.toUtc();
+  if (utc == _cachedStamp) return _cachedEphemeris!;
   if (utc.year < 1900 || utc.year > 2100) {
     throw ArgumentError('Planet ephemerides support 1900–2100 only');
   }
   final jde = julianEphemerisDay(utc);
   final earth = planetposition.Planet(planetposition.planetEarth)
       .position2000(jde);
-  final earthDistance = earth.range;
+  final distance = earth.range;
   final cosEarthLat = math.cos(earth.lat);
-  final earthX = earthDistance * cosEarthLat * math.cos(earth.lon);
-  final earthY = earthDistance * cosEarthLat * math.sin(earth.lon);
-  final earthZ = earthDistance * math.sin(earth.lat);
-  return [
-    for (final planet in Planet.values)
-      _geocentric(planet, jde, earthDistance, earthX, earthY, earthZ),
-  ];
+  final ephemeris = PlanetEphemeris._(
+    jde,
+    distance,
+    distance * cosEarthLat * math.cos(earth.lon),
+    distance * cosEarthLat * math.sin(earth.lon),
+    distance * math.sin(earth.lat),
+  );
+  _cachedStamp = utc;
+  return _cachedEphemeris = ephemeris;
 }
 
 PlanetPosition _geocentric(

@@ -98,4 +98,42 @@ void main() {
     expect(() => planetPositions(DateTime.utc(1899)), throwsArgumentError);
     expect(() => planetPositions(DateTime.utc(2101)), throwsArgumentError);
   });
+
+  test(
+    'single-planet ephemeris matches the full set and refills per instant',
+    () {
+      for (final instant in [
+        DateTime.utc(2026, 6, 21, 19),
+        DateTime.utc(1950, 1, 1),
+        DateTime.utc(2099, 12, 31, 23, 59),
+      ]) {
+        final all = {
+          for (final position in planetPositions(instant))
+            position.planet: position,
+        };
+        for (final planet in Planet.values) {
+          final one = planetEphemeris(instant).of(planet);
+          final full = all[planet]!;
+          expect(
+            one.ra,
+            full.ra,
+            reason: '$planet ${instant.toIso8601String()}',
+          );
+          expect(one.dec, full.dec);
+          expect(one.distanceAu, full.distanceAu);
+          expect(one.magnitude, full.magnitude);
+          expect(one.angularRadius, full.angularRadius);
+        }
+      }
+      // A cached Earth anchor must not leak across instants.
+      final first = planetEphemeris(DateTime.utc(2026, 6, 21, 19))
+          .of(Planet.mars);
+      final second = planetEphemeris(DateTime.utc(2026, 6, 21, 19, 0, 1))
+          .of(Planet.mars);
+      expect(first.ra, isNot(second.ra));
+      final again = planetEphemeris(DateTime.utc(2026, 6, 21, 19))
+          .of(Planet.mars);
+      expect(again.ra, first.ra);
+    },
+  );
 }

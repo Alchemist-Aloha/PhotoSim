@@ -288,7 +288,7 @@ class SimulationState {
 
   /// Planet as seen from this observer, using the same frame as stars.
   CelestialPosition planetPosition(Planet planet) {
-    final body = planets.firstWhere((entry) => entry.planet == planet);
+    final body = planetEphemeris(timestamp).of(planet);
     final sky = observerFrame.position(body.ra, body.dec);
     return CelestialPosition(
       sky.azimuth,

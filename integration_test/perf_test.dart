@@ -181,6 +181,47 @@ void main() {
         await tester.pump();
       });
 
+      // A selected planet makes the timeline readouts resolve planet ephemerides
+      // every frame, which is a distinct interactive workload from a bodyless aim.
+      inspector = tester.widget<CameraInspector>(find.byType(CameraInspector));
+      inspector.onChanged(
+        inspector.state.copyWith(
+          renderQuality: RenderQuality.balanced,
+          target: CelestialTarget.jupiter,
+        ),
+      );
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        if (find.text('Imagery 9/9').evaluate().isNotEmpty) break;
+      }
+      await run('planet-aim-scrub', const Duration(seconds: 4), () async {
+        inspector = tester.widget<CameraInspector>(
+          find.byType(CameraInspector),
+        );
+        inspector.onChanged(
+          inspector.state.copyWith(
+            azimuth: (inspector.state.azimuth + 7) % 360,
+          ),
+        );
+        await tester.pump();
+      });
+      await run('planet-time-scrub', const Duration(seconds: 3), () async {
+        inspector = tester.widget<CameraInspector>(
+          find.byType(CameraInspector),
+        );
+        inspector.onChanged(
+          inspector.state.copyWith(
+            timestamp: inspector.state.timestamp.add(const Duration(minutes: 5)),
+          ),
+        );
+        await tester.pump();
+      });
+      inspector = tester.widget<CameraInspector>(find.byType(CameraInspector));
+      inspector.onChanged(
+        inspector.state.copyWith(target: CelestialTarget.none),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+
       // Pure Dart astronomy cost within one frame-sized batch.
       final sample = tester
           .widget<CameraInspector>(find.byType(CameraInspector))
