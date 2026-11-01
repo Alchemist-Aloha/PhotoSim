@@ -20,12 +20,14 @@ aperture-linked depth of field.
 ## Photography controls
 
 The right inspector is grouped into collapsible **Optics**, **Position & orientation**,
-**Depth of field**, **Weather**, **Rendering**, and **About this preview** sections.
+**Exposure**, **Depth of field**, **Weather**, and **Composition guides** sections.
 Optics starts expanded; the other sections start collapsed. Expansion is retained
-while using the current workspace/session. Rendering includes quality, approximate
-relighting (enabled by default in new sessions) and constellation guides. Existing
-saved plans retain their own relighting preference. Weather, quality and relighting
-have a single home in the right panel. Open the app-bar **navigation menu** to
+while using the current workspace/session. The app-bar **Settings** page holds
+less frequent options: rendering quality, antialiasing, approximate relighting
+(enabled by default in new sessions), constellation guides, disk cache and preview
+info. Existing saved plans retain their own relighting preference. Weather
+stays in the inspector; quality and relighting live only in Settings.
+Open the app-bar **navigation menu** to
 switch between **Map** and **3D Preview**; its selected destination is highlighted
 and selection closes the drawer without resetting camera/time.
 
@@ -35,7 +37,7 @@ cache/download counts, navigation help and attribution/source links. No duplicat
 loading rows remain above or below the view. Cards scroll if space is tight;
 controls and metadata stay outside the export boundary and hide in clean mode.
 
-Under Rendering:
+Under **Settings → Rendering**:
 
 | Quality | Render scale | AA when Auto is selected | Shadow map | DOF gather |
 |---|---:|---|---:|---:|
@@ -43,7 +45,7 @@ Under Rendering:
 | Balanced (default) | 100% | Medium (FXAA) | 2048 | 32 taps |
 | High | 100% | High (MSAA where supported) | 4096 | 48 taps |
 
-**Rendering → Antialiasing** selects FXAA (enabled by default), MSAA 4×,
+**Settings → Rendering → Antialiasing** selects FXAA (enabled by default), MSAA 4×,
 Off, or Auto (follow the quality preset above). Explicit AA choices are independent
 of quality and persist in plans; old plans default to FXAA. Unsupported MSAA
 falls back to FXAA. The same effect is included in PNG exports. AA changes do

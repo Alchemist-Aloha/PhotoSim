@@ -45,8 +45,9 @@ The policy covers terrain/imagery requests, not the separate planning-map client
 
 ## Disk cache settings
 
-Open **Storage** in the right settings/inspector panel. Set **Total disk cache
-limit (MiB)** and press **Apply cache limit**. Default: **512 MiB**; range:
+Open the app-bar **Settings** page and set **Total disk cache
+limit (MiB)** under **Storage**, then press **Apply cache limit**. Default:
+**512 MiB**; range:
 **0–65,536 MiB** (64 GiB). Zero disables disk caching and removes existing raster
 entries. Changing the limit does not change camera/time, plans or loaded GPU assets.
 

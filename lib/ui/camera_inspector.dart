@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../core/geo.dart';
 import '../models/simulation_state.dart';
-import '../data/raster_cache.dart';
-import 'cache_settings_panel.dart';
 import 'terrain_range_controls.dart';
 import 'numeric_setting_field.dart';
 
@@ -14,13 +12,9 @@ class CameraInspector extends StatelessWidget {
     super.key,
     required this.state,
     required this.onChanged,
-    this.rasterCache,
-    this.cacheError,
     this.expandedSections = const {},
     this.onSectionChanged,
   });
-  final RasterCache? rasterCache;
-  final String? cacheError;
   final Map<String, bool> expandedSections;
   final void Function(String title, bool expanded)? onSectionChanged;
   final SimulationState state;
@@ -404,83 +398,6 @@ class CameraInspector extends StatelessWidget {
           'Illustrative conditions, not a forecast. Changing presets restores their defaults. Rain intensity controls screen-space streak density, not measured precipitation.',
         ),
       ]),
-      section('Rendering', Icons.tune, [
-        DropdownButtonFormField<RenderQuality>(
-          key: ValueKey(state.renderQuality),
-          initialValue: state.renderQuality,
-          decoration: const InputDecoration(labelText: 'Render quality'),
-          items: [
-            for (final quality in RenderQuality.values)
-              DropdownMenuItem(value: quality, child: Text(quality.label)),
-          ],
-          onChanged: (value) {
-            if (value != null) onChanged(state.copyWith(renderQuality: value));
-          },
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<Antialiasing>(
-          key: ValueKey(state.antialiasing),
-          initialValue: state.antialiasing,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Antialiasing'),
-          items: [
-            for (final mode in Antialiasing.values)
-              DropdownMenuItem(value: mode, child: Text(mode.label)),
-          ],
-          onChanged: (value) {
-            if (value != null) onChanged(state.copyWith(antialiasing: value));
-          },
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'FXAA is enabled by default. MSAA falls back to FXAA if unsupported; Auto follows the quality preset.',
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Approximate relighting'),
-          value: state.relitImagery,
-          onChanged: (value) => onChanged(state.copyWith(relitImagery: value)),
-        ),
-        Text(
-          state.relitImagery
-              ? 'UTC-driven Sun/Moon light · approximate atmosphere'
-              : state.atmosphericEffects || state.depthOfField
-              ? 'Illustrative weather/DOF · captured shadows remain'
-              : 'Natural imagery retains captured lighting',
-        ),
-        const SizedBox(height: 8),
-        Text(
-          state.cameraLightStrength == 0
-              ? 'Camera light: off'
-              : 'Camera light: ${state.cameraLightStrength.toStringAsFixed(0)}%',
-        ),
-        Semantics(
-          label: 'Camera light strength',
-          child: Slider(
-            key: const ValueKey('camera-light-strength'),
-            value: state.cameraLightStrength,
-            min: 0,
-            max: 100,
-            divisions: 100,
-            semanticFormatterCallback: (value) =>
-                value == 0 ? 'Off' : '${value.round()} percent',
-            onChanged: state.relitImagery
-                ? (value) =>
-                      onChanged(state.copyWith(cameraLightStrength: value))
-                : null,
-          ),
-        ),
-        const Text(
-          'Terrain-only preview fill from the camera. 0% is off; requires approximate relighting. Auto exposure is held while the light is on.',
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Constellation guides'),
-          value: state.showConstellations,
-          onChanged: (value) =>
-              onChanged(state.copyWith(showConstellations: value)),
-        ),
-      ]),
       section('Composition guides', Icons.grid_3x3, [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -502,14 +419,6 @@ class CameraInspector extends StatelessWidget {
         ),
         const Text(
           'Composition guides are omitted from PNG exports. The level is the geometric horizontal plane, not a terrain-horizon prediction.',
-        ),
-      ]),
-      section('Storage', Icons.storage, [
-        CacheSettingsPanel(cache: rasterCache, error: cacheError),
-      ]),
-      section('About this preview', Icons.info_outline, [
-        const Text(
-          'PhotoSim\nSun/Moon readouts are airless topocentric centers; no refraction or terrain-horizon prediction. Relighting is approximate; photographic shadows remain in the imagery.',
         ),
       ]),
     ],

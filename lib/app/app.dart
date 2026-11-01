@@ -20,6 +20,7 @@ import '../core/night_sky.dart';
 
 import '../models/simulation_state.dart';
 import '../ui/camera_inspector.dart';
+import '../ui/settings_page.dart';
 import '../ui/map_workspace.dart';
 import '../ui/simulation_workspace.dart';
 import '../ui/time_slider.dart';
@@ -500,6 +501,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       expandedSections = Map.of(saved.expandedSections);
     }
     cleanComposition = saved?.cleanComposition ?? composition;
+    rasterCache = widget.rasterCache;
     sessionWarning = widget.sessionWarning;
     if (widget.sessionStore != null || widget.sessionWarning != null) {
       exitListener = AppLifecycleListener(onExitRequested: requestExit);
@@ -1021,8 +1023,6 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     final inspector = CameraInspector(
       state: state,
       onChanged: updateFromInspector,
-      rasterCache: rasterCache,
-      cacheError: cacheError,
       expandedSections: expandedSections,
       onSectionChanged: (title, expanded) =>
           setState(() => expandedSections[title] = expanded),
@@ -1049,6 +1049,22 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       } else {
         scaffoldKey.currentState?.openEndDrawer();
       }
+    }
+
+    Future<void> openSettings() async {
+      final navigator = Navigator.of(context);
+      if (rasterCache == null && cacheError == null) await initializeCache();
+      if (!mounted) return;
+      await navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => SettingsPage(
+            state: state,
+            onChanged: update,
+            rasterCache: rasterCache,
+            cacheError: cacheError,
+          ),
+        ),
+      );
     }
 
     final viewport = workspace == Workspace.calendar
@@ -1260,6 +1276,11 @@ class _WorkspaceShellState extends State<WorkspaceShell>
                       }
                     },
                   ),
+                IconButton(
+                  tooltip: 'Settings',
+                  icon: const Icon(Icons.settings_outlined),
+                  onPressed: () => unawaited(openSettings()),
+                ),
               ],
             ),
       endDrawer: dockedInspector || cleanPreview || !editingScene

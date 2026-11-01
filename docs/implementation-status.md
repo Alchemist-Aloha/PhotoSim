@@ -47,7 +47,7 @@ requirements separately from excluded platform work.
   preferences remain authoritative. Optional natural, display-referred imagery.
 - Pixels unavailable from every source stay a labeled fallback surface; unavailable
   high-resolution imagery retains a successful preview.
-- Terrain/imagery share one persistent LRU disk-cache limit under **Storage**:
+- Terrain/imagery share one persistent LRU disk-cache limit under **Settings → Storage**:
   512 MiB default, configurable 0–65,536 MiB. Provider/resolution namespaces stay
   separate on disk without fixed individual quotas; old NAIP paths remain readable. Corruption recovery,
   source metadata, dimension-checked PNG/indexed PNG/JPEG and isolate compositing.
@@ -60,7 +60,7 @@ requirements separately from excluded platform work.
   relit terrain. Natural imagery is preserved; celestial proxies bypass terrestrial
   fog without bypassing exposure or terrain occlusion. Astronomy/geometry remain unchanged.
 - Explicit FXAA (default), MSAA 4× with capability fallback, Off and quality-driven
-  Auto controls in Rendering; persisted in plans without geographic reloads.
+  Auto controls in **Settings → Rendering**; persisted in plans without geographic reloads.
 - NASA SVS/LRO-textured Moon sphere with near-side/pole orientation, correct apparent size, phase and limb
   orientation, depth-tested against terrain; phase-dependent approximate moonlight.
 - Corrected east/west viewport handedness, with a GPU bright-limb regression test.

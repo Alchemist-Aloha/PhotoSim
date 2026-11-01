@@ -180,7 +180,7 @@ penumbra cap stays small because the backend also uses it in receiver bias.
 Shadow reach is bounded by render distance and 16 km (24 km high); screen-space
 contact shadows cannot represent off-screen occluders.
 
-**Rendering → Camera light** adds an optional white point source at the camera,
+**Settings → Rendering → Camera light** adds an optional white point source at the camera,
 0–100% strength (0 = off), in approximately relit mode. It uses inverse-square
 falloff, a 2 m emitter-radius safety floor and the terrain render range; it is a
 visibility aid, not a simulated calibrated flashlight. It casts no extra shadows

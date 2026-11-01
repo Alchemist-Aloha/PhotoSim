@@ -83,7 +83,6 @@ void main() {
                     child: CameraInspector(
                       state: state,
                       onChanged: (next) => setState(() => state = next),
-                      rasterCache: cache,
                     ),
                   ),
                 ],

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/settings_page.dart';
 
 void main() {
   testWidgets('focal length edits and readouts use whole millimeters', (
@@ -42,7 +43,7 @@ void main() {
   });
 
   testWidgets(
-    'rendering section exposes antialiasing without changing camera/time',
+    'settings page exposes rendering controls without changing camera/time',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(310, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -50,20 +51,9 @@ void main() {
       final original = state;
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, update) => CameraInspector(
-                state: state,
-                onChanged: (next) => update(() => state = next),
-              ),
-            ),
-          ),
+          home: SettingsPage(state: state, onChanged: (next) => state = next),
         ),
       );
-      await tester.tap(find.text('Optics'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Rendering'));
-      await tester.pumpAndSettle();
       await tester.tap(find.byType(DropdownButtonFormField<Antialiasing>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('MSAA 4×').last);

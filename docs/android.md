@@ -49,7 +49,7 @@ One shared Flutter UI and simulation state, not a separate mobile codebase:
   side-by-side tablet layout; it hides camera controls and the simulation timeline.
   Its keyless sources and approximation limits are in [night planning](night-calendar.md).
 - Android starts with the Performance render preset. Balanced and High remain
-  available in the Rendering inspector.
+  available in the app-bar **Settings** page under **Rendering**.
 
 ## Local files and export
 

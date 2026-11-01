@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/data/app_session.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
-import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/settings_page.dart';
 
 void main() {
   test(
@@ -44,20 +44,14 @@ void main() {
         final semantics = tester.ensureSemantics();
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(
-              body: StatefulBuilder(
-                builder: (context, update) {
-                  rebuild = update;
-                  return CameraInspector(
-                    state: state,
-                    expandedSections: const {
-                      'Optics': false,
-                      'Rendering': true,
-                    },
-                    onChanged: (next) => update(() => state = next),
-                  );
-                },
-              ),
+            home: StatefulBuilder(
+              builder: (context, update) {
+                rebuild = update;
+                return SettingsPage(
+                  state: state,
+                  onChanged: (next) => update(() => state = next),
+                );
+              },
             ),
           ),
         );

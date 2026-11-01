@@ -78,10 +78,11 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
   a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile.
 - Approximate relighting enabled by default; optional natural imagery, without rebuilding terrain.
-- Collapsible inspector sections for optics, position/orientation, depth of field, weather and rendering.
+- Collapsible inspector sections for optics, position/orientation, depth of field, weather and composition guides.
+- **Settings** page (app-bar gear) for rendering quality, antialiasing, relighting/camera light, constellation guides and disk cache.
 - Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
 - [Procedural volumetric clouds](docs/clouds.md): five cloud types, amount and randomization controls, 256 km cloud range with distance-based quality, warm twilight and dark moonlit shading. Type/amount/seed survive save and restart.
-- Persistent terrain/imagery disk caching with one adjustable size limit under **Storage** (512 MiB default), LRU eviction, corruption recovery and source metadata.
+- Persistent terrain/imagery disk caching with one adjustable size limit under **Settings → Storage** (512 MiB default), LRU eviction, corruption recovery and source metadata.
 - Drag the 3D preview to look around, with finer aiming when zoomed in; use the focal-length slider in whole millimeters or type an exact 8–600 mm value and apply it.
 - Enter decimal-degree latitude/longitude under **Position & orientation** for precise, keyboard-accessible placement. Map placement, marker drags and coordinate edits offer a one-step **Undo** for 10 seconds; undo preserves other lens/time settings.
 - Dismiss map instructions with **Hide map guidance**; the preference survives restart. **Map guide** keeps the full instructions available.
@@ -92,11 +93,11 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
 - Blended terrain shadow cascades; High quality adds PCSS/contact shadows, denser 256/128/64 terrain meshes, 1.25× supersampling and terrain-scale GTAO with bent-normal indirect lighting.
 - Progressive imagery: 256px previews, then a 1024px camera tile; High refines up to nine nearest rendered tiles with bounded three-request concurrency. Failed detail requests retain previews.
-- **Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
-- Rendering-panel antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
+- **Settings → Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
+- **Settings → Rendering** antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
 - Persistent navigation rail for Map/3D Preview/Calendar/Export; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
-- Collapsible inspector with weather/quality/relighting in the right panel; camera-local date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
+- Collapsible inspector with camera, weather and composition controls in the right panel; app-bar **Settings** page for rendering and cache options; camera-local date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
 - Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
 - Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
 - 5,044 bundled stars, licensed simplified Milky Way brightness contours, and the seven naked-eye planets from offline VSOP87 ephemerides (light-time corrected).
@@ -223,7 +224,7 @@ The map's dashed circle approximates the nearby tile envelope or forward reach,
 whichever is larger. Zoom out to see its full extent. It is not an exact tile
 boundary or download-status indicator; render distance does not shrink the fetch circle.
 
-Terrain and imagery share a persistent LRU disk budget configured under **Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
+Terrain and imagery share a persistent LRU disk budget configured under **Settings → Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
 loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,
 but current mesh density does not display their finest native detail. Cached terrain works without network access, but this is not a complete
 offline-region feature. Source vertical datums are uncorrected; do not use the
