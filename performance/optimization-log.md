@@ -149,6 +149,41 @@ broad refactor of the immutable-state plumbing: rejected as disproportionate.
 GPU-bound High-quality interaction remains the real limit and cannot be measured
 reliably here (shared GPU, no GPU completion timestamps).
 
+## Iteration 5 — share scene assets across Map ↔ 3D switches
+
+- Baseline: `8865570`.
+- Bottleneck: the shell builds `SimulationWorkspace` only while the 3D workspace
+  is selected, so every Map → 3D switch tears the scene down and reloads its
+  assets. Probes over six entries attributed the rebuild: lunar texture
+  ≈30 ms/entry (89 ms first), cloud material+noise ≈19 ms, Milky Way texture
+  ≈9 ms, star geometry ≈9 ms, planet label atlas ≈9 ms. Measured re-entry cost
+  was 112–185 ms to the first rendered frame.
+- Change: `lib/render/scene_assets.dart` memoizes the immutable device inputs
+  (sky shader, lunar and Milky Way textures, cloud material and noise texture)
+  in one process-wide future, retried after a failed load; `CloudRenderer` takes
+  those shared resources (`CloudResources`) and still builds its own node; the
+  planet label atlas is memoized too. Scene graphs, nodes, lights and terrain
+  remain per-entry, so nothing is shared that belongs to a scene.
+- Benchmark: `integration_test/perf_test.dart` gained a permanent
+  `map-to-preview re-entry` measurement (two Map → 3D switches after the warm
+  phase), because the existing phases only measured the first entry.
+- Results, 3 interleaved runs (A = `8865570`, B = candidate):
+  - Map → 3D re-entry first-scene, 6 samples each: A 112/127/167/147/185/167 ms
+    (median 157.4) → B 67/71/84/86/84/69 ms (median 77.4), **−50.8 %**;
+    every B sample is faster than every A sample.
+  - warm-cache first-scene (second entry in one process): A 150.2/134.4/186.7 →
+    B 68.0/66.2/69.0 ms medians, **−54.7 %**.
+  - First entry in a cold process is unchanged by design (assets still load once).
+  - Per-frame phases (aim, time, high-quality scrub, planet target) unchanged.
+- Tradeoff: the shared textures stay resident for the process (≈10 MB VRAM:
+  2048-wide lunar map plus the cloud noise and Milky Way atlases) instead of being
+  released when the 3D workspace is left.
+- Correctness: 299 unit/widget tests, strict analysis and the `startup`,
+  `clouds`, `idle-render`, `moon-texture` and `cloud-photo` integration tests
+  pass. Assets are immutable inputs; no rendering inputs or shader settings
+  changed, so pixel output is unaffected.
+- Accepted.
+
 ## Final measurement — accepted commits versus the original baseline
 
 Direct comparison, 3 interleaved runs each, `A` = `4ade658`, `B` = `8865570`

@@ -26,6 +26,7 @@ import '../models/simulation_state.dart';
 import '../render/moon.dart';
 import '../render/atmosphere_sky.dart';
 import '../render/clouds.dart';
+import '../render/scene_assets.dart';
 import '../render/photography.dart';
 import '../render/photo_framing.dart';
 import '../core/sunlight.dart';
@@ -204,13 +205,16 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
 
   Future<void> initializeScene() async {
     await scene.Scene.initializeStaticResources();
-    final (atmosphere, lunarAlbedo, starCatalog, band, clouds) = await (
-      AtmosphereSky.load(),
-      scene.Texture2D.fromAsset('assets/moon/lroc_color_2k.jpg', maxSize: 2048),
+    final (assets, starCatalog) = await (
+      SceneAssets.load(),
       rootBundle.loadString('assets/sky/stars.json'),
-      scene.Texture2D.fromAsset('assets/sky/milky_way.png'),
-      CloudRenderer.load(),
     ).wait;
+    final atmosphere = assets.atmosphere,
+        lunarAlbedo = assets.lunarAlbedo,
+        band = assets.milkyWay,
+        clouds = CloudRenderer(
+          CloudResources(assets.cloudMaterial, assets.cloudNoise),
+        );
     skySource = atmosphere;
     if (!mounted) return;
     cloudRenderer = clouds;

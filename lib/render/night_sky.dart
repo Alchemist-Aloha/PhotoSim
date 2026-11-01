@@ -175,8 +175,12 @@ class NightSkyRenderer {
     for (final planet in Planet.values) planet.label,
   ];
 
-  static Future<scene.Texture2D> labelAtlasForPlanets() =>
+  /// Memoized: the atlas is identical for every scene, and rasterizing it again
+  /// on each map-to-preview switch costs ~9 ms.
+  static Future<scene.Texture2D> labelAtlasForPlanets() => _planetAtlas ??=
       buildLabelAtlas(planetLabels, color: const Color(0xFFFFE9B8));
+
+  static Future<scene.Texture2D>? _planetAtlas;
 
   /// Marker tints; brightness comes from apparent magnitude, as with stars.
   static final _planetColour = <Planet, vm.Vector4>{

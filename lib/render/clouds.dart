@@ -45,12 +45,21 @@ const cloudRenderDistanceKm = 256.0;
 double cloudLightTransmission(SimulationState state) =>
     1 - state.cloudAmount * (state.cloudType == CloudType.cirrus ? 0.15 : 0.55);
 
+/// The material and noise texture, shared by every [CloudRenderer] instance.
+class CloudResources {
+  const CloudResources(this.material, this.noise);
+  final scene.PreprocessedMaterial material;
+  final scene.Texture2D noise;
+}
+
 class CloudRenderer {
-  CloudRenderer._(this.material, scene.Texture2D noise) {
+  CloudRenderer(CloudResources resources)
+    : material = resources.material,
+      _noise = resources.noise {
     material.parameters.setTexture(
       'cloud_noise',
-      noise.gpuTexture,
-      sampler: noise.sampledSampler,
+      _noise.gpuTexture,
+      sampler: _noise.sampledSampler,
     );
     node =
         scene.Node(
@@ -65,7 +74,7 @@ class CloudRenderer {
           ..renderOrder = 100;
   }
 
-  static Future<CloudRenderer> load() async {
+  static Future<CloudResources> loadShared() async {
     final (material, noise) = await (
       scene.loadFmatMaterial('assets/atmosphere/clouds.fmat'),
       scene.Texture2D.fromAsset(
@@ -74,10 +83,14 @@ class CloudRenderer {
         sampling: const scene.TextureSampling(mipmaps: false),
       ),
     ).wait;
-    return CloudRenderer._(material, noise);
+    return CloudResources(material, noise);
   }
 
+  static Future<CloudRenderer> load() async =>
+      CloudRenderer(await loadShared());
+
   final scene.PreprocessedMaterial material;
+  final scene.Texture2D _noise;
   late final scene.Node node;
   int? lastSeed;
 

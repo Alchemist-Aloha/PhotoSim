@@ -95,6 +95,42 @@ void main() {
           await tester.pump(const Duration(milliseconds: 100));
         }
       }
+      // Map <-> 3D Preview switches destroy and rebuild the workspace, so this is
+      // a separate latency from the first entry measured above.
+      final reentry = <double>[];
+      for (var i = 0; i < 2; i++) {
+        await tester.tap(find.byIcon(Icons.map_outlined).last);
+        for (var f = 0; f < 60; f++) {
+          await tester.pump(const Duration(milliseconds: 50));
+          if (find.byType(scene.SceneView).evaluate().isEmpty) break;
+        }
+        await tester.pump(const Duration(milliseconds: 300));
+        final watch = Stopwatch()..start();
+        await tester.tap(find.text('3D Preview'));
+        while (watch.elapsed < const Duration(seconds: 60)) {
+          await tester.pump(const Duration(milliseconds: 10));
+          final views = find.byType(scene.SceneView);
+          if (views.evaluate().isNotEmpty &&
+              tester
+                      .widget<scene.SceneView>(views)
+                      .scene!
+                      .renderStats
+                      .frameCount >
+                  0) {
+            break;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        reentry.add(watch.elapsedMicroseconds / 1000);
+        for (var f = 0; f < 400; f++) {
+          await tester.pump(const Duration(milliseconds: 50));
+          if (find.text('Imagery 9/9').evaluate().isNotEmpty) break;
+        }
+      }
+      output.writeln(
+        'map-to-preview re-entry first-scene ms: '
+        '${reentry.map((ms) => ms.toStringAsFixed(1)).toList()}',
+      );
       SchedulerBinding.instance.addTimingsCallback(timings.addAll);
       Future<void> run(
         String label,
@@ -211,7 +247,9 @@ void main() {
         );
         inspector.onChanged(
           inspector.state.copyWith(
-            timestamp: inspector.state.timestamp.add(const Duration(minutes: 5)),
+            timestamp: inspector.state.timestamp.add(
+              const Duration(minutes: 5),
+            ),
           ),
         );
         await tester.pump();
