@@ -207,25 +207,31 @@ rebuilds only on interaction, so it was left alone.
 
 ## Final measurement — accepted commits versus the original baseline
 
-Direct comparison, 3 interleaved runs each, `A` = `4ade658`, `B` = `8865570`
-(the current `perf_test.dart` copied into a worktree of the baseline so both
-sides run the same workloads), UI-thread `build p50`:
+Direct comparison, 3 interleaved runs each, `A` = `4ade658`, `B` = `4c2d4ae`
+(the current `perf_test.dart`, including the planet-target and map-to-preview
+phases, copied into a worktree of the baseline so both sides run the same
+workloads):
 
 | Workload | A (median) | B (median) | Change |
 |---|---:|---:|---:|
-| planet-target aim scrub | 9.49 ms (9.49/9.38/9.63) | 7.33 ms (7.32/7.33/7.34) | **−22.8 %** |
-| planet-target time scrub | 9.70 ms (9.71/9.50/9.70) | 8.01 ms (8.01/8.20/7.89) | **−17.4 %** |
-| cold 3D entry → first scene | 175.8 ms (175.8/173.6/228.9) | 158.6 ms (160.3/158.6/157.5) | **−9.8 %** |
-| warm 3D entry → first scene | 152.6 ms | 147.5 ms | −3.3 % (weak) |
-| aim scrub | 6.71 ms | 6.69 ms | unchanged |
-| time scrub | 7.40 ms | 7.36 ms | unchanged |
-| high-quality aim scrub | 6.96 ms | 6.42 ms | unchanged (noise) |
-| star mesh construction (probe) | 7.50 ms | 1.75 ms | −77 % |
+| warm 3D entry → first scene | 150.95 ms | 67.19 ms | **−55.5 %** |
+| cold 3D entry → first scene | 212.79 ms | 154.76 ms | **−27.3 %** |
+| Map → 3D re-entry → first scene | 157.9 ms | 84.1 ms | **−46.7 %** |
+| planet-target aim scrub (build p50) | 9.16 ms | 7.54 ms | **−17.7 %** |
+| planet-target time scrub | 9.62 ms | 8.22 ms | **−14.6 %** |
+| aim scrub | 6.95 ms | 6.84 ms | unchanged |
+| time scrub | 7.29 ms | 7.41 ms | unchanged |
+| high-quality aim scrub | 6.87 ms | 6.88 ms | unchanged |
+| playback build p50 | 2.47–2.82 ms | 2.81–2.84 ms | unchanged |
 
-Peak-RSS, VRAM and GPU-completion timings were not collected: the tools for
-per-process GPU attribution are unavailable here and the device is shared.
-Rendering correctness is argued from bit-identical geometry plus unchanged
-shader/material inputs, not from reference-image comparison.
+Auxiliary measurements from isolated probes (removed from the tree): star mesh
+7.50 → 1.75 ms, planet label atlas 8–10 ms moved off the entry path, scene asset
+load 77.7 ms first entry then ~1 ms per re-entry.
+
+Peak-RSS, VRAM and GPU-completion timings were not collected: per-process GPU
+attribution tooling is unavailable here and the device is shared. Rendering
+correctness is argued from bit-identical geometry and unchanged shader/material
+inputs, not from reference-image comparison.
 
 ## Environment caveats found during baseline work
 
