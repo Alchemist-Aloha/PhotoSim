@@ -205,6 +205,36 @@ Temporary profile harness (removed): the map workspace is not a bottleneck —
 idle `build p50` 0.19 ms, pan 0.95 ms, zoom 0.22 ms, raster p50 3–4.5 ms. It
 rebuilds only on interaction, so it was left alone.
 
+## Iteration 7 — rejected: skip planet markers' ephemerides while they are hidden
+
+- Baseline: `6d333c1`.
+- Hypothesis: `NightSkyRenderer.update` resolves all seven planet ephemerides
+  every simulated hour even when the markers are invisible (daylight). Probes
+  during the daytime time-scrub phase: `nightUpdate` 43.3 ms over 120 frames
+  (0.36 ms/frame) with the refresh, 10.3 ms (0.085 ms/frame) when gated on star
+  visibility — the gate works and removes ~0.28 ms/frame of UI-thread work.
+- Result on the benchmark: not user-visible. `time-scrub` build mean
+  7.21/7.18 ms → 7.31 ms (4 paired runs each) and p95 11.45 → 11.16 ms — inside
+  noise; the night-time `planet-time-scrub` control phase was unchanged as
+  expected. The frames are not CPU-limited in that workload, so the saved work
+  hides behind GPU waits.
+- **Reverted** as an inconclusive improvement. Worth revisiting only on a
+  CPU-limited target (low-end Android), where 0.28 ms/frame at 60 Hz is ~1.7 %
+  of the frame budget, or once GPU time can be measured here.
+
+## Benchmark infrastructure added
+
+`perf_test.dart` now prints `mean` alongside `p50/p95/max` for build and raster
+durations: p95 from ~90–120 frames is too unstable to decide small changes, so
+the mean is used as the primary estimator with the medians as support.
+
+## Measured, no action needed: export render
+
+Temporary profile harness (removed): the Export workspace's high-quality render
+takes ~810–830 ms wall at 2× density, but the UI thread stays free — build p50
+0.8–1.1 ms, max 9.4 ms, raster max 20.7 ms, ~23 frames. It is render/encode
+bound in the engine, not app-side CPU, so nothing was changed.
+
 ## Final measurement — accepted commits versus the original baseline
 
 Direct comparison, 3 interleaved runs each, `A` = `4ade658`, `B` = `4c2d4ae`

@@ -155,9 +155,12 @@ void main() {
         double pct(List<double> values, double p) => values.isEmpty
             ? double.nan
             : values[math.min(values.length - 1, (values.length * p).floor())];
+        final buildMean = build.isEmpty
+            ? double.nan
+            : build.reduce((a, b) => a + b) / build.length;
         output.writeln(
           '$label frames=${timings.length} loop=$count '
-          'build p50=${pct(build, .5).toStringAsFixed(2)} p95=${pct(build, .95).toStringAsFixed(2)} max=${build.isEmpty ? 'n/a' : build.last.toStringAsFixed(2)} | '
+          'build p50=${pct(build, .5).toStringAsFixed(2)} p95=${pct(build, .95).toStringAsFixed(2)} max=${build.isEmpty ? 'n/a' : build.last.toStringAsFixed(2)} mean=${buildMean.toStringAsFixed(2)} | '
           'raster p50=${pct(raster, .5).toStringAsFixed(2)} p95=${pct(raster, .95).toStringAsFixed(2)} max=${raster.isEmpty ? 'n/a' : raster.last.toStringAsFixed(2)}',
         );
       }
