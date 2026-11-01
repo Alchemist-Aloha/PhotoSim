@@ -75,6 +75,33 @@ device utilization with PhotoSim closed), so no GPU-bound claim is made.
 - Accepted (below the 3 % default on its own but consistently repeatable, paired,
   and a three-line change with no behavioural surface).
 
+## Iteration 3 — build the planet label atlas after the first frame
+
+- Baseline: `11924cf`.
+- Bottleneck: `initializeScene` awaited `NightSkyRenderer.loadPlanetLabels()`
+  before publishing the scene. That atlas rasterizes seven labels with
+  `Picture.toImage` + texture upload, measured with temporary probes at
+  8–10 ms per 3D entry, and it sat inside the critical path to the first
+  rendered preview frame.
+- Change: the 3D entry no longer waits for it; the atlas loads from the existing
+  post-frame callback (next to constellation guides) and triggers one rebuild
+  when ready. `exportImage` awaits it before capturing so exports keep labels.
+  `_updatePlanetLabels` already no-ops until the geometry exists.
+- App benchmark, `workspace-to-ready` `first-scene` milestones, 4 interleaved
+  paired runs (A = `11924cf`, B = candidate):
+  - warm cache: A 167.58/148.76/152.01/146.19 (median 150.38 ms) → B
+    145.95/134.36/137.33/133.99 (median 135.85 ms), **−9.7 %**; non-overlapping
+    ranges, every pair improved.
+  - cold cache: A 228.89/175.31/219.51/218.07 (median 218.95 ms) → B
+    207.55/174.57/190.72/179.33 (median 185.03 ms), **−15.5 %**; ranges overlap
+    through one low A outlier, but every pair improved.
+  - `center-terrain`/`center-imagery` unchanged in kind (network-bound).
+- Correctness: 298 unit/widget tests, strict analysis, `startup_test`,
+  `idle_render_test` and `clouds_test` pass. `atmosphere_test` fails on this
+  machine identically with the change stashed (pre-existing). Exports await the
+  atlas, so an early capture cannot lose planet names.
+- Accepted.
+
 ## Rejected this session — rebuild scope of the 3D shell
 
 Temporary subtree ablation during aim scrub (paired phases in one process,

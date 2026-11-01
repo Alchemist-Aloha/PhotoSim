@@ -239,11 +239,21 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     world!.add(moonRenderer!.node);
     nightRenderer = NightSkyRenderer(parseStarCatalog(starCatalog), band);
     world!.add(nightRenderer!.root);
-    await nightRenderer!.loadPlanetLabels();
+    // The label atlas rasterizes and reads back a texture; build it after the
+    // first frame so it does not delay the preview's first render.
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(loadConstellations());
+      if (!mounted) return;
+      unawaited(loadPlanetLabels());
+      unawaited(loadConstellations());
     });
+  }
+
+  Future<void> loadPlanetLabels() async {
+    final renderer = nightRenderer;
+    if (renderer == null || renderer.planetLabelNode != null) return;
+    await renderer.loadPlanetLabels();
+    if (mounted) setState(() {});
   }
 
   Future<void> loadConstellations() async {
@@ -694,6 +704,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   Future<void> exportImage({bool previewOnly = false}) async {
     if (exporting || saving) return;
     widget.onPausePlayback?.call();
+    // Captures may happen before the deferred label atlas finishes.
+    await loadPlanetLabels();
+    if (!mounted) return;
     setState(() {
       exporting = true;
       exportError = null;
