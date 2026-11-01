@@ -149,6 +149,28 @@ broad refactor of the immutable-state plumbing: rejected as disproportionate.
 GPU-bound High-quality interaction remains the real limit and cannot be measured
 reliably here (shared GPU, no GPU completion timestamps).
 
+## Final measurement — accepted commits versus the original baseline
+
+Direct comparison, 3 interleaved runs each, `A` = `4ade658`, `B` = `8865570`
+(the current `perf_test.dart` copied into a worktree of the baseline so both
+sides run the same workloads), UI-thread `build p50`:
+
+| Workload | A (median) | B (median) | Change |
+|---|---:|---:|---:|
+| planet-target aim scrub | 9.49 ms (9.49/9.38/9.63) | 7.33 ms (7.32/7.33/7.34) | **−22.8 %** |
+| planet-target time scrub | 9.70 ms (9.71/9.50/9.70) | 8.01 ms (8.01/8.20/7.89) | **−17.4 %** |
+| cold 3D entry → first scene | 175.8 ms (175.8/173.6/228.9) | 158.6 ms (160.3/158.6/157.5) | **−9.8 %** |
+| warm 3D entry → first scene | 152.6 ms | 147.5 ms | −3.3 % (weak) |
+| aim scrub | 6.71 ms | 6.69 ms | unchanged |
+| time scrub | 7.40 ms | 7.36 ms | unchanged |
+| high-quality aim scrub | 6.96 ms | 6.42 ms | unchanged (noise) |
+| star mesh construction (probe) | 7.50 ms | 1.75 ms | −77 % |
+
+Peak-RSS, VRAM and GPU-completion timings were not collected: the tools for
+per-process GPU attribution are unavailable here and the device is shared.
+Rendering correctness is argued from bit-identical geometry plus unchanged
+shader/material inputs, not from reference-image comparison.
+
 ## Environment caveats found during baseline work
 
 - Function-level VM-service profiling was unusable: every connection from a
