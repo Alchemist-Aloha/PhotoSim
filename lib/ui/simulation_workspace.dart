@@ -363,6 +363,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       coverageDebounce = Timer(const Duration(milliseconds: 400), () {
         if (mounted && nightRenderer != null) unawaited(loadTerrain());
       });
+    } else if (old.focalLength != next.focalLength ||
+        old.sensor != next.sensor ||
+        old.portrait != next.portrait) {
+      // Lens changes move the focal-length detail band, so resident patches need
+      // a new mesh resolution even with forward fetching off.
+      coverageDebounce?.cancel();
+      coverageDebounce = Timer(const Duration(milliseconds: 400), () {
+        if (mounted && nightRenderer != null) unawaited(loadTerrain());
+      });
     }
     if (old.terrainRenderKm != next.terrainRenderKm ||
         old.location != next.location) {

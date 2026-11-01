@@ -217,10 +217,10 @@ class SimulationState {
         terrainRings > 3 ||
         !terrainForwardKm.isFinite ||
         terrainForwardKm < 0 ||
-        terrainForwardKm > 40 ||
+        terrainForwardKm > 100 ||
         !terrainRenderKm.isFinite ||
         terrainRenderKm < 2 ||
-        terrainRenderKm > 40 ||
+        terrainRenderKm > 100 ||
         (fixedElevation != null &&
             (!fixedElevation!.isFinite ||
                 fixedElevation! < -12000 ||

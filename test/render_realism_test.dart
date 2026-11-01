@@ -111,6 +111,47 @@ void main() {
       );
     }
   });
+  test('focal length moves the far low-detail threshold', () {
+    const place = LatLng(37.744, -119.59);
+    final center = TileId.at(place);
+    final mid = TileId(center.z, center.x + 3, center.y);
+    final distant = TileId(center.z, center.x + 5, center.y);
+    final base = SimulationState(
+      latitude: place.latitude,
+      longitude: place.longitude,
+    );
+    final wide = base.copyWith(focalLength: 14);
+    final telephoto = base.copyWith(focalLength: 400);
+    expect(
+      terrainFullDetailTileWidths(telephoto),
+      greaterThan(terrainFullDetailTileWidths(wide)),
+    );
+    expect(terrainMeshResolution(center, wide), 128);
+    expect(terrainMeshResolution(center, telephoto), 128);
+    expect(
+      terrainMeshResolution(distant, telephoto),
+      greaterThan(terrainMeshResolution(distant, wide)),
+    );
+    expect(terrainMeshResolution(distant, telephoto), 64);
+    final highWide = wide.copyWith(renderQuality: RenderQuality.high);
+    final highTelephoto = telephoto.copyWith(renderQuality: RenderQuality.high);
+    expect(
+      terrainImageryDetailTiles([
+        center,
+        mid,
+        distant,
+      ], highWide).map((tile) => tile.key),
+      [center.key],
+    );
+    expect(
+      terrainImageryDetailTiles([
+        center,
+        mid,
+        distant,
+      ], highTelephoto).map((tile) => tile.key),
+      [center.key, mid.key, distant.key],
+    );
+  });
   test('full DEM geometry retains narrow peaks, valid uint32 indices and unit normals', () {
     final id = TileId.at(const LatLng(37.744, -119.59));
     final heights = Float32List(256 * 256)..[100 * 256 + 100] = 1000;

@@ -145,13 +145,20 @@ void main() {
       );
       expect(changed.groundElevation, 1200);
       expect(changed.timestamp, state.timestamp);
+      final extended = state.copyWith(
+        terrainForwardKm: 100,
+        terrainRenderKm: 100,
+      );
+      expect(extended.terrainForwardKm, 100);
+      expect(extended.terrainRenderKm, 100);
       for (final action in <void Function()>[
         () => state.copyWith(terrainRings: 0),
         () => state.copyWith(terrainRings: 4),
         () => state.copyWith(terrainForwardKm: -1),
         () => state.copyWith(terrainForwardKm: double.nan),
-        () => state.copyWith(terrainForwardKm: 41),
+        () => state.copyWith(terrainForwardKm: 101),
         () => state.copyWith(terrainRenderKm: 1),
+        () => state.copyWith(terrainRenderKm: 101),
         () => state.copyWith(terrainRenderKm: double.infinity),
       ]) {
         expect(action, throwsArgumentError);

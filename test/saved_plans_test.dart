@@ -128,7 +128,7 @@ void main() {
         ('showConstellations', 1),
         ('terrainRings', 4),
         ('terrainRings', 1.5),
-        ('terrainForwardKm', 41),
+        ('terrainForwardKm', 101),
         ('terrainForwardKm', '20'),
         ('terrainRenderKm', -1),
         ('name', ''),

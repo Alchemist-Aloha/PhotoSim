@@ -33,13 +33,13 @@ requirements separately from excluded platform work.
   natural-color processing, bounded/cancellable requests and visible source credits.
 - Regional errors/no-data fall through; transparent coverage composites over lower
   priority sources. No newer non-commercial EOX layers or paid accounts required.
-- **Terrain range** inspector section (live controls): 1–3 surrounding tile rings, 0–40 km FOV-aware forward
-  fetching and 2–40 km whole-tile render cutoff plus actual 3D frustum culling.
+- **Terrain range** inspector section (live controls): 1–3 surrounding tile rings, 0–100 km FOV-aware forward
+  fetching and 2–100 km whole-tile render cutoff plus actual 3D frustum culling.
   Pitch/aim/optics changes debounce 400 ms; non-overlapping distant tiles coarsen
   within a 256-patch budget, long lenses prefer finer tiles, retained patches reuse
   meshes/textures, and settings persist in plans with legacy defaults.
 - Progressive 256×256 image previews and a 1024×1024 camera-tile replacement;
-  High refines up to nine nearest tiles within render range, three requests at a
+  High refines up to nine nearest tiles inside the focal-length detail band, three requests at a
   time. Failed detail fetches retain previews; resident detail survives lowering quality.
 - Texture swaps preserve existing geometry; switching natural/relit mode also
   preserves geometry and shared camera/time state.

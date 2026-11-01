@@ -491,8 +491,8 @@ High focal lengths may require additional detail in distant terrain, even when t
 ### Current range controls (Linux vertical slice)
 
 The **Terrain range** inspector section controls surrounding fetch radius (1–3 zoom-13
-tile rings), forward fetch distance (0–40 km, off by default), and terrain render
-radius (2–40 km, default 40). Forward coverage uses the horizontal projection of
+tile rings), forward fetch distance (0–100 km, off by default), and terrain render
+radius (2–100 km, default 40). Forward coverage uses the horizontal projection of
 the sensor/focal-length FOV and camera pitch/azimuth, with a 400 ms adjustment
 debounce. Retain overlapping terrain meshes/textures and cancel obsolete jobs.
 Use non-overlapping distance/FOV quadtree leaves with at most 256 patches; long

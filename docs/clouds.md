@@ -15,7 +15,7 @@ No cloud control triggers geographic downloads.
 ## Rendering
 
 `assets/atmosphere/clouds.fmat` ray-marches a spherical cloud layer to **256 km**,
-independently of terrain's 2–40 km render range. Earth curvature determines layer
+independently of terrain's 2–100 km render range. Earth curvature determines layer
 intersections and which cloud heights still receive sunlight. Opaque scene depth
 stops clouds at terrain; the sky's empty far-plane depth is not treated as terrain.
 Cloud compositing occurs after the Moon, stars and Milky Way, with their proxy

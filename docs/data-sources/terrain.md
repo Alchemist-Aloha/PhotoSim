@@ -42,8 +42,8 @@ time, so PhotoSim does not invent per-tile source identity/accuracy metadata.
 ### Selection and bounded loading
 
 Default coverage remains nine zoom-13 XYZ patches. The inspector's **Terrain range** section
-sets 1–3 surrounding tile rings (3×3 through 7×7), 0–40 km forward reach (default
-off), and a 2–40 km horizontal render radius (default 40). Ring distances vary
+sets 1–3 surrounding tile rings (3×3 through 7×7), 0–100 km forward reach (default
+off), and a 2–100 km horizontal render radius (default 40). Ring distances vary
 with latitude and camera position within the tile; the dialog shows approximate km.
 
 Forward fetches use the horizontal envelope of the camera's optical frustum,
@@ -52,6 +52,8 @@ or nadir, its envelope spans every heading; vertical terrain visibility is not
 predicted before downloading. A distance/FOV quadtree keeps nearby rings at zoom
 13 and uses coarser, non-overlapping tiles farther away. Long lenses prefer finer
 tiles; automatic coarsening enforces a 256-tile budget rather than truncating reach.
+Mesh and imagery detail also step down beyond a focal-length-scaled distance
+(twenty tile widths at most), so far patches stay cheap unless the lens magnifies them.
 This is an observer-scale Mercator approximation, not terrain-aware horizon or
 screen-error selection. Web Mercator's polar coverage limit still applies.
 

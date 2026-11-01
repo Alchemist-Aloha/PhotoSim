@@ -1,6 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
-  <rect width="108" height="108" rx="24" fill="#123E38"/>
-  <path fill="#fff" d="M38 34 45 27H63L70 34H79Q84 34 84 39V74Q84 79 79 79H29Q24 79 24 74V39Q24 34 29 34Z"/>
-  <path fill="#123E38" d="M54 39A17 17 0 1 0 54 73A17 17 0 1 0 54 39"/>
-  <path fill="#fff" d="M54 45A11 11 0 1 0 54 67A11 11 0 1 0 54 45"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="PhotoSim icon: green mountains under a sunset sky with a cream cloud, framed by thick cream viewfinder brackets">
+  <title>PhotoSim</title>
+  <defs>
+    <!-- Sunset sky: deep blue into warm horizon -->
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2B5A96"/>
+      <stop offset="0.42" stop-color="#7CB0D7"/>
+      <stop offset="0.72" stop-color="#F8C58C"/>
+      <stop offset="1" stop-color="#FFDCA8"/>
+    </linearGradient>
+    <!-- Low sun glow behind the ridge -->
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFEAC2" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#FFEAC2" stop-opacity="0"/>
+    </radialGradient>
+    <!-- App icon mask: rounded square -->
+    <clipPath id="mask">
+      <rect width="512" height="512" rx="112" ry="112"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#mask)">
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <circle cx="250" cy="215" r="170" fill="url(#glow)"/>
+
+    <!-- Far ridge: pale distance terrain, rolling crest behind the haze band -->
+    <path fill="#A9BEAA" d="M -40 306 C -29.2 303.7 5.0 296.7 25 292 C 45.0 287.3 64.2 278.7 80 278 C 95.8 277.3 105.8 287.3 120 288 C 134.2 288.7 150.8 281.7 165 282 C 179.2 282.3 191.7 290.7 205 290 C 218.3 289.3 231.7 281.7 245 278 C 258.3 274.3 271.7 267.7 285 268 C 298.3 268.3 311.7 276.0 325 280 C 338.3 284.0 351.7 291.7 365 292 C 378.3 292.3 391.7 285.0 405 282 C 418.3 279.0 431.7 273.7 445 274 C 458.3 274.3 471.7 280.7 485 284 C 498.3 287.3 512.5 291.3 525 294 C 537.5 296.7 554.2 299.0 560 300 L 560 540 L -40 540 Z"/>
+
+    <!-- Mid ridge: rolling green terrain, one long ridge with knolls -->
+    <path fill="#7C9F82" d="M -40 320 C -29.2 318.0 5.0 312.7 25 308 C 45.0 303.3 60.0 292.7 80 292 C 100.0 291.3 124.2 303.0 145 304 C 165.8 305.0 185.0 301.0 205 298 C 225.0 295.0 245.0 286.3 265 286 C 285.0 285.7 305.0 292.3 325 296 C 345.0 299.7 365.0 308.7 385 308 C 405.0 307.3 425.0 292.3 445 292 C 465.0 291.7 485.8 302.3 505 306 C 524.2 309.7 550.8 312.7 560 314 L 560 540 L -40 540 Z"/>
+
+    <!-- Front range: deep forest green, soft dome summit -->
+    <path fill="#1D3D2A" d="M -40 520 C -28.3 508.3 7.5 473.3 30 450 C 52.5 426.7 75 396.7 95 380 C 115 363.3 134.2 363.3 150 350 C 165.8 336.7 173.3 320 190 300 C 206.7 280 230 230 250 230 C 270 230 295 281.7 310 300 C 325 318.3 323.3 330 340 340 C 356.7 350 388.3 350 410 360 C 431.7 370 445 378.3 470 400 C 495 421.7 545 475 560 490 L 560 540 L -40 540 Z"/>
+
+    <!-- Cloud: flat cream, no outline -->
+    <path fill="#FFF6E6" d="M 310 142 C 293 142 280 129 280 113 C 280 98 291 85 306 83 C 309 62 327 46 348 46 C 369 46 386 60 392 78 C 394 83 399 84 404 82 C 408 80 411 78 414 75 C 426 64 446 82 446 103 C 446 105 446 107 445 109 C 460 112 470 125 470 137 C 470 140 468 142 464 142 Z"/>
+
+    <!-- Viewfinder brackets: thick cream corners framing the simulated shot -->
+    <path d="M 62 166 V 62 H 166" fill="none" stroke="#FFF6E6" stroke-width="30" stroke-linejoin="round" stroke-linecap="butt"/>
+    <path d="M 450 346 V 450 H 346" fill="none" stroke="#FFF6E6" stroke-width="30" stroke-linejoin="round" stroke-linecap="butt"/>
+  </g>
 </svg>

@@ -92,7 +92,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain. Per-state astronomy/observer caching removes duplicate ephemeris work per frame.
 - Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
 - Blended terrain shadow cascades; High quality adds PCSS/contact shadows, denser 256/128/64 terrain meshes, 1.25× supersampling and terrain-scale GTAO with bent-normal indirect lighting.
-- Progressive imagery: 256px previews, then a 1024px camera tile; High refines up to nine nearest rendered tiles with bounded three-request concurrency. Failed detail requests retain previews.
+- Progressive imagery: 256px previews, then a 1024px camera tile; High refines up to nine nearest tiles inside the focal-length detail band with bounded three-request concurrency. Failed detail requests retain previews.
 - **Settings → Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
 - **Settings → Rendering** antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
@@ -215,11 +215,13 @@ follow simulation time; source acquisition dates are not queried yet. See
 
 Terrain defaults to the original 3×3 zoom-13 region. The **Terrain range** section
 in the right inspector (controls drawer on phones) adjusts
-surrounding coverage (1–3 tile rings), forward reach (0–40 km, off by default),
-and terrain rendering (2–40 km, whole-tile cutoff plus view-frustum culling).
+surrounding coverage (1–3 tile rings), forward reach (0–100 km, off by default),
+and terrain rendering (2–100 km, whole-tile cutoff plus view-frustum culling).
 Forward coverage follows sensor/focal length, pitch and azimuth after a 400 ms
-pause; long lenses prefer finer tiles, subject to a 256-tile budget. Overlapping
-meshes/textures stay resident. Settings apply live and persist in saved plans/session recovery.
+pause; long lenses prefer finer tiles, subject to a 256-tile budget. Far terrain
+and imagery step down to coarser meshes and 256px previews beyond a
+focal-length-scaled distance, so a wide lens coarsens distant slopes earlier than
+a telephoto. Overlapping meshes/textures stay resident. Settings apply live and persist in saved plans/session recovery.
 The map's dashed circle approximates the nearby tile envelope or forward reach,
 whichever is larger. Zoom out to see its full extent. It is not an exact tile
 boundary or download-status indicator; render distance does not shrink the fetch circle.

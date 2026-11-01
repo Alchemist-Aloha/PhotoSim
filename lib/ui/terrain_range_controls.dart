@@ -40,8 +40,8 @@ class TerrainRangeControls extends StatelessWidget {
           key: const ValueKey('terrain-forward'),
           value: state.terrainForwardKm,
           min: 0,
-          max: 40,
-          divisions: 40,
+          max: 100,
+          divisions: 100,
           label: '${state.terrainForwardKm.toStringAsFixed(0)} km',
           semanticFormatterCallback: (value) => '${value.round()} km',
           onChanged: (value) =>
@@ -55,8 +55,8 @@ class TerrainRangeControls extends StatelessWidget {
           key: const ValueKey('terrain-render'),
           value: state.terrainRenderKm,
           min: 2,
-          max: 40,
-          divisions: 38,
+          max: 100,
+          divisions: 98,
           label: '${state.terrainRenderKm.toStringAsFixed(0)} km',
           semanticFormatterCallback: (value) => '${value.round()} km',
           onChanged: (value) =>
@@ -70,7 +70,9 @@ class TerrainRangeControls extends StatelessWidget {
       const Text(
         'Changes apply automatically. Forward coverage follows the camera FOV, pitch and aim after you stop adjusting. '
         'Nearby tiles stay available in all directions. Distant tiles are coarser '
-        '(maximum $terrainTileBudget tiles). The circle is an approximate envelope, not an exact tile boundary or download-status indicator. '
+        '(maximum $terrainTileBudget tiles), and terrain and imagery drop detail '
+        'beyond a focal-length-dependent distance; longer lenses keep detail farther out. '
+        'The circle is an approximate envelope, not an exact tile boundary or download-status indicator. '
         'Rendering uses whole-tile distance limits and view-frustum culling; '
         'it cannot show terrain beyond the fetched area. Larger ranges use more data and memory.',
       ),

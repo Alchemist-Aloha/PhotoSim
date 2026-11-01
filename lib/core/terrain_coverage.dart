@@ -12,6 +12,13 @@ const terrainTileBudget = 256;
 /// enough that a horizon ridge keeps its silhouette instead of flattening.
 const minTerrainMeshSamples = 16;
 
+/// A tile keeps full mesh and imagery detail inside this many of its own widths.
+/// Focal length and sensor width set its apparent size, so a long lens magnifies
+/// distant ridges and keeps detail farther out; a wide lens coarsens sooner.
+/// Capped at twenty widths (~100 km of zoom-13 tiles near the equator).
+double terrainFullDetailTileWidths(SimulationState state) =>
+    (2.5 * state.focalLength * 36 / (24 * state.sensorWidth)).clamp(0.5, 20.0);
+
 /// Camera-to-tile-centre distance in that tile's own widths, wrapped across the
 /// date line. Cheap proxy for the tile's apparent size on screen.
 double terrainCameraDistanceInTileWidths(TileId id, SimulationState state) {
@@ -35,7 +42,7 @@ int terrainMeshResolution(TileId id, SimulationState state) {
   final high = state.renderQuality == RenderQuality.high;
   if (id.key == TileId.at(state.location).key) return high ? 256 : 128;
   final base = id.z == 13 ? 64 : 32;
-  const fullDetailTileWidths = 2.5;
+  final fullDetailTileWidths = terrainFullDetailTileWidths(state);
   final widths = terrainCameraDistanceInTileWidths(id, state);
   final step = widths <= fullDetailTileWidths
       ? 0
@@ -44,7 +51,8 @@ int terrainMeshResolution(TileId id, SimulationState state) {
   return lod * (high ? 2 : 1);
 }
 
-/// Refine the camera tile, or at most nine nearest rendered tiles in High.
+/// Refine the camera tile, or in High up to nine nearest tiles inside the
+/// focal-length detail band and render range. Far tiles keep 256px previews.
 List<TileId> terrainImageryDetailTiles(
   Iterable<TileId> tiles,
   SimulationState state,
@@ -55,7 +63,9 @@ List<TileId> terrainImageryDetailTiles(
       tiles.where((tile) {
         if (!high) return tile.key == center.key;
         return terrainDistance(tile, state.location) <=
-            state.terrainRenderKm * 1000;
+                state.terrainRenderKm * 1000 &&
+            terrainCameraDistanceInTileWidths(tile, state) <=
+                terrainFullDetailTileWidths(state);
       }).toList()..sort((a, b) {
         if (a.key == b.key) return 0;
         if (a.key == center.key) return -1;

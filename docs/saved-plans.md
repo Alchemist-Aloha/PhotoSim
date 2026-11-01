@@ -49,8 +49,8 @@ Each snapshot is a standalone UTF-8 JSON file containing:
 - Natural/approximate-relighting preference. New sessions enable approximate
   relighting; opening a plan preserves its stored preference.
 - Optional `showConstellations` toggle; missing in older plans defaults to off.
-- Optional `terrainRings` (integer 1–3), `terrainForwardKm` (0–40) and
-  `terrainRenderKm` (2–40). Older plans default to 1 ring, forward off and a
+- Optional `terrainRings` (integer 1–3), `terrainForwardKm` (0–100) and
+  `terrainRenderKm` (2–100). Older plans default to 1 ring, forward off and a
   40 km whole-tile render radius. Missing fields do not require a schema bump.
 - Optional `antialiasing` (`automatic`, `off`, `fxaa`, `msaa`); missing fields
   default to FXAA. This preference is independent of quality and preserves geometry.
