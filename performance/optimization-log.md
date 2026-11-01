@@ -184,6 +184,27 @@ reliably here (shared GPU, no GPU completion timestamps).
   changed, so pixel output is unaffected.
 - Accepted.
 
+## Iteration 6 — rejected: share night-sky geometry across scenes
+
+- Baseline: `a045172`.
+- Hypothesis: after iteration 5 the remaining per-re-entry CPU was the star,
+  Milky Way, marker and planet meshes (~10 ms measured by probes in iteration 4),
+  so caching those `MeshGeometry` objects next to the assets should shave another
+  ~10 ms off each Map → 3D switch.
+- Implemented and measured: re-entry first-scene over 6 samples each, 3 paired
+  runs — baseline 66.6/67.4/71.0/82.7/83.9/86.7 ms (median 76.9) versus candidate
+  39.8/65.6/67.4/80.2/82.3/82.3 ms (median 73.8), **−4 %** with fully overlapping
+  ranges; warm-cache first-scene unchanged (68.5 → 68.2 ms medians).
+- **Reverted.** The mesh build evidently overlaps the terrain/imagery loads that
+  now bound re-entry, so it is no longer on the critical path. Keeping a second
+  cross-scene resource cache would add lifetime risk for no reproducible gain.
+
+## Measured, no action needed: map workspace interaction
+
+Temporary profile harness (removed): the map workspace is not a bottleneck —
+idle `build p50` 0.19 ms, pan 0.95 ms, zoom 0.22 ms, raster p50 3–4.5 ms. It
+rebuilds only on interaction, so it was left alone.
+
 ## Final measurement — accepted commits versus the original baseline
 
 Direct comparison, 3 interleaved runs each, `A` = `4ade658`, `B` = `8865570`
