@@ -37,5 +37,18 @@
   and shader bound), third-party GPU work (shadows, clouds, GTAO at High), the
   ~6 ms per-frame framework rebuild of the shell, and the moon colour-buffer
   upload (≈0.31 ms/frame while scrubbing time).
-- Loop stopped: no remaining low-risk, measurable UI-thread win was found, and
-  GPU-side work cannot be validated on this shared, un-attributable GPU.
+- Also rejected: gating planet-marker ephemerides on star visibility. Probes show
+  it removes 0.28 ms/frame of UI-thread work during daytime time scrubs
+  (`nightUpdate` 43.3 → 10.3 ms per 120 frames), but the benchmark mean build
+  time did not move (7.21 → 7.31 ms), so the frames are not CPU-limited there.
+  Revisit on CPU-limited hardware (low-end Android) with a profiler.
+- Benchmark tooling now reports `mean` next to `p50/p95/max`; use the mean as the
+  primary estimator for small deltas because p95 over ~100 frames is unstable.
+- Also measured, no action: export render is ~810–830 ms wall at 2× density but
+  keeps the UI thread free (build p50 ≈1 ms, ~23 frames) — engine render/encode
+  bound.
+- An external commit `a74903b` (dependencies/.gitignore) landed between
+  iterations; it carries the pre-existing working-tree changes and is untouched.
+- Loop stopped: two consecutive hypotheses failed to produce measurable gains,
+  two more are blocked on GPU attribution, and the remainder need reference-image
+  validation or CPU-limited hardware. No speculative changes were kept.
