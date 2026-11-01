@@ -51,6 +51,46 @@ device utilization with PhotoSim closed), so no GPU-bound claim is made.
   lookup (two lookups per frame from the timeline readouts); a per-state
   single-entry memo could halve it if a later measurement justifies it.
 
+## Iteration 2 — resolve the selected target once per state
+
+- Baseline: `7397e07`.
+- Bottleneck: with a planet selected, the timeline readouts, the app-bar target
+  checks and `targetAngularOffset` each resolved `state.targetPosition`. Each
+  planet resolution costs 0.64 ms `p50` in the profile build, paid again on
+  every rebuilt frame (measured with temporary probes: `targetPosition` p50
+  0.638 ms in planet phases versus 0.003–0.004 ms when the target is the Sun or
+  no target at all).
+- Change: `SimulationState.targetPosition` is now a `late final` that resolves
+  once per state; `targetAngularOffset` and every UI readout reuse it.
+- App benchmark, `build p50`, 3 interleaved paired runs (baseline `A` = `7397e07`,
+  candidate `B`):
+  - planet-aim-scrub: A 7.92/7.63/7.95 (median 7.92) → B 7.68/7.60/7.44
+    (median 7.60), **−4.0 %**; every pair improved.
+  - planet-time-scrub: A 8.42/8.65/8.53 (median 8.53) → B 8.42/8.09/8.03
+    (median 8.09), **−5.2 %**; five of six paired runs improved, one tie.
+  - aim-scrub 6.80/7.19/6.57 → 6.82/6.71/7.01 and time-scrub 7.61/7.17/7.29 →
+    7.48/7.29/7.35: unchanged within noise, as expected.
+- Correctness: all 298 unit/widget tests and strict analysis pass; the cached
+  value is the same expression chain, only evaluated once per immutable state.
+- Accepted (below the 3 % default on its own but consistently repeatable, paired,
+  and a three-line change with no behavioural surface).
+
+## Rejected this session — rebuild scope of the 3D shell
+
+Temporary subtree ablation during aim scrub (paired phases in one process,
+probes removed afterwards) removed at most ~1.0 ms of a ~6.5–7 ms UI thread for
+the whole preview viewport and ~0.6 ms for every camera-inspector control; the
+timeline and navigation rail showed no measurable effect (app-level Dart work is
+only ~0.7 ms of the frame). The remainder is Flutter element rebuild/layout/paint
+of several hundred widgets, so cutting it means not rebuilding the shell for
+aim-only changes. That requires either stale-closure-safe `onChanged` reducers
+across camera inspector, timeline and app bar (a missed field silently reverts
+camera aim on the next tap) or letting the azimuth/pitch/roll readouts lag during
+a drag. Expected gain ≈1.6 ms on a UI thread that already has headroom, versus a
+broad refactor of the immutable-state plumbing: rejected as disproportionate.
+GPU-bound High-quality interaction remains the real limit and cannot be measured
+reliably here (shared GPU, no GPU completion timestamps).
+
 ## Environment caveats found during baseline work
 
 - Function-level VM-service profiling was unusable: every connection from a
@@ -62,6 +102,11 @@ device utilization with PhotoSim closed), so no GPU-bound claim is made.
   build; ablating the preview viewport saved ~1.0 ms, the inspector ~0.6 ms, and
   the timeline/rail nothing measurable. No single dominant subtree exists, which
   is why the frame path itself was not reworked.
+- Startup breakdown from those probes (per `initializeScene` call, profile):
+  scene assets ≈76–97 ms wall, star geometry ≈15 ms, static GPU resources
+  ≈11–14 ms, planet label atlas ≈8–10 ms, star-catalog JSON parse ≈0.8 ms.
+  Except for the JSON parse these are GPU/shader-bound surfaces, so no change was
+  attempted without a way to attribute them safely.
 - Existing workload numbers are unstable for loading (live network) and
   GPU-bound phases; only UI-thread build metrics on fixed phases are used for
   before/after verdicts here.

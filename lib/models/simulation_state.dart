@@ -299,7 +299,11 @@ class SimulationState {
     );
   }
 
-  CelestialPosition? get targetPosition => switch (target) {
+  CelestialPosition? get targetPosition => _targetPosition;
+
+  /// Resolved once per state: timeline readouts and the app bar each ask, and a
+  /// planet lookup is expensive enough to matter per frame.
+  late final CelestialPosition? _targetPosition = switch (target) {
     CelestialTarget.none => null,
     CelestialTarget.sun => sky.sun,
     CelestialTarget.moon => sky.moon,
