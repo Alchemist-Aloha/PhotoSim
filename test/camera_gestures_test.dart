@@ -37,13 +37,14 @@ void main() {
           ),
         ),
       );
+      final detector = tester.widget<GestureDetector>(
+        find.descendant(
+          of: find.byType(CameraGestures),
+          matching: find.byType(GestureDetector),
+        ),
+      );
+      detector.onScaleStart!(ScaleStartDetails());
       for (var i = 0; i < 10; i++) {
-        final detector = tester.widget<GestureDetector>(
-          find.descendant(
-            of: find.byType(CameraGestures),
-            matching: find.byType(GestureDetector),
-          ),
-        );
         detector.onScaleUpdate!(
           ScaleUpdateDetails(
             focalPointDelta: Offset(size.width / 800, -size.height / 600),
@@ -68,6 +69,48 @@ void main() {
     expect(cropped.azimuth - 180, lessThan(zoomed.azimuth - 180));
     final portrait = await aim(600, const Size(800, 600), portrait: true);
     expect(portrait.pitch, greaterThan(zoomed.pitch));
+  });
+
+  testWidgets('every pointer event in one frame reaches the camera', (
+    tester,
+  ) async {
+    // A pointer sends several events per frame while the parent rebuilds once;
+    // composing each delta onto the stale widget state lost all but the last.
+    const step = Offset(5, -2);
+    Future<double> dragBy(int events) async {
+      var state = SimulationState(azimuth: 180, pitch: 0);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) => CameraGestures(
+              state: state,
+              onChanged: (next) => setState(() => state = next),
+              child: const ColoredBox(color: Colors.black),
+            ),
+          ),
+        ),
+      );
+      final detector = tester.widget<GestureDetector>(
+        find.descendant(
+          of: find.byType(CameraGestures),
+          matching: find.byType(GestureDetector),
+        ),
+      );
+      detector.onScaleStart!(ScaleStartDetails());
+      for (var i = 0; i < events; i++) {
+        detector.onScaleUpdate!(
+          ScaleUpdateDetails(focalPointDelta: step, pointerCount: 1),
+        );
+      }
+      await tester.pump();
+      return state.azimuth - 180;
+    }
+
+    final single = await dragBy(1);
+    final batched = await dragBy(8);
+    expect(single, greaterThan(0));
+    expect(batched, closeTo(single * 8, single * 0.001));
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets(

@@ -23,6 +23,13 @@ class CameraGestures extends StatefulWidget {
 class _CameraGesturesState extends State<CameraGestures> {
   double focalLength = 24;
 
+  /// Aiming and zooming accumulate from the gesture origin. A pointer delivers
+  /// several events per frame while the parent only rebuilds once, so composing
+  /// each event onto [widget.state] kept just the last delta: a high-polling-rate
+  /// mouse, or a GPU-bound frame rate, moved the camera a fraction of the cursor.
+  SimulationState? origin;
+  var drag = Offset.zero;
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
@@ -33,31 +40,31 @@ class _CameraGesturesState extends State<CameraGestures> {
                 bounds.maxHeight
           : 0.0;
       return GestureDetector(
-        onScaleStart: (_) => focalLength = widget.state.focalLength,
+        onScaleStart: (_) {
+          focalLength = widget.state.focalLength;
+          origin = widget.state;
+          drag = Offset.zero;
+        },
+        onScaleEnd: (_) {
+          origin = null;
+          drag = Offset.zero;
+        },
         onScaleUpdate: (details) {
-          final state = widget.state;
-          if (details.pointerCount > 1) {
-            widget.onChanged(
-              state.copyWith(
-                focalLength: (focalLength * details.scale)
-                    .clamp(
-                      SimulationState.minFocalLength,
-                      SimulationState.maxFocalLength,
-                    )
-                    .roundToDouble(),
-              ),
-            );
-          } else {
-            widget.onChanged(
-              state.copyWith(
-                azimuth:
-                    state.azimuth +
-                    details.focalPointDelta.dx * degreesPerPixel,
-                pitch:
-                    state.pitch - details.focalPointDelta.dy * degreesPerPixel,
-              ),
-            );
-          }
+          final base = origin ??= widget.state;
+          if (details.pointerCount == 1) drag += details.focalPointDelta;
+          final next = base.copyWith(
+            azimuth: base.azimuth + drag.dx * degreesPerPixel,
+            pitch: base.pitch - drag.dy * degreesPerPixel,
+            focalLength: details.pointerCount > 1
+                ? (focalLength * details.scale)
+                      .clamp(
+                        SimulationState.minFocalLength,
+                        SimulationState.maxFocalLength,
+                      )
+                      .roundToDouble()
+                : null,
+          );
+          widget.onChanged(next);
         },
         child: widget.child,
       );
