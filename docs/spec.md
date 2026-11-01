@@ -1967,8 +1967,10 @@ These extensions must build on the existing camera, terrain, astronomy, and rend
 
 ## Geographic imagery
 
-- USGS NAIP: <https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer>
+- USGS NAIP (cached tiles): <https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer>
+- USGS NAIP metadata: <https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer>
 - EOX 2016 mosaic / licensing: <https://cloudless.eox.at/pricing>
+- EOX WMTS: <https://tiles.maps.eox.at/wmts>
 - IGN BD ORTHO: <https://geoservices.ign.fr/bdortho>
 - swisstopo SWISSIMAGE: <https://www.swisstopo.admin.ch/en/orthoimage-swissimage-10>
 - Copernicus Data Space: <https://dataspace.copernicus.eu/>

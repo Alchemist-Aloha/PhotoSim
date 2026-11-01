@@ -22,37 +22,31 @@ void main() {
   );
   tearDown(() async => directory.delete(recursive: true));
 
-  int pixels(Uri uri) => int.parse(
-    uri.queryParameters['WIDTH'] ??
-        uri.queryParameters['size']!.split(',').first,
-  );
-
-  test('WMS exports preserve terrain bounds, dimensions and north-up Mercator axes', () {
+  test('providers build cached tile URLs for previews and 4x4 details', () {
     final tile = TileId.at(const LatLng(46.58, 7.96));
-    final bounds = tile.mercatorBounds;
-    for (final provider in imageryProviders.whereType<WmsImageryProvider>()) {
-      final q = provider.request(tile, 1024).queryParameters;
-      expect(q['VERSION'], '1.3.0');
-      expect(q['CRS'], 'EPSG:3857');
-      expect(
-        q['BBOX'],
-        '${bounds.west},${bounds.south},${bounds.east},${bounds.north}',
-      );
-      expect(q['WIDTH'], '1024');
-      expect(q['HEIGHT'], '1024');
-      expect(q['TRANSPARENT'], 'TRUE');
-      expect(q['FORMAT'], 'image/png');
-      expect(q['LAYERS'], provider.layer);
-      expect(() => provider.request(tile, 9999), throwsArgumentError);
-    }
-    final global = imageryProviders.last as WmsImageryProvider;
-    expect(global.layer, 's2cloudless_3857');
-    expect(global.attribution, contains('2016'));
-    expect(global.attribution, contains('CC BY 4.0'));
+    final usgs = imageryProviders.first.requests(tile, 256).single;
+    expect(usgs.host, 'basemap.nationalmap.gov');
+    expect(usgs.path, contains('/tile/13/${tile.y}/${tile.x}'));
+    final swiss = imageryProviders[1].requests(tile, 256).single;
+    expect(swiss.host, 'wms.geo.admin.ch');
+    expect(swiss.queryParameters['LAYERS'], 'ch.swisstopo.images-swissimage');
+    expect(swiss.queryParameters['WIDTH'], '256');
     expect(
-      (imageryProviders[1] as WmsImageryProvider).layer,
-      'ch.swisstopo.images-swissimage',
+      imageryProviders[1].requests(tile, 1024).single.queryParameters['WIDTH'],
+      '1024',
     );
+    final ign = imageryProviders[2].requests(tile, 1024);
+    expect(ign, hasLength(16));
+    expect(ign.first.host, 'data.geopf.fr');
+    expect(ign.first.queryParameters['LAYER'], 'ORTHOIMAGERY.ORTHOPHOTOS');
+    expect(ign.first.queryParameters['TILEMATRIX'], '${tile.z + 2}');
+    final eox = imageryProviders.last.requests(tile, 256).single;
+    expect(eox.host, 'tiles.maps.eox.at');
+    expect(eox.path, contains('/GoogleMapsCompatible/13/'));
+    expect(eox.path, endsWith('.jpg'));
+    expect(() => imageryProviders[1].requests(tile, 9999), throwsArgumentError);
+    expect(imageryProviders.last.attribution, contains('2016'));
+    expect(imageryProviders.last.attribution, contains('CC BY 4.0'));
   });
 
   test(
@@ -61,7 +55,11 @@ void main() {
       final requested = <Uri>[];
       final client = MockClient((request) async {
         requested.add(request.url);
-        return http.Response.bytes(imageryFixture(pixels(request.url)), 200);
+        final width = request.url.queryParameters['WIDTH'];
+        return http.Response.bytes(
+          imageryFixture(width == null ? 256 : int.parse(width)),
+          200,
+        );
       });
       addTearDown(client.close);
       final sources = ImagerySources(client: client, directory: directory);
@@ -93,13 +91,13 @@ void main() {
           expect(metadata['attribution'], result.providers.single.attribution);
           expect(
             metadata['url'],
-            source.provider.request(tile, size).toString(),
+            source.provider.requests(tile, size).first.toString(),
           );
           final again = await sources.load(tile, size, abort: abort);
           expect(again.providers.single.name, entry.$2);
         }
       }
-      expect(requested, hasLength(14));
+      expect(requested, hasLength(104));
       expect(sources.downloads, 14);
       expect(sources.cacheHits, 14);
     },
@@ -120,14 +118,18 @@ void main() {
         if (request.url.host == 'data.geopf.fr') {
           return http.Response.bytes(imageryFixture(256, empty: true), 200);
         }
-        if (request.url.host == 'imagery.nationalmap.gov') {
+        if (request.url.host == 'basemap.nationalmap.gov') {
           return http.Response(
             'unavailable',
             503,
             headers: {'retry-after': '120'},
           );
         }
-        return http.Response.bytes(imageryFixture(256), 200);
+        final width = request.url.queryParameters['WIDTH'];
+        return http.Response.bytes(
+          imageryFixture(width == null ? 256 : int.parse(width)),
+          200,
+        );
       });
       addTearDown(client.close);
       final sources = ImagerySources(client: client, directory: directory);
@@ -147,7 +149,7 @@ void main() {
         'wms.geo.admin.ch',
         'data.geopf.fr',
         'tiles.maps.eox.at',
-        'imagery.nationalmap.gov',
+        'basemap.nationalmap.gov',
         'tiles.maps.eox.at',
       ]);
       expect(sources.downloads, 2);
@@ -162,7 +164,7 @@ void main() {
 
   test('partial regional coverage overlays global pixels without losing regional pixels', () async {
     final client = MockClient((request) async {
-      if (request.url.host == 'imagery.nationalmap.gov') {
+      if (request.url.host == 'basemap.nationalmap.gov') {
         return http.Response.bytes(imageryFixture(256, partial: true), 200);
       }
       return http.Response.bytes(imageryFixture(256), 200);
@@ -194,7 +196,7 @@ void main() {
     'partial coverage survives global failure with a labeled fallback surface',
     () async {
       final client = MockClient(
-        (request) async => request.url.host == 'imagery.nationalmap.gov'
+        (request) async => request.url.host == 'basemap.nationalmap.gov'
             ? http.Response.bytes(imageryFixture(256, partial: true), 200)
             : http.Response(
                 'unavailable',
@@ -258,10 +260,14 @@ void main() {
     'service timeout falls back when the caller has not cancelled',
     () async {
       final client = MockClient((request) async {
-        if (request.url.host == 'imagery.nationalmap.gov') {
+        if (request.url.host == 'basemap.nationalmap.gov') {
           throw http.RequestAbortedException(request.url);
         }
-        return http.Response.bytes(imageryFixture(256), 200);
+        final width = request.url.queryParameters['WIDTH'];
+        return http.Response.bytes(
+          imageryFixture(width == null ? 256 : int.parse(width)),
+          200,
+        );
       });
       addTearDown(client.close);
       final sources = ImagerySources(client: client, directory: directory);

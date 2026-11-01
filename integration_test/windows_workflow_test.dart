@@ -26,15 +26,12 @@ void main() {
     final output = Directory('build/validation/windows').absolute;
     await output.create(recursive: true);
     final terrain = terrainWebpFixture();
-    final preview = imageryFixture(256), detail = imageryFixture(1024);
+    final preview = imageryFixture(256);
     final client = MockClient((request) async {
       if (request.url.host == 'tiles.mapterhorn.com') {
         return http.Response.bytes(terrain, 200);
       }
-      return http.Response.bytes(
-        request.url.queryParameters['size'] == '256,256' ? preview : detail,
-        200,
-      );
+      return http.Response.bytes(preview, 200);
     });
     const channel = MethodChannel('photosim/window');
     addTearDown(() async {

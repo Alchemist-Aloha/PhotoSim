@@ -112,12 +112,86 @@ ImageryRaster decodeImagery(ImageryDecodeRequest request) {
   return ImageryRaster(rgba, request.size, partial);
 }
 
+class TiledImageryDecodeRequest {
+  TiledImageryDecodeRequest(
+    this.tiles,
+    this.size, {
+    this.retainTransparency = false,
+  });
+  final List<Uint8List> tiles;
+  final int size;
+  final bool retainTransparency;
+}
+
+class TiledImageryResult {
+  TiledImageryResult(this.raster, this.png);
+  final ImageryRaster raster;
+  final Uint8List png;
+}
+
+/// Stitches a row-major 4×4 tile grid; missing sub-tiles stay transparent for fallback.
+TiledImageryResult decodeTiledImagery(TiledImageryDecodeRequest request) {
+  if (request.size != 1024 || request.tiles.length != 16) {
+    throw const FormatException('Invalid tiled imagery');
+  }
+  final rgba = Uint8List(request.size * request.size * 4);
+  var partial = false, present = false;
+  for (var index = 0; index < request.tiles.length; index++) {
+    final ImageryRaster tile;
+    try {
+      tile = decodeImagery(
+        ImageryDecodeRequest(
+          request.tiles[index],
+          256,
+          retainTransparency: true,
+        ),
+      );
+    } on ImageryUnavailable {
+      partial = true;
+      continue;
+    }
+    present = true;
+    partial = partial || tile.partial;
+    final dx = index % 4 * 256, dy = index ~/ 4 * 256;
+    for (var y = 0; y < 256; y++) {
+      final source = y * 256 * 4;
+      final destination = ((dy + y) * 1024 + dx) * 4;
+      rgba.setRange(destination, destination + 1024, tile.rgba, source);
+    }
+  }
+  if (!present) {
+    throw const ImageryUnavailable('Source has no imagery in this tile');
+  }
+  if (!request.retainTransparency) {
+    for (var offset = 0; offset < rgba.length; offset += 4) {
+      final alpha = rgba[offset + 3];
+      if (alpha == 255) continue;
+      final inverse = 1 - alpha / 255;
+      rgba[offset] = (rgba[offset] * alpha / 255 + 154 * inverse).round();
+      rgba[offset + 1] = (rgba[offset + 1] * alpha / 255 + 170 * inverse)
+          .round();
+      rgba[offset + 2] = (rgba[offset + 2] * alpha / 255 + 137 * inverse)
+          .round();
+      rgba[offset + 3] = 255;
+    }
+  }
+  final png = image.encodePng(
+    image.Image.fromBytes(
+      width: 1024,
+      height: 1024,
+      bytes: rgba.buffer,
+      numChannels: 4,
+    ),
+  );
+  return TiledImageryResult(ImageryRaster(rgba, 1024, partial), png);
+}
+
 class ImageryRepository {
   ImageryRepository({
     required this.client,
     required this.previewCache,
     required this.detailCache,
-    this.provider = const NaipProvider(),
+    this.provider = naipImageryProvider,
     this.retainTransparency = false,
   });
   final http.Client client;
@@ -131,10 +205,11 @@ class ImageryRepository {
     int pixels, {
     required Future<void> abort,
   }) async {
-    final uri = provider.request(tile, pixels);
+    final uris = provider.requests(tile, pixels);
     if (!provider.covers(tile)) {
       throw ImageryUnavailable('Outside ${provider.name} service extent');
     }
+    final uri = uris.first;
     var cancelled = false;
     unawaited(abort.then((_) => cancelled = true));
     final cache = pixels == 256 ? previewCache : detailCache;
@@ -158,29 +233,41 @@ class ImageryRepository {
         await cache.remove(tile);
       }
     }
-    final bytes = await downloadBytes(
-      client,
-      uri,
-      abort: abort,
-      maxBytes: 8 * 1024 * 1024,
-      // EOX's dynamic detail exports can take more than 20 seconds; previews remain usable.
-      timeout: const Duration(seconds: 40),
-    );
-    final result = await compute(
-      decodeImagery,
-      ImageryDecodeRequest(
-        bytes,
-        pixels,
-        retainTransparency: retainTransparency,
-      ),
-    );
+    Uint8List cacheBytes;
+    ImageryRaster result;
+    if (uris.length == 1) {
+      cacheBytes = await _download(uris.single, abort);
+      result = await compute(
+        decodeImagery,
+        ImageryDecodeRequest(
+          cacheBytes,
+          pixels,
+          retainTransparency: retainTransparency,
+        ),
+      );
+    } else {
+      final tiles = await Future.wait([
+        for (final uri in uris) _download(uri, abort),
+      ]);
+      final tiled = await compute(
+        decodeTiledImagery,
+        TiledImageryDecodeRequest(
+          tiles,
+          pixels,
+          retainTransparency: retainTransparency,
+        ),
+      );
+      cacheBytes = tiled.png;
+      result = tiled.raster;
+    }
     if (cancelled) throw http.RequestAbortedException(uri);
     await cache.write(
       tile,
-      bytes,
+      cacheBytes,
       metadata: {
         'provider': provider.name,
         'url': uri.toString(),
+        'sourceTiles': uris.length,
         'pixels': pixels,
         'attribution': provider.attribution,
         'verticalDatum': null,
@@ -192,4 +279,7 @@ class ImageryRepository {
     downloads++;
     return result;
   }
+
+  Future<Uint8List> _download(Uri uri, Future<void> abort) =>
+      downloadBytes(client, uri, abort: abort, maxBytes: 8 * 1024 * 1024);
 }

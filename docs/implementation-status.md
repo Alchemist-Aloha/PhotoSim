@@ -29,8 +29,10 @@ requirements separately from excluded platform work.
   distance/FOV quadtree LOD, skirts and native LRU elevation caching within the configurable shared
   terrain/imagery disk budget. Native 1–5 m source detail is not displayed by the existing mesh.
 - Automatic free imagery selection: NAIP, Swiss-only SWISSIMAGE, IGN BD ORTHO
-  and the CC BY EOX Sentinel-2 2016 global mosaic. Exact EPSG:3857 bounds,
-  natural-color processing, bounded/cancellable requests and visible source credits.
+  and the CC BY EOX Sentinel-2 2016 global mosaic. USGS, IGN and EOX use cached
+  XYZ map tiles; each 1024 texture is a 4×4 zoom+2 mosaic. Swiss borders use WMS
+  to retain alpha. Exact EPSG:3857 bounds, natural-color processing,
+  bounded/cancellable requests and visible source credits.
 - Regional errors/no-data fall through; transparent coverage composites over lower
   priority sources. No newer non-commercial EOX layers or paid accounts required.
 - **Terrain range** inspector section (live controls): 1–3 surrounding tile rings, 0–100 km FOV-aware forward
@@ -38,7 +40,7 @@ requirements separately from excluded platform work.
   Pitch/aim/optics changes debounce 400 ms; non-overlapping distant tiles coarsen
   within a 256-patch budget, long lenses prefer finer tiles, retained patches reuse
   meshes/textures, and settings persist in plans with legacy defaults.
-- Progressive 256×256 image previews and a 1024×1024 camera-tile replacement;
+- Progressive 256×256 image previews and a 1024×1024 camera mosaic of cached detail tiles;
   High refines up to nine nearest tiles inside the focal-length detail band, three requests at a
   time. Failed detail fetches retain previews; resident detail survives lowering quality.
 - Texture swaps preserve existing geometry; switching natural/relit mode also
@@ -227,7 +229,7 @@ Environment: Linux x86_64, Flutter 3.47.6 / Dart 3.13.5.
   all terrain meshes/ground still load; later previews/detail retain geometry.
   Shared HTTP scheduling caps each origin at three streamed requests and applies
   cancellable 429/503 Retry-After/backoff without delaying cached data. Small live
-  probes found HTTP 200, not rate-limit errors; EOX detail took 23.35 seconds.
+  probes found HTTP 200, not rate-limit errors; the old uncached EOX detail took 23.35 seconds. Cached tiles now take about 1–2 seconds.
   See [loading diagnostics and policy](loading.md).
 - Storage settings persist outside plans, trim immediately and leave resident GPU
   resources untouched. The native loading workflow applies zero through the actual

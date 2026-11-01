@@ -13,16 +13,18 @@ coverage bounds. Actual coverage is not guaranteed by those bounds.
 | [IGN BD ORTHO](https://geoservices.ign.fr/bdortho) | Metropolitan France/Corsica and selected overseas departments/territories; 20 cm source orthophotos in much of France, varying by area/year | [Licence Ouverte / Etalab 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/); **© IGN · BD ORTHO · Licence Ouverte 2.0**; see [IGN service terms](https://geoservices.ign.fr/cgu-licences) |
 | [EOX Sentinel-2 cloudless 2016](https://cloudless.eox.at/pricing) | Global basemap, approximately 10 m Sentinel-2 source data where available; not guaranteed detailed/current imagery everywhere | **EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016)**; [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
-EOX's WMS `s2cloudless_3857` layer is explicitly identified as the **2016**
+EOX's WMTS `s2cloudless_3857` layer is explicitly identified as the **2016**
 CC BY mosaic in [GetCapabilities](https://tiles.maps.eox.at/wms?SERVICE=WMS&REQUEST=GetCapabilities).
 Newer EOX mosaics have non-commercial restrictions and are **not** used. The
 2016 pricing exception permits direct use of the public service with attribution,
 including commercial applications. This old mosaic must not be mistaken for
 current photography or imagery corresponding to the simulated date.
 
-Switzerland uses only `ch.swisstopo.images-swissimage`, not the broader
+Switzerland requests only `ch.swisstopo.images-swissimage` by WMS, not the broader
 `ch.swisstopo.swissimage` background group containing third-party SPOT imagery.
-France uses `ORTHOIMAGERY.ORTHOPHOTOS`; approximate search bounds cover mainland
+The WMS export is kept because Swiss WMTS tiles are opaque white outside national
+coverage, which would hide French imagery at the border; the WMS preserves alpha.
+France uses the cached `ORTHOIMAGERY.ORTHOPHOTOS` WMTS tiles; approximate search bounds cover mainland
 France/Corsica, French Guiana, Guadeloupe, Martinique, Saint-Martin/Saint-Barthélemy,
 Réunion, Mayotte and Saint-Pierre-et-Miquelon. No claim is made that every pixel
 in these regions is covered.
@@ -35,22 +37,29 @@ terms and arrange hosting/service agreements before substantial distribution.
 
 ## Geographic alignment and progressive loading
 
-NAIP uses the documented ArcGIS
-[exportImage](https://developers.arcgis.com/rest/services-reference/enterprise/export-image/)
-operation with `bboxSR=3857`, `imageSR=3857`, `adjustAspectRatio=false` and an
-explicit `NaturalColor` rule, not bulk exportTiles or infrared/NDVI templates.
-The other sources use WMS 1.3.0 GetMap in **EPSG:3857**, whose axis order remains
-Easting/Northing. Endpoints: `https://wms.geo.admin.ch/`,
-`https://data.geopf.fr/wms-r/wms`, `https://tiles.maps.eox.at/wms`.
+USGS, IGN and EOX use each service's public cached XYZ tile grid: USGS
+`USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`, IGN `ORTHOIMAGERY.ORTHOPHOTOS`
+WMTS and EOX `s2cloudless_3857` WMTS. A preview is the single zoom-13 tile; the
+1024 camera texture is a 4×4 grid of zoom-15 child tiles stitched inside an
+isolate. Requests use the exact existing terrain tile's Web Mercator bounds
+(or the bounds of its zoom+2 children), so row zero maps to north and existing
+normalized UVs and clamped texture edges are reused. Swiss imagery remains a
+single WMS 1.3.0 GetMap in **EPSG:3857** at `https://wms.geo.admin.ch/`, whose
+axis order remains Easting/Northing. Endpoints: `https://basemap.nationalmap.gov/`,
+`https://wms.geo.admin.ch/`, `https://data.geopf.fr/wmts`,
+`https://tiles.maps.eox.at/wmts`.
 
-Every export uses the exact existing terrain XYZ tile's Web Mercator bounds.
-Row zero maps to north; existing normalized UVs and clamped texture edges are
-reused. Each selected terrain patch receives a 256×256 preview (nine by default),
+Cached tile samples were roughly 0.2–0.4 seconds for a USGS preview and 4×4
+detail mosaic, 1.2–1.3 seconds for an EOX 4×4 mosaic and 1.7 seconds for a Swiss
+1024 WMS export. These are individual samples, not provider guarantees; the
+previous dynamic NAIP export and uncached EOX 1024 WMS took about 23 seconds.
+
+Each selected terrain patch receives a 256×256 preview (nine by default),
 with at most three jobs active. Forward-range coverage can add coarser patches;
 preview ground spacing doubles for each lower terrain zoom.
 Nearby previews begin alongside the remaining terrain jobs. The camera tile
 upgrades to 1024×1024 after terrain and preview loading, without rebuilding geometry;
-slow detail exports never block terrain. Remaining tiles retain previews.
+slow detail tiles never block terrain. Remaining tiles retain previews.
 Terrain and imagery share [HTTP concurrency/backoff](../loading.md), not a fixed
 assumed provider requests-per-second quota. Source selection is automatic; there is no source picker
 or new saved-plan setting.
@@ -102,9 +111,9 @@ partial coverage and unknown exact acquisition time. Only original source raster
 not generated composites, are cached. Corrupt entries are refetched; failed and
 all-no-data responses are not cached. There is no automatic refresh/expiry UI.
 
-Imagery downloads have a **40-second deadline**, explicit cancellation and an
-8 MiB encoded limit; elevation retains its 20-second deadline. EOX dynamic detail
-exports can take over 20 seconds, while previews remain usable. PNG and JPEG magic
+Imagery downloads have a **20-second deadline**, explicit cancellation and an
+8 MiB encoded limit, the same as elevation. Cached tiles and the Swiss WMS export
+normally finish well within it. PNG and JPEG magic
 and dimensions are validated before pixel decoding, with decoder pixel limits.
 PNG supports 8-bit RGB/RGBA and indexed palettes. Despite a PNG request, EOX can
 return JPEG for tile-aligned previews; cached raster files retain the shared

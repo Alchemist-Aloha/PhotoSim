@@ -76,7 +76,8 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Terrain-derived camera height, progressive loading, distance/FOV quadtree LOD, and tile skirts.
 - **Terrain range** inspector section: live surrounding radius, FOV-aware forward fetching and render distance; the map shows a dashed approximate requested-range circle.
 - Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
-  a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile.
+  a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile
+  from cached map tiles.
 - Approximate relighting enabled by default; optional natural imagery, without rebuilding terrain.
 - Collapsible inspector sections for optics, position/orientation, depth of field, weather and composition guides.
 - **Settings** page (app-bar gear) for rendering quality, antialiasing, relighting/camera light, constellation guides and disk cache.
@@ -92,7 +93,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain. Per-state astronomy/observer caching removes duplicate ephemeris work per frame.
 - Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
 - Blended terrain shadow cascades; High quality adds PCSS/contact shadows, denser 256/128/64 terrain meshes, 1.25× supersampling and terrain-scale GTAO with bent-normal indirect lighting.
-- Progressive imagery: 256px previews, then a 1024px camera tile; High refines up to nine nearest tiles inside the focal-length detail band with bounded three-request concurrency. Failed detail requests retain previews.
+- Progressive imagery: 256px tile previews, then a 1024px mosaic of cached detail tiles; High refines up to nine nearest tiles inside the focal-length detail band with bounded three-request concurrency. Failed detail requests retain previews.
 - **Settings → Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
 - **Settings → Rendering** antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
 - Sun/Moon map bearing guides with altitude labels and below-horizontal styling.

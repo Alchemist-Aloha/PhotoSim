@@ -1151,3 +1151,20 @@ numerical code outweighs the gain. Revisit behind a profile build.
   placement.
 - `NightCalendar` `rating()` linear scan (≤42 entries), `label.split(' ')` per
   cell, `localClock` per item: all sub-100 µs per build.
+
+### Imagery detail: dynamic exports → cached map tiles
+
+The old NAIP `exportImage` took about 23 seconds for 256px (then CloudFront
+hit) and over 60 seconds for 1024px; the EOX WMS 1024px image took 23 seconds
+and 2.25 MB on every request. Probes found no 429s, `Retry-After` or rate-limit
+headers, and 16 concurrent cached tile GETs succeeded.
+
+USGS, IGN and EOX now use their public cached tile grids: one zoom-13 tile for
+the 256px preview, and a row-major 4×4 grid of zoom+2 tiles stitched into the
+1024px camera texture. Swiss WMTS tiles are opaque white outside national
+coverage, so Switzerland keeps a WMS export that preserves alpha at the border.
+Measured 1024px details: Yosemite 0.40 s, EOX 1.2–1.3 s, Swiss WMS 1.7 s.
+The three-requests-per-origin cap is unchanged; a detail mosaic makes 16 small
+requests instead of one large export. A failed sub-tile currently drops that
+mosaic and falls back to the next source; empty no-data sub-tiles stay
+transparent and are filled by lower-priority imagery.

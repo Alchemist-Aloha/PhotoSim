@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -18,7 +17,7 @@ import 'imagery_fixture.dart';
 
 void main() {
   final tile = TileId.at(const LatLng(37.744, -119.59));
-  const provider = NaipProvider();
+  final provider = imageryProviders.first;
   late Directory directory;
   setUp(
     () async =>
@@ -26,30 +25,18 @@ void main() {
   );
   tearDown(() async => directory.delete(recursive: true));
 
-  test('export uses exact terrain EPSG:3857 bounds without aspect-ratio adjustment', () {
-    final uri = provider.request(tile, 256);
-    expect(uri.host, 'imagery.nationalmap.gov');
-    final query = uri.queryParameters;
-    expect(query['bboxSR'], '3857');
-    expect(query['imageSR'], '3857');
-    expect(query['size'], '256,256');
-    expect(query['format'], 'png32');
-    expect(query['adjustAspectRatio'], 'false');
+  test('cached source tiles: one preview tile or a 4x4 z+2 detail grid', () {
+    final preview = provider.requests(tile, 256);
+    expect(preview, hasLength(1));
+    expect(preview.single.path, contains('/tile/13/${tile.y}/${tile.x}'));
+    final detail = provider.requests(tile, 1024);
+    expect(detail, hasLength(16));
+    expect(detail.first.path, contains('/tile/15/${tile.y * 4}/${tile.x * 4}'));
     expect(
-      (jsonDecode(query['renderingRule']!)
-          as Map<String, Object?>)['rasterFunction'],
-      'NaturalColor',
+      detail.last.path,
+      contains('/tile/15/${tile.y * 4 + 3}/${tile.x * 4 + 3}'),
     );
-    final bounds = query['bbox']!.split(',').map(double.parse).toList();
-    final nw = tile.point(0, 0), se = tile.point(1, 1);
-    double x(double lon) => lon * math.pi / 180 * 6378137;
-    double y(double lat) =>
-        math.log(math.tan(math.pi / 4 + lat * math.pi / 360)) * 6378137;
-    expect(bounds[0], closeTo(x(nw.longitude), 1e-6));
-    expect(bounds[1], closeTo(y(se.latitude), 1e-6));
-    expect(bounds[2], closeTo(x(se.longitude), 1e-6));
-    expect(bounds[3], closeTo(y(nw.latitude), 1e-6));
-    expect(() => provider.request(tile, 9999), throwsArgumentError);
+    expect(() => provider.requests(tile, 9999), throwsArgumentError);
   });
 
   test('raster orientation preserves northwest and southeast color pixels', () {
@@ -143,15 +130,41 @@ void main() {
   );
 
   test(
+    'detail mosaic stitches row-major and keeps empty sub-tiles transparent',
+    () {
+      final tiles = [for (var i = 0; i < 16; i++) imageryFixture(256)];
+      final result = decodeTiledImagery(TiledImageryDecodeRequest(tiles, 1024));
+      expect(result.raster.size, 1024);
+      expect(result.raster.rgba.sublist(0, 4), [255, 0, 0, 255]);
+      expect(result.raster.rgba.sublist(1024 * 1024 * 4 - 4), [0, 0, 255, 255]);
+      final decoded = decodeImagery(ImageryDecodeRequest(result.png, 1024));
+      expect(decoded.rgba.sublist(0, 4), [255, 0, 0, 255]);
+      final empty = [...tiles]..[5] = imageryFixture(256, empty: true);
+      const offset = (256 * 1024 + 256) * 4;
+      final partial = decodeTiledImagery(
+        TiledImageryDecodeRequest(empty, 1024, retainTransparency: true),
+      );
+      expect(partial.raster.rgba.sublist(offset, offset + 4), [0, 0, 0, 0]);
+      expect(partial.raster.partial, isTrue);
+      final blended = decodeTiledImagery(
+        TiledImageryDecodeRequest(empty, 1024),
+      );
+      expect(blended.raster.rgba.sublist(offset, offset + 4), [
+        154,
+        170,
+        137,
+        255,
+      ]);
+    },
+  );
+
+  test(
     'preview/detail cache independently and revisits do not call HTTP',
     () async {
       var requests = 0;
       final client = MockClient((request) async {
         requests++;
-        final size = int.parse(
-          request.url.queryParameters['size']!.split(',').first,
-        );
-        return http.Response.bytes(imageryFixture(size), 200);
+        return http.Response.bytes(imageryFixture(256), 200);
       });
       addTearDown(client.close);
       final preview = TileCache(Directory('${directory.path}/preview'));
@@ -169,7 +182,7 @@ void main() {
       await repository.load(tile, 1024, abort: abort);
       await repository.load(tile, 256, abort: abort);
       await repository.load(tile, 1024, abort: abort);
-      expect(requests, 2);
+      expect(requests, 17);
       expect(repository.cacheHits, 2);
       final metadata = jsonDecode(
         await File('${detail.directory.path}/${tile.key}.png.json')
@@ -177,13 +190,14 @@ void main() {
       ) as Map<String, Object?>;
       expect(metadata['provider'], 'USGS NAIP');
       expect(metadata['pixels'], 1024);
-      expect(metadata['url'], provider.request(tile, 1024).toString());
+      expect(metadata['url'], provider.requests(tile, 1024).first.toString());
+      expect(metadata['sourceTiles'], 16);
       expect(metadata['acquisitionTime'], isNull);
       expect(metadata['horizontalCrs'], 'EPSG:3857');
       await File('${preview.directory.path}/${tile.key}.png')
           .writeAsString('bad');
       await repository.load(tile, 256, abort: abort);
-      expect(requests, 3);
+      expect(requests, 18);
     },
   );
   test('outside NAIP extent skips network and preserves terrain-independent fallback', () async {
@@ -213,13 +227,9 @@ void main() {
     'missing imagery is not cached, and detail failure retains cached preview',
     () async {
       final client = MockClient(
-        (request) async => request.url.queryParameters['size'] == '256,256'
-            ? http.Response.bytes(imageryFixture(256), 200)
-            : http.Response(
-                'unavailable',
-                503,
-                headers: {'retry-after': '120'},
-              ),
+        (request) async => request.url.path.contains('/15/')
+            ? http.Response('unavailable', 503, headers: {'retry-after': '120'})
+            : http.Response.bytes(imageryFixture(256), 200),
       );
       addTearDown(client.close);
       final preview = TileCache(Directory('${directory.path}/preview'));

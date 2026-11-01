@@ -4,8 +4,10 @@
 
 Small local probes of the actual endpoints returned HTTP 200, not 429, with no
 Retry-After/rate-limit headers. Three requests for one Mapterhorn tile took
-0.13–0.21 seconds each. A USGS NAIP 1024px export took 3.25 seconds; an EOX 2016
-1024px WMS image took 23.35 seconds (first byte 0.83 seconds, 2.25 MB total).
+0.13–0.21 seconds each. Cached imagery tiles took roughly 0.2–0.4 seconds for a
+USGS preview and 4×4 detail mosaic, 1.2–1.3 seconds for an EOX 4×4 mosaic and
+1.7 seconds for a Swiss 1024px WMS export. The replaced dynamic NAIP export and
+uncached EOX 1024px WMS image took about 23 seconds each.
 These are individual samples, not provider guarantees or a load test. Cached
 terrain responses do not establish service-wide capacity; HTTP 200 does not rule
 out bandwidth shaping or other server/network delays.
@@ -27,8 +29,8 @@ textures, cancellation, source order, provenance and size limits are preserved.
   and HTTP-date values. Missing, invalid or past dates use exponential delays of
   1, 2, 4, 8, 16, then at most 32 seconds; success resets the failure count without
   shortening an already announced cooldown. Valid longer server delays win.
-- Each download retries at most twice. Its existing 20-second terrain / 40-second
-  imagery deadline includes queueing, transfers and retries. Backoff waits and
+- Each download retries at most twice. Its existing 20-second terrain and imagery
+  deadline includes queueing, transfers and retries. Backoff waits and
   queued slots cancel promptly; cancellation never starts a deferred request.
 - New uncached calls during cooldown fail fast, allowing the normal source fallback.
   A current request also falls back immediately if its next retry exceeds its

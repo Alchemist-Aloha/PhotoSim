@@ -10,6 +10,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/data/raster_cache.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/settings_page.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 
 import '../test/imagery_fixture.dart';
@@ -29,23 +30,22 @@ void main() {
       );
       await cache.initialize();
       final imagesReady = Completer<void>();
-      final preview = imageryFixture(256), detail = imageryFixture(1024);
+      final preview = imageryFixture(256);
       var terrainRequests = 0, previewRequests = 0, detailRequests = 0;
       final client = MockClient((request) async {
         if (request.url.host == 'tiles.mapterhorn.com') {
           terrainRequests++;
           return http.Response.bytes(terrainWebpFixture(), 200);
         }
-        final size = request.url.queryParameters['size'];
-        if (size == '256,256') {
+        if (request.url.path.contains('/tile/13/')) {
           previewRequests++;
-        } else if (size == '1024,1024') {
+        } else if (request.url.path.contains('/tile/15/')) {
           detailRequests++;
         } else {
           throw StateError('Unexpected source request: ${request.url}');
         }
         await imagesReady.future;
-        return http.Response.bytes(size == '256,256' ? preview : detail, 200);
+        return http.Response.bytes(preview, 200);
       });
       addTearDown(() async {
         if (!imagesReady.isCompleted) imagesReady.complete();
@@ -131,7 +131,7 @@ void main() {
       }
       expect(find.text('Imagery 9/9'), findsOneWidget);
       expect(previewRequests, 9);
-      expect(detailRequests, 1);
+      expect(detailRequests, 16);
       expect(terrainRequests, 9);
       final viewRect = tester.getRect(find.byType(scene.SceneView));
       expect(viewRect, tester.getRect(find.byType(SimulationWorkspace)));
@@ -200,18 +200,21 @@ void main() {
         (await files()).where((file) => file.path.endsWith('.png')),
         hasLength(19),
       );
-      final inspectorScroll = find
-          .descendant(
-            of: find.byKey(const PageStorageKey('scene-inspector')),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
-        find.text('Storage'),
-        300,
-        scrollable: inspectorScroll,
+      final navigator = Navigator.of(
+        tester.element(find.byType(SimulationWorkspace)),
       );
-      await tester.tap(find.text('Storage'));
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => SettingsPage(
+              state: state,
+              onChanged: (next) => state = next,
+              rasterCache: cache,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       final field = find.byKey(const PageStorageKey('cache-limit'));
       await tester.ensureVisible(field);
@@ -228,6 +231,9 @@ void main() {
       expect(find.text('Cache limit saved.'), findsOneWidget);
       expect(cache.limitMiB, 0);
       expect(await files(), isEmpty);
+      navigator.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       final reopened = RasterCache(
         cache.directory,
         settingsFile: cache.settingsFile,
@@ -240,7 +246,7 @@ void main() {
       expect(find.text('Imagery 9/9'), findsOneWidget);
       expect(terrainRequests, 9);
       expect(previewRequests, 9);
-      expect(detailRequests, 1);
+      expect(detailRequests, 16);
       expect(tester.takeException(), isNull);
     },
   );

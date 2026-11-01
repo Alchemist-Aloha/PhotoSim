@@ -23,14 +23,10 @@ void main() {
     (tester) async {
       final directory = await Directory.systemTemp.createTemp('photosim-fill-');
       final terrain = terrainWebpFixture();
-      final preview = imageryFixture(256), detail = imageryFixture(1024);
+      final preview = imageryFixture(256);
       final client = MockClient(
         (request) async => http.Response.bytes(
-          request.url.host == 'tiles.mapterhorn.com'
-              ? terrain
-              : request.url.queryParameters['size'] == '256,256'
-              ? preview
-              : detail,
+          request.url.host == 'tiles.mapterhorn.com' ? terrain : preview,
           200,
         ),
       );

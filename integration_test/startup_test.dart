@@ -45,7 +45,7 @@ void main() {
         TileId.at(state.location),
       );
       final terrain = terrainWebpFixture();
-      final preview = imageryFixture(256), detail = imageryFixture(1024);
+      final preview = imageryFixture(256);
       var terrainRequests = 0, previewRequests = 0;
       final client = MockClient((request) async {
         if (request.url.host == 'tiles.mapterhorn.com') {
@@ -53,9 +53,9 @@ void main() {
           if (request.url != center) await neighborsReady.future;
           return http.Response.bytes(terrain, 200);
         }
-        final isPreview = request.url.queryParameters['size'] == '256,256';
+        final isPreview = request.url.path.contains('/tile/13/');
         if (isPreview) previewRequests++;
-        return http.Response.bytes(isPreview ? preview : detail, 200);
+        return http.Response.bytes(preview, 200);
       });
       addTearDown(() async {
         if (!indexReady.isCompleted) indexReady.complete();
