@@ -225,6 +225,34 @@ void main() {
     },
   );
 
+  test('star geometry keeps its exact vertex payload', () {
+    final data = starMesh([
+      Star(1, 247.3519 * radians, -26.4320 * radians, 1.06),
+      Star(2, 0.0, 89.9 * radians, 5.5),
+    ]);
+    // Golden values from the pre-optimization vector_math implementation; the
+    // allocation-free rewrite must stay bit-identical.
+    expect(data.positions.sublist(0, 27), [
+      -13792.650390625, -33056.46875, -17805.4140625, //
+      -13829.2333984375, -33041.203125, -17805.4140625,
+      -13813.7138671875, -33034.16015625, -17830.513671875,
+      -13785.85546875, -33040.18359375, -17840.912109375,
+      -13761.9765625, -33055.74609375, -17830.513671875,
+      -13756.06640625, -33071.73046875, -17805.4140625,
+      -13771.5859375, -33078.77734375, -17780.314453125,
+      -13799.4443359375, -33072.75, -17769.91796875,
+      -13823.3232421875, -33057.1875, -17780.314453125,
+    ]);
+    expect(data.colors.sublist(0, 4), [
+      0.8637620210647583,
+      0.8637620210647583,
+      0.8637620210647583,
+      1.0,
+    ]);
+    expect(data.indices.sublist(0, 12), [0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 5, 4]);
+    expect(data.indices.length, 2 * 8 * 3);
+  });
+
   test('batched stellar geometry faces inward and scales with magnitude', () {
     final data = starMesh([
       const Star(1, 0, 0, -1),

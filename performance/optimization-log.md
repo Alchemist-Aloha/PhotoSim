@@ -102,6 +102,37 @@ device utilization with PhotoSim closed), so no GPU-bound claim is made.
   atlas, so an early capture cannot lose planet names.
 - Accepted.
 
+## Iteration 4 — allocation-free star mesh
+
+- Baseline: `098aa06`.
+- Bottleneck: `starMesh` (built once per 3D entry, on the UI isolate) created
+  ~40 throwaway `Vector3`s and 8 list literals per star, ~250k allocations for
+  the bundled 5044-star catalog. Temporary probes put it at 7.50 ms `p50` per
+  entry, the largest remaining CPU chunk of scene construction.
+- Change: `lib/render/night_sky.dart` computes the same geometry with plain
+  doubles and writes indices directly into a preallocated list. The
+  `vector_math` orderings were mirrored exactly (reciprocal normalization,
+  `(y*oz - z*oy)`, `(u*cos + v*sin) * radius`, `center + ...`).
+- Equivalence: a temporary check compared the rewrite against the previous
+  implementation for the real catalog — **0 differing values** across 5044 stars
+  (positions 136k floats, colors 181k floats, 121k indices). A permanent golden
+  test now pins the exact vertex payload for two stars.
+- Probe A/B, `p50` per entry, 3 interleaved runs each (probes removed afterwards):
+  old 7.36/8.63/7.50 (median 7.50 ms) → new 1.55/1.75/1.81 (median 1.75 ms),
+  **−77 %**, non-overlapping.
+- End-to-end `first-scene`: warm 148.3/136.4/150.8 → 150.4/113.1/135.1 ms and
+  cold 174.4/190.0/179.3 → 177.2/192.5/206.5 ms — **inconclusive**, because
+  that milestone is dominated by texture/shader/GPU time with ±20 ms spread;
+  the ~5.8 ms removed is real but inside that noise. Reported as such rather
+  than claimed as an end-to-end win.
+- The same preallocated-index rewrite applied to the Milky Way grid showed no
+  measurable change (its cost is the upload), so it was reverted to keep this
+  change to one hypothesis.
+- Correctness: 299 unit/widget tests, strict analysis, `startup_test`,
+  `clouds_test` and `idle_render_test` pass; the geometry payload is verified
+  bit-identical, so rendered pixels cannot change.
+- Accepted on the targeted metric.
+
 ## Rejected this session — rebuild scope of the 3D shell
 
 Temporary subtree ablation during aim scrub (paired phases in one process,

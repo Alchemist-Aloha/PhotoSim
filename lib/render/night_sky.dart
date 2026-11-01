@@ -7,7 +7,6 @@ import 'package:flutter/material.dart' show Color, Size;
 import 'constellations.dart';
 
 import 'package:vector_math/vector_math.dart' as vm;
-import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 import '../core/astronomy.dart';
 import '../core/geo.dart';
@@ -22,36 +21,65 @@ import 'label_atlas.dart';
 ) {
   final positions = Float32List(stars.length * 9 * 3);
   final colors = Float32List(stars.length * 9 * 4);
-  final indices = <int>[];
-  // Indexed writes: setRange with a list literal built ~130k throwaway lists for the
-  // bundled 5k-star catalog, all on the UI isolate during scene creation.
+  final indices = List<int>.filled(stars.length * 8 * 3, 0);
+  // Plain double math: the vector_math helpers built ~40 throwaway Vector3s and
+  // 8 list literals per star, all on the UI isolate during scene creation.
   for (var i = 0; i < stars.length; i++) {
-    final star = stars[i], d = star.direction;
-    final u = d
-        .cross(d.z.abs() > 0.9 ? Vector3(1, 0, 0) : Vector3(0, 0, 1))
-        .normalized();
-    final v = d.cross(u);
+    final star = stars[i];
+    final cosDec = math.cos(star.dec), sinDec = math.sin(star.dec);
+    final dx = cosDec * math.cos(star.ra);
+    final dy = cosDec * math.sin(star.ra);
+    final dz = sinDec;
+    // u = normalize(d × axis), axis = +X near the pole, otherwise +Z.
+    double ux, uy, uz;
+    if (dz.abs() > 0.9) {
+      ux = 0;
+      uy = dz;
+      uz = -dy;
+    } else {
+      ux = dy;
+      uy = -dx;
+      uz = 0;
+    }
+    final uScale = 1 / math.sqrt(ux * ux + uy * uy + uz * uz);
+    ux *= uScale;
+    uy *= uScale;
+    uz *= uScale;
+    final vx = dy * uz - dz * uy;
+    final vy = dz * ux - dx * uz;
+    final vz = dx * uy - dy * ux;
     // shortcut: unresolved stars use exaggerated fixed-angular disks, not a calibrated PSF/exposure model.
     final flux = math.pow(10, -0.2 * star.magnitude).toDouble();
     final radius = NightSkyRenderer.starDistance * (0.0005 + 0.0008 * flux);
     final brightness = 0.25 + flux;
+    final centerX = dx * NightSkyRenderer.starDistance;
+    final centerY = dy * NightSkyRenderer.starDistance;
+    final centerZ = dz * NightSkyRenderer.starDistance;
     for (var j = 0; j < 9; j++) {
       final angle = (j - 1) * math.pi / 4;
-      final p =
-          d * NightSkyRenderer.starDistance +
-          (j == 0
-              ? Vector3.zero()
-              : (u * math.cos(angle) + v * math.sin(angle)) * radius);
       final vertex = i * 9 + j;
-      positions[vertex * 3] = p.x;
-      positions[vertex * 3 + 1] = p.y;
-      positions[vertex * 3 + 2] = p.z;
+      final p = vertex * 3;
+      if (j == 0) {
+        positions[p] = centerX;
+        positions[p + 1] = centerY;
+        positions[p + 2] = centerZ;
+      } else {
+        final cos = math.cos(angle) * radius, sin = math.sin(angle) * radius;
+        positions[p] = centerX + (ux * cos + vx * sin);
+        positions[p + 1] = centerY + (uy * cos + vy * sin);
+        positions[p + 2] = centerZ + (uz * cos + vz * sin);
+      }
       final color = vertex * 4;
       colors[color] = brightness;
       colors[color + 1] = brightness;
       colors[color + 2] = brightness;
       colors[color + 3] = 1;
-      if (j > 0) indices.addAll([i * 9, i * 9 + j % 8 + 1, vertex]);
+      if (j > 0) {
+        final index = (i * 8 + j - 1) * 3;
+        indices[index] = i * 9;
+        indices[index + 1] = i * 9 + j % 8 + 1;
+        indices[index + 2] = vertex;
+      }
     }
   }
   return (positions: positions, colors: colors, indices: indices);
