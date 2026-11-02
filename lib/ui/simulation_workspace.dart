@@ -251,7 +251,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               return;
             }
             final nodes = <scene.Node>[];
-            if (result.surface.indices.isNotEmpty) {
+            if (result.surface.indices.isNotEmpty || result.adjustedTerrain) {
               final terrain = result.terrain;
               if (cameraGroundTile?.key == key) {
                 cameraGroundField = terrain;

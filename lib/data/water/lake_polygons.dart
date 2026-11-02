@@ -17,6 +17,7 @@ class LakePolygon {
   final int id;
   final double height;
   final List<List<math.Point<double>>> rings;
+  late final _curvedRings = rings.map(_curveRing).toList();
 }
 
 List<LakePolygon> decodeLakePolygons(Uint8List bytes) {
@@ -97,25 +98,58 @@ List<LakePolygon> decodeLakePolygons(Uint8List bytes) {
   return lakes;
 }
 
-/// Project without wrapping longitudes around the camera (important at the dateline).
+// Round corners in world coordinates so adjacent tiles and mesh LODs share one curve.
+List<math.Point<double>> _curveRing(List<math.Point<double>> ring) {
+  final points = <math.Point<double>>[];
+  for (final point in ring) {
+    final radians = point.y * math.pi / 180;
+    final projected = math.Point(
+      (point.x + 180) / 360,
+      (1 - math.log(math.tan(radians) + 1 / math.cos(radians)) / math.pi) / 2,
+    );
+    if (points.isEmpty || points.last != projected) points.add(projected);
+  }
+  if (points.length > 1 && points.first == points.last) points.removeLast();
+  if (points.length < 3) {
+    return [...points, if (points.isNotEmpty) points.first];
+  }
+  final curved = <math.Point<double>>[];
+  for (var i = 0; i < points.length; i++) {
+    final b = points[i];
+    final incoming = points[(i + points.length - 1) % points.length] - b;
+    final outgoing = points[(i + 1) % points.length] - b;
+    final latitude =
+        2 * math.atan(math.exp((0.5 - b.y) * 2 * math.pi)) - math.pi / 2;
+    final meters = 40075016.68557849 * math.cos(latitude);
+    // Short edges retain half their straight span; cutbacks never exceed 10 m.
+    final trim = math.min(
+      10 / meters,
+      math.min(incoming.magnitude, outgoing.magnitude) / 4,
+    );
+    final a = b + incoming * (trim / incoming.magnitude);
+    final c = b + outgoing * (trim / outgoing.magnitude);
+    final bend = (a - b + c - b).magnitude * meters / 4;
+    if (bend < 0.02) {
+      curved.add(b);
+      continue;
+    }
+    // Quadratic Bezier segments stay inside the corner's control triangle (no spline overshoot).
+    final steps = math.sqrt(bend / 0.02).ceil().clamp(2, 16);
+    for (var step = 0; step <= steps; step++) {
+      final t = step / steps, s = 1 - t;
+      curved.add(a * (s * s) + b * (2 * s * t) + c * (t * t));
+    }
+  }
+  return [...curved, curved.first];
+}
+
+/// Project shared curves without wrapping longitudes around the camera.
 List<List<math.Point<double>>> lakeTileRings(LakePolygon lake, TileId id) {
   final n = (1 << id.z).toDouble();
-  return lake.rings
-      .map(
-        (ring) => ring.map((point) {
-          final radians = point.y * math.pi / 180;
-          return math.Point(
-            (point.x + 180) / 360 * n - id.x,
-            (1 -
-                        math.log(math.tan(radians) + 1 / math.cos(radians)) /
-                            math.pi) /
-                    2 *
-                    n -
-                id.y,
-          );
-        }).toList(),
-      )
-      .toList();
+  return [
+    for (final ring in lake._curvedRings)
+      [for (final p in ring) math.Point(p.x * n - id.x, p.y * n - id.y)],
+  ];
 }
 
 typedef LakeEdge = (math.Point<double>, math.Point<double>);
@@ -139,7 +173,12 @@ List<LakeEdge> _crossings(List<LakeEdge> edges, double y) =>
       ..sort((a, b) => _x(a, y).compareTo(_x(b, y)));
 
 /// Even/odd filling preserves islands, independent of ring winding.
-Float32List lakeLevels(List<LakePolygon> lakes, TileId id, int size) {
+Float32List lakeLevels(
+  List<LakePolygon> lakes,
+  TileId id,
+  int size, {
+  double padding = 0,
+}) {
   final levels = Float32List(size * size)
     ..fillRange(0, size * size, double.nan);
   for (final lake in lakes) {
@@ -156,11 +195,40 @@ Float32List lakeLevels(List<LakePolygon> lakes, TileId id, int size) {
         levels.fillRange(y * size + start, y * size + end, lake.height);
       }
     }
+    if (padding == 0) continue;
+    // Clear the terrain's interpolation footprint, not just water pixel centers.
+    for (final (a, b) in _edges(lakeTileRings(lake, id))) {
+      final first = ((math.min(a.y, b.y) - padding) * size - 0.5).ceil().clamp(
+        0,
+        size,
+      );
+      final last = ((math.max(a.y, b.y) + padding) * size - 0.5).floor().clamp(
+        -1,
+        size - 1,
+      );
+      for (var y = first; y <= last; y++) {
+        final v = (y + 0.5) / size;
+        final dy = b.y - a.y;
+        final t0 = dy == 0 ? 0.0 : ((v - padding - a.y) / dy).clamp(0.0, 1.0);
+        final t1 = dy == 0 ? 1.0 : ((v + padding - a.y) / dy).clamp(0.0, 1.0);
+        final x0 = a.x + (b.x - a.x) * t0;
+        final x1 = a.x + (b.x - a.x) * t1;
+        final start = ((math.min(x0, x1) - padding) * size - 0.5).ceil().clamp(
+          0,
+          size,
+        );
+        final end = ((math.max(x0, x1) + padding) * size - 0.5).ceil().clamp(
+          0,
+          size,
+        );
+        levels.fillRange(y * size + start, y * size + end, lake.height);
+      }
+    }
   }
   return levels;
 }
 
-/// Exact polygon edges with grid subdivision to retain Earth curvature.
+/// Curved shoreline edges with grid subdivision to retain Earth curvature.
 /// Adding vertex and tile-edge intersection rows keeps topology fixed within a strip.
 void lakeSurfaceQuads(
   LakePolygon lake,

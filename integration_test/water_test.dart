@@ -37,10 +37,11 @@ void main() {
       final mask = waterFixture(wet: (_, _) => false);
       final polygons = lakeFixture(atlas, [
         [
-          for (var i = 0; i <= 64; i++)
+          // Deliberately angular source geometry exercises rendered Bezier corners.
+          for (var i = 0; i <= 8; i++)
             [
-              0.46 + 0.055 * math.cos(i % 64 / 64 * math.pi * 2),
-              0.46 + 0.055 * math.sin(i % 64 / 64 * math.pi * 2),
+              0.46 + 0.055 * math.cos(i % 8 / 8 * math.pi * 2),
+              0.46 + 0.055 * math.sin(i % 8 / 8 * math.pi * 2),
             ],
         ],
       ]);
@@ -169,6 +170,28 @@ void main() {
       await File('build/validation/linux-static-water.png')
           .writeAsBytes(bytes!.buffer.asUint8List());
       rendered.dispose();
+      final corner = atlas.point(0.515, 0.46);
+      rebuild(
+        () => state = state.copyWith(
+          latitude: corner.latitude,
+          longitude: corner.longitude,
+          fixedElevation: 140,
+        ),
+      );
+      await waitFor(
+        () =>
+            workspace.loading == false &&
+            workspace.waterNodes.length == 9 &&
+            workspace.imageryLoading == false,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      final closeup = await boundary.toImage();
+      final closeupBytes = await closeup.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      await File('build/validation/linux-curved-shore.png')
+          .writeAsBytes(closeupBytes!.buffer.asUint8List());
+      closeup.dispose();
       // A mesh-resolution change must rebuild water alongside terrain, not lose its carving.
       rebuild(() => state = state.copyWith(renderQuality: RenderQuality.high));
       await waitFor(

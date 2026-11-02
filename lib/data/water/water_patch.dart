@@ -131,7 +131,13 @@ class WaterMesh {
 }
 
 class WaterPatch {
-  WaterPatch(this.terrain, this.surface, this.outline);
+  WaterPatch(
+    this.terrain,
+    this.surface,
+    this.outline, {
+    this.adjustedTerrain = false,
+  });
+  final bool adjustedTerrain;
   final TerrainPatch terrain;
   final WaterMesh surface, outline;
 }
@@ -235,9 +241,17 @@ WaterPatch buildWaterPatch(
       }
     }
   }
-  if (surface.indices.isEmpty) return WaterPatch(terrain, surface, outline);
+  if (surface.indices.isEmpty && atlas.lakes.isEmpty) {
+    return WaterPatch(terrain, surface, outline);
+  }
   final heights = Float32List.fromList(terrain.field.heights);
-  final lakeHeights = lakeLevels(atlas.lakes, id, terrain.field.size);
+  final lakeHeights = lakeLevels(
+    atlas.lakes,
+    id,
+    terrain.field.size,
+    padding: 1 / terrain.resolution + 1 / terrain.field.size,
+  );
+  var changed = false;
   for (var y = 0; y < terrain.field.size; y++) {
     for (var x = 0; x < terrain.field.size; x++) {
       final index = y * terrain.field.size + x;
@@ -247,12 +261,14 @@ WaterPatch buildWaterPatch(
               (x + 0.5) / terrain.field.size,
               (y + 0.5) / terrain.field.size,
             );
-      // Remove small DEM ripples beneath water, but never carve hills to fit a coarse mask.
+      // Keep shoreline interpolation beneath water without excavating hills.
       if (height != null && (heights[index] - height).abs() <= 4) {
         heights[index] = height - 0.15;
+        changed = true;
       }
     }
   }
+  if (!changed) return WaterPatch(terrain, surface, outline);
   return WaterPatch(
     buildTerrainPatch(
       HeightField(heights, terrain.field.size),
@@ -262,5 +278,6 @@ WaterPatch buildWaterPatch(
     ),
     surface,
     outline,
+    adjustedTerrain: true,
   );
 }

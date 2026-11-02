@@ -10,8 +10,15 @@ Lakes use **HydroLAKES v1.0**, queried from the public
 [UNEP-WCMC Ocean+ GIS service](https://data-gis.unep-wcmc.org/server/rest/services/Oceanplus/_Global_lake_distribution_of_HydroLAKES_McGill_University/MapServer/0).
 Intersecting full GeoJSON polygons are fetched once per canonical zoom-10 atlas;
 no server-side geometry simplification is requested. Polygon/MultiPolygon rings
-retain islands. Geometry is clipped to render tiles and subdivided for Earth
-curvature; only original shores, never tile clipping edges, receive dark rims.
+retain islands. Before tile clipping, shoreline corners are rounded with
+quadratic Bézier curves. Corner cutbacks are capped at 10 m and one quarter of
+each adjoining edge; curve tessellation targets 2 cm error, with continuous
+bounded joins along the shore rim. The water fill,
+shore rim and terrain clearance all use this same world-space contour across
+tiles and detail levels. This is a small visual approximation, not more accurate
+shoreline data; original downloaded geometry is unchanged.
+Geometry is then clipped and subdivided for Earth curvature; only actual shores,
+never tile clipping edges, receive dark rims.
 
 Each identified lake uses its dataset `elevation` across every render tile and
 atlas. This avoids splitting large lakes into separately estimated raster
@@ -54,10 +61,14 @@ Polygon lakes still render if the mask service fails; ocean then remains absent.
 ## Rendering, loading and cache
 
 Water follows WGS84 curvature in the terrain's local frame. Under covered water,
-DEM ripples within 4 m of the estimated level are lowered in memory only;
-hills are not excavated to match an inaccurate height. Original cached terrain
-is unchanged. Larger DEM/height discrepancies can still occlude water, and
-shoreline detail is limited by the terrain mesh as well as the source polygon.
+DEM ripples within 4 m of the estimated level are lowered in memory only.
+For polygon lakes, clearance includes one terrain-mesh cell plus the DEM
+interpolation footprint around the shore. This stops coarse terrain triangles
+from hiding a smooth polygon behind a staircase, without expanding the water
+polygon or filling its islands. Near-shore ground within that narrow band can
+also be lowered; hills outside the 4 m tolerance are never excavated.
+Original cached terrain is unchanged. Larger DEM/height discrepancies can still
+occlude water. Raster ocean/fallback outlines retain their source resolution.
 Smooth opaque PBR surfaces receive scene lighting/specular sky; narrow dark
 rims distinguish shores. No waves, flowing rivers, tides or live levels are modeled.
 
@@ -75,8 +86,9 @@ and NASA data terms continue to apply.
 
 ## Verification
 
-`test/lake_polygons_test.dart` covers holes/concavity, clipping, cross-atlas lake
-levels, real Rochester/Lake Ontario shoreline geometry, cache recovery/offline
+`test/lake_polygons_test.dart` covers quadratic curves and their bounds,
+shared contours across tiles/detail levels, holes/concavity, clipping, cross-atlas
+lake levels, real Rochester/Lake Ontario shoreline geometry, cache recovery/offline
 reuse and polygons with missing/unavailable MODIS coverage. `test/water_test.dart`
 covers ocean classification, raster outage fallback, curvature, bounded terrain
 adjustment and cancellation. `integration_test/water_test.dart` renders a polygon
