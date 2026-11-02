@@ -142,6 +142,18 @@ class _SettingsPageState extends State<SettingsPage> {
                         update(state.copyWith(showConstellations: value)),
                   ),
                   const Divider(height: 32),
+                  Text('Data sources', style: textTheme.titleMedium),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('NASA terrain & imagery'),
+                    value: state.useNasaData,
+                    onChanged: (value) =>
+                        update(state.copyWith(useNasaData: value)),
+                  ),
+                  const Text(
+                    'No API key needed. Adds NED 10 m / ASTER 30 m elevation fallbacks after Mapterhorn, and prefers NASA Landsat imagery outside regional aerial coverage. Landsat is a historical 30 m mosaic, not necessarily sharper than the default. Changing this reloads the preview.',
+                  ),
+                  const Divider(height: 32),
                   Text('Storage', style: textTheme.titleMedium),
                   const SizedBox(height: 8),
                   CacheSettingsPanel(

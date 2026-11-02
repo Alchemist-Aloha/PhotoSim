@@ -39,6 +39,32 @@ terrain through this change. Global data remains roughly 30 m outside finer
 coverage. The service does not report each tile's exact source blend or acquisition
 time, so PhotoSim does not invent per-tile source identity/accuracy metadata.
 
+### Optional NASA elevation
+
+**Settings → Data sources → NASA terrain & imagery** is enabled by default and can be switched off.
+After both Mapterhorn attempts fail, PhotoSim tries NASA WorldWind's
+`https://worldwind26.arc.nasa.gov/elev` WMS 1.3.0 service:
+
+1. **USGS NED 10 m** (`USGS-NED`) inside the contiguous-US coverage extent.
+2. **NASA/METI ASTER GDEM v2**, approximately 30 m (`aster_v2`), between 83° S and 83° N.
+3. The existing Mapzen fallback if NASA is unavailable or returns no-data.
+
+Requests use the terrain tile's exact **EPSG:3857** bounds, 256×256 samples and
+`application/bil16`: signed little-endian integer meters, north-up. Wrong lengths,
+service XML, -9999/-32768 voids and out-of-range heights are rejected, not turned
+into flat terrain. Existing timeouts, cancellation and download limits apply.
+The original BIL bytes and provenance use independent `nasa-ned-10m-v1` and
+`nasa-aster-v2-v1` cache directories within the shared disk budget.
+
+No NASA API key or Earthdata login is needed. This is an extra source/failure
+fallback, **not a guaranteed resolution upgrade** over Mapterhorn's regional DEMs.
+NED's NAVD88 and ASTER's EGM96 heights remain uncorrected; ASTER may include
+surface features/artifacts. ASTER GDEM is a product of METI and NASA; visible
+credits identify the actual source. See [NASA WorldWind](https://worldwind.arc.nasa.gov/)
+and the service's [capabilities](https://worldwind26.arc.nasa.gov/elev?SERVICE=WMS&REQUEST=GetCapabilities).
+Changing the preference cancels old jobs and reloads resident geography; saved
+plans/session recovery preserve explicit on/off choices, and older plans without the preference default to on.
+
 ### Selection and bounded loading
 
 Default coverage remains nine zoom-13 XYZ patches. The inspector's **Terrain range** section
@@ -76,9 +102,9 @@ For each zoom-13 patch:
    zoom 12 outside regional high-resolution archives. Crop the exact 256×256 child
    quadrant from its 512×512 raster, preserving pixel-center registration, north-up
    orientation and the requested patch's geographic bounds. Do not upscale it.
-3. If both fail, request the existing Mapzen zoom-13 tile.
+3. If both fail, try enabled NASA sources as above, then the existing Mapzen zoom-13 tile.
 
-Coarser patches request their own zoom directly from Mapterhorn, then Mapzen;
+Coarser patches request their own zoom directly from Mapterhorn, then enabled NASA sources and Mapzen;
 they do not request zoom-13 children or crop an unrelated zoom-12 raster.
 
 Cached detail is preferred; if only the parent is cached, use it without repeating

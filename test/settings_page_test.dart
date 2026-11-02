@@ -9,6 +9,36 @@ import 'package:photosim/ui/cache_settings_panel.dart';
 import 'package:photosim/ui/settings_page.dart';
 
 void main() {
+  for (final size in [const Size(390, 844), const Size(1280, 900)]) {
+    testWidgets('NASA switch updates preferences at $size without overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var state = SimulationState();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SettingsPage(state: state, onChanged: (next) => state = next),
+        ),
+      );
+      final toggle = find.widgetWithText(
+        SwitchListTile,
+        'NASA terrain & imagery',
+      );
+      await tester.ensureVisible(toggle);
+      expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(state.useNasaData, isFalse);
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(state.useNasaData, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
     'app bar opens the settings page with rendering and storage controls',
     (tester) async {

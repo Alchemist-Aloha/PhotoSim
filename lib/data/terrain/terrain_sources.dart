@@ -16,8 +16,11 @@ class TerrainSources {
     required http.Client client,
     required Directory directory,
     RasterCache? budget,
+    bool useNasa = false,
   }) : sources = [
-         for (final provider in TerrainProvider.values)
+         for (final provider in TerrainProvider.values.where(
+           (provider) => useNasa || !provider.isNasa,
+         ))
            TerrainRepository(
              client: client,
              provider: provider,
@@ -60,7 +63,8 @@ class TerrainSources {
     final candidates = [
       (primary, preferParent ? parent : id),
       if (parent != null) (primary, preferParent ? id : parent),
-      (sources.last, id),
+      for (final source in sources.skip(1))
+        if (source.provider.covers(id)) (source, id),
     ];
     Exception? failure;
     for (final (source, rasterId) in candidates) {

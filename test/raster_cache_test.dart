@@ -31,6 +31,36 @@ void main() {
   File raster(TileCache cache, TileId tile) =>
       File('${cache.directory.path}/${tile.key}.png');
 
+  test(
+    'startup counts optional NASA caches even with the preference disabled',
+    () async {
+      await budget.setLimitMiB(1);
+      final folders = [
+        'nasa-ned-10m-v1',
+        'nasa-aster-v2-v1',
+        'nasa-weld-truecolor-2000-256-v1',
+        'nasa-weld-truecolor-2000-1024-v1',
+      ];
+      for (var i = 0; i < folders.length; i++) {
+        final file = File(
+          '${budget.directory.path}/${folders[i]}/${a.key}.png',
+        );
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(Uint8List(400 * 1024));
+        await file.setLastModified(DateTime.utc(2000, 1, i + 1));
+      }
+      final reopened = RasterCache(budget.directory, settingsFile: settings);
+      await reopened.initialize();
+      for (var i = 0; i < folders.length; i++) {
+        expect(
+          await File('${budget.directory.path}/${folders[i]}/${a.key}.png')
+              .exists(),
+          i >= 2,
+        );
+      }
+    },
+  );
+
   test('one LRU cap across terrain, previews and detail, not old per-source quotas', () async {
     await budget.setLimitMiB(1);
     final terrain = source('mapterhorn-v1');

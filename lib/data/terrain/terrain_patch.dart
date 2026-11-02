@@ -61,6 +61,26 @@ HeightField decodeTerrarium(Uint8List bytes) {
   return _heightField(decoded, 256);
 }
 
+/// WorldWind BIL16: signed little-endian meters, north-to-south pixel rows.
+HeightField decodeNasaElevation(Uint8List bytes) {
+  const size = 256;
+  if (bytes.length != size * size * 2) {
+    throw const FormatException('Expected a 256×256 BIL16 elevation tile');
+  }
+  final data = ByteData.sublistView(bytes);
+  final heights = Float32List(size * size);
+  for (var i = 0; i < heights.length; i++) {
+    final height = data.getInt16(i * 2, Endian.little);
+    if (height == -9999 || height < -12000 || height > 10000) {
+      throw const FormatException(
+        'NASA terrain contains void or out-of-range elevations',
+      );
+    }
+    heights[i] = height.toDouble();
+  }
+  return HeightField(heights, size);
+}
+
 HeightField decodeMapterhorn(Uint8List bytes) {
   if (bytes.length < 25 || bytes.length > 1024 * 1024) {
     throw const FormatException('Invalid terrain WebP');
@@ -219,7 +239,9 @@ class TerrainBuildRequest {
 }
 
 TerrainPatch decodeAndBuildTerrain(TerrainBuildRequest request) {
-  var field = request.provider == TerrainProvider.mapterhorn
+  var field = request.provider.isNasa
+      ? decodeNasaElevation(request.bytes)
+      : request.provider == TerrainProvider.mapterhorn
       ? decodeMapterhorn(request.bytes)
       : decodeTerrarium(request.bytes);
   final id = request.id, rasterId = request.rasterId;

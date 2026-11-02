@@ -134,6 +134,7 @@ class SimulationState {
     this.groundElevation,
     this.fixedElevation,
     this.relitImagery = true,
+    this.useNasaData = true,
     this.cameraLightStrength = 0,
     this.showConstellations = false,
     this.terrainRings = 1,
@@ -253,7 +254,7 @@ class SimulationState {
   double? get cameraElevation =>
       fixedElevation ??
       (groundElevation == null ? null : groundElevation! + height);
-  final bool relitImagery, showConstellations;
+  final bool relitImagery, showConstellations, useNasaData;
   final double cameraLightStrength;
   final int terrainRings;
   final double terrainForwardKm, terrainRenderKm;
@@ -395,6 +396,7 @@ class SimulationState {
     double? fixedElevation,
     bool clearFixedElevation = false,
     bool? relitImagery,
+    bool? useNasaData,
     double? cameraLightStrength,
     bool? showConstellations,
     int? terrainRings,
@@ -453,6 +455,7 @@ class SimulationState {
           ? null
           : groundElevation ?? this.groundElevation,
       relitImagery: relitImagery ?? this.relitImagery,
+      useNasaData: useNasaData ?? this.useNasaData,
       cameraLightStrength: cameraLightStrength ?? this.cameraLightStrength,
       showConstellations: showConstellations ?? this.showConstellations,
       terrainRings: terrainRings ?? this.terrainRings,

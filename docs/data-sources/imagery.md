@@ -13,6 +13,30 @@ coverage bounds. Actual coverage is not guaranteed by those bounds.
 | [IGN BD ORTHO](https://geoservices.ign.fr/bdortho) | Metropolitan France/Corsica and selected overseas departments/territories; 20 cm source orthophotos in much of France, varying by area/year | [Licence Ouverte / Etalab 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/); **© IGN · BD ORTHO · Licence Ouverte 2.0**; see [IGN service terms](https://geoservices.ign.fr/cgu-licences) |
 | [EOX Sentinel-2 cloudless 2016](https://cloudless.eox.at/pricing) | Global basemap, approximately 10 m Sentinel-2 source data where available; not guaranteed detailed/current imagery everywhere | **EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016)**; [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
+### Optional NASA imagery
+
+**Settings → Data sources → NASA terrain & imagery** adds **NASA GIBS Landsat
+WELD 2000** after regional aerial services and before EOX. It is enabled by default,
+requires no API key or login, persists in plans/session recovery and reloads the
+preview when changed. Existing behavior is unchanged while disabled.
+
+The [NASA EOSDIS GIBS](https://nasa-gibs.github.io/gibs-api-docs/) WMS endpoint
+`https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi` serves layer
+`Landsat_WELD_CorrectedReflectance_TrueColor_Global_Annual` at fixed
+`TIME=2000-12-01`. This is a **historical annual mosaic**, approximately 30 m,
+not imagery for the simulation date and not necessarily sharper than EOX's 10 m
+Sentinel-2 or regional aerial data. Source availability, cloud cover and artifacts
+vary. Transparent, malformed or unavailable NASA imagery falls through to EOX;
+partial coverage uses the existing alpha-compositing pipeline.
+
+WMS 1.3.0 PNG requests use the exact terrain tile's EPSG:3857 bounds at 256 or
+1024 pixels. Original responses and NASA EOSDIS GIBS / USGS-NASA Landsat WELD
+credits are cached in `nasa-weld-truecolor-2000-{256,1024}-v1` namespaces under the
+shared budget, including eviction while disabled. Simulation time never changes
+the imagery epoch. See [GIBS usage and attribution](https://nasa-gibs.github.io/gibs-api-docs/overview/).
+GIBS supplies imagery only; [NASA elevation](terrain.md#optional-nasa-elevation)
+uses a separate WorldWind service, not imagery interpreted as heights.
+
 EOX's WMTS `s2cloudless_3857` layer is explicitly identified as the **2016**
 CC BY mosaic in [GetCapabilities](https://tiles.maps.eox.at/wms?SERVICE=WMS&REQUEST=GetCapabilities).
 Newer EOX mosaics have non-commercial restrictions and are **not** used. The
@@ -61,8 +85,8 @@ Nearby previews begin alongside the remaining terrain jobs. The camera tile
 upgrades to 1024×1024 after terrain and preview loading, without rebuilding geometry;
 slow detail tiles never block terrain. Remaining tiles retain previews.
 Terrain and imagery share [HTTP concurrency/backoff](../loading.md), not a fixed
-assumed provider requests-per-second quota. Source selection is automatic; there is no source picker
-or new saved-plan setting.
+assumed provider requests-per-second quota. Source selection is automatic within
+the enabled sources; the optional NASA preference is saved with plans.
 
 **Native sub-meter aerial resolution is not displayed.** At terrain zoom 13,
 1024 pixels span approximately `4.78 × cos(latitude)` meters per pixel, and

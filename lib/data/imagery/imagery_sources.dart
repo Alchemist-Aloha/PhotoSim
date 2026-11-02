@@ -16,8 +16,13 @@ class ImagerySources {
     required http.Client client,
     required Directory directory,
     RasterCache? budget,
+    bool useNasa = false,
   }) : sources = [
-         for (final provider in imageryProviders)
+         for (final provider in [
+           ...imageryProviders.take(imageryProviders.length - 1),
+           if (useNasa) nasaImageryProvider,
+           imageryProviders.last,
+         ])
            ImageryRepository(
              client: client,
              provider: provider,

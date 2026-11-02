@@ -106,6 +106,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   static const maxExportSide = 6144;
   scene.Scene? world;
   CloudRenderer? cloudRenderer;
+  RasterCache? sourceBudget;
   TerrainSources? repository;
   final terrainProviders = <String, TerrainProvider>{};
   String terrainCredits = '';
@@ -191,15 +192,22 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         )
         .toSet()
         .join('\n\n');
+    sourceBudget = budget;
+    configureSources(budget);
+  }
+
+  void configureSources(RasterCache budget) {
     repository = TerrainSources(
       client: client,
       directory: budget.directory,
       budget: budget,
+      useNasa: widget.state.useNasaData,
     );
     imagery = ImagerySources(
       client: client,
       directory: budget.directory,
       budget: budget,
+      useNasa: widget.state.useNasaData,
     );
   }
 
@@ -323,7 +331,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.cameraElevation != next.cameraElevation) {
       world?.skyEnvironment?.invalidate();
     }
-    if (old.latitude != next.latitude ||
+    if (old.useNasaData != next.useNasaData && sourceBudget != null) {
+      coverageDebounce?.cancel();
+      configureSources(sourceBudget!);
+      unawaited(loadTerrain(resetSources: true));
+    } else if (old.latitude != next.latitude ||
         old.longitude != next.longitude ||
         old.terrainRings != next.terrainRings ||
         old.terrainForwardKm != next.terrainForwardKm ||
@@ -437,7 +449,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
   }
 
-  Future<void> loadTerrain({bool retry = false}) async {
+  Future<void> loadTerrain({
+    bool retry = false,
+    bool resetSources = false,
+  }) async {
     if (repository == null || imagery == null || nightRenderer == null) return;
     final location = widget.state.location;
     // shortcut: rebase on camera-tile exit; retain more height fields for uninterrupted long-range flight.
@@ -452,6 +467,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final center = TileId.at(origin);
     int resolution(TileId tile) => terrainMeshResolution(tile, widget.state);
     if (!rebase &&
+        !resetSources &&
         !retry &&
         wanted.length == wantedTiles.length &&
         wanted.containsAll(wantedTiles) &&
@@ -468,7 +484,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final token = ++generation;
     final stop = cancellation = Completer<void>();
     for (final key in patches.keys.toList()) {
-      if (!rebase && wanted.contains(key)) continue;
+      if (!rebase && !resetSources && wanted.contains(key)) continue;
       final node = patches.remove(key)!.node;
       world!.remove(node);
       terrainNodes.remove(node);
@@ -485,7 +501,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       loaded = patches.length;
       failed = 0;
       total = tiles.length;
-      if (rebase) {
+      if (rebase || resetSources) {
         ground = null;
         cameraGroundField = null;
         cameraGroundTile = null;
@@ -935,6 +951,12 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'a coarse mesh and does not display native lidar detail. '
             'Global zoom-12 tiles are cropped where higher zooms are absent. '
             'Mapzen remains the independent fallback.\n\n'
+            'Optional NASA sources (Settings → Data sources; no API key): '
+            'NASA WorldWind USGS NED 10 m (contiguous US) and NASA/METI ASTER GDEM v2 30 m '
+            'are tried after Mapterhorn, before Mapzen. ASTER GDEM is a product of METI and NASA. '
+            'NASA EOSDIS GIBS / USGS-NASA Landsat WELD true-color annual mosaic 2000 '
+            'is tried after regional aerial imagery, before EOX. '
+            'NASA data is not necessarily higher resolution; source dates and height datums remain uncorrected.\n\n'
             'Mapzen Terrain Tiles · AWS Open Data\n'
             'Source credits: tilezen/joerd docs/attribution.md on GitHub.\n\n'
             'ArcticDEM: DEM(s) created from DigitalGlobe, Inc., imagery; funded under NSF awards 1043681, 1559691, 1542736.\n'

@@ -16,6 +16,7 @@ void main() {
     focalLength: 321,
     target: CelestialTarget.galacticCenter,
     relitImagery: true,
+    useNasaData: true,
     showConstellations: true,
     terrainRings: 2,
     terrainForwardKm: 25,
@@ -40,6 +41,9 @@ void main() {
       expect(plan.state.focalLength, state.focalLength);
       expect(plan.state.target, state.target);
       expect(plan.state.relitImagery, state.relitImagery);
+      expect(plan.state.useNasaData, isTrue);
+      expect(state.copyWith(pitch: 0).useNasaData, isTrue);
+      expect(state.copyWith(useNasaData: false).useNasaData, isFalse);
       expect(plan.state.showConstellations, isTrue);
       expect(plan.state.terrainRings, 2);
       expect(plan.state.terrainForwardKm, 25);
@@ -58,11 +62,25 @@ void main() {
     },
   );
 
-  test('old plans without constellation preference default to off', () {
+  test('an explicitly disabled NASA preference survives saving', () {
+    final restored = SavedPlan.decode(
+      SavedPlan('NASA off', state.copyWith(useNasaData: false)).encode(),
+    );
+    expect(restored.state.useNasaData, isFalse);
+  });
+
+  test('old plans default NASA on and constellations off', () {
     final json =
         jsonDecode(SavedPlan('Old', state).encode()) as Map<String, dynamic>;
     json.remove('showConstellations');
+    json.remove('useNasaData');
     for (final version in [1, 2]) {
+      expect(
+        SavedPlan.decode(jsonEncode({...json, 'version': version}))
+            .state
+            .useNasaData,
+        isTrue,
+      );
       expect(
         SavedPlan.decode(jsonEncode({...json, 'version': version}))
             .state
@@ -125,6 +143,7 @@ void main() {
         ('target', 'unknown'),
         ('focalLength', 1000),
         ('relitImagery', 1),
+        ('useNasaData', 1),
         ('showConstellations', 1),
         ('terrainRings', 4),
         ('terrainRings', 1.5),

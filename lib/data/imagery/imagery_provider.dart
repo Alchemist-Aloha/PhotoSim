@@ -87,11 +87,13 @@ class WmsImageryProvider implements ImageryProvider {
     required this.endpoint,
     required this.layer,
     this.style = '',
+    this.time,
     this.extents = const [(-180, -85.06, 180, 85.06)],
   });
   @override
   final String name, cacheKey, attribution;
   final String endpoint, layer, style;
+  final String? time;
   final List<(double, double, double, double)> extents;
 
   @override
@@ -126,6 +128,7 @@ class WmsImageryProvider implements ImageryProvider {
           'HEIGHT': '$pixels',
           'FORMAT': 'image/png',
           'TRANSPARENT': 'TRUE',
+          'TIME': ?time,
         },
       ),
     ];
@@ -139,6 +142,15 @@ const naipImageryProvider = TileImageryProvider(
   kind: ImageryTileKind.usgs,
   // Published conterminous-US service extent; intersection is not a coverage guarantee.
   extents: [(-124.85, 24.2, -66.85, 49.6)],
+);
+
+const nasaImageryProvider = WmsImageryProvider(
+  name: 'NASA GIBS Landsat WELD 2000',
+  cacheKey: 'nasa-weld-truecolor-2000',
+  attribution: 'NASA EOSDIS GIBS · USGS/NASA Landsat WELD · annual mosaic 2000',
+  endpoint: 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi',
+  layer: 'Landsat_WELD_CorrectedReflectance_TrueColor_Global_Annual',
+  time: '2000-12-01',
 );
 
 const imageryProviders = <ImageryProvider>[

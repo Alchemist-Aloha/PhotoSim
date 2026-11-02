@@ -24,6 +24,7 @@ void main() {
       ]) {
         final captureKey = GlobalKey();
         var state = SimulationState(
+          useNasaData: false,
           latitude: site.$1,
           longitude: site.$2,
           height: 100,

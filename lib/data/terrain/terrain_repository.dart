@@ -80,7 +80,14 @@ class TerrainRepository {
         'attribution': provider.attribution,
         'pixels': provider.pixels,
         'horizontalCrs': 'EPSG:3857',
-        'encoding': provider == TerrainProvider.mapterhorn
+        'verticalDatum': provider == TerrainProvider.nasaNed
+            ? 'NAVD88 (uncorrected)'
+            : provider == TerrainProvider.nasaAster
+            ? 'EGM96 (uncorrected)'
+            : null,
+        'encoding': provider.isNasa
+            ? 'BIL16 little-endian signed meters'
+            : provider == TerrainProvider.mapterhorn
             ? 'Terrarium lossless WebP'
             : 'Terrarium PNG',
         'acquisitionTimeNote': 'Blended source dates vary; not queried',

@@ -234,6 +234,8 @@ The map's dashed circle approximates the nearby tile envelope or forward reach,
 whichever is larger. Zoom out to see its full extent. It is not an exact tile
 boundary or download-status indicator; render distance does not shrink the fetch circle.
 
+**Settings → Data sources → NASA terrain & imagery** optionally adds account-free NASA WorldWind NED/ASTER elevation fallbacks and NASA GIBS Landsat imagery. It is enabled by default and can be switched off; no NASA API key is needed. Regional aerial imagery stays preferred. NASA's historical 30 m Landsat mosaic is not necessarily sharper than the default Sentinel-2 or regional imagery. The preference persists in plans/session recovery and reloads the preview when changed.
+
 Terrain and imagery share a persistent LRU disk budget configured under **Settings → Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
 loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,
 but current mesh density does not display their finest native detail. Cached terrain works without network access, but this is not a complete

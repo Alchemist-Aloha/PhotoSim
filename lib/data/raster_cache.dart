@@ -35,7 +35,7 @@ class RasterCache {
     for (final provider in TerrainProvider.values) {
       yield Directory('${directory.path}/${provider.cacheKey}');
     }
-    for (final provider in imageryProviders) {
+    for (final provider in [...imageryProviders, nasaImageryProvider]) {
       for (final size in [256, 1024]) {
         yield Directory('${directory.path}/${provider.cacheKey}-$size-v1');
       }
