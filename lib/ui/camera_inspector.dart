@@ -266,7 +266,7 @@ class CameraInspector extends StatelessWidget {
           ' K',
         ),
         const Text(
-          'Manual exposure uses photographic stop ratios relative to f/8, 1/125 s, ISO 100. Auto meters scene luminance. Enhanced visibility ignores ISO/shutter. Brightness and white balance are approximate, not calibrated; no noise or motion blur.',
+          'Manual exposure uses photographic stop ratios relative to f/8, 1/125 s, ISO 100. Auto meters scene luminance. Enhanced visibility also adapts through twilight without dimming daylight; both ignore ISO/shutter. Brightness and white balance are approximate, not calibrated; no noise or motion blur.',
         ),
       ]),
       section('Depth of field', Icons.blur_on, [

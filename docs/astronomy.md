@@ -134,14 +134,42 @@ Long atmospheric paths dim the red channel and attenuate green/blue more strongl
 producing dim red/orange low-Sun lighting. A last-solar-diameter fade avoids an
 abrupt directional-light switch at 0°; it is not a refracted limb calculation.
 The sky uses matching clear-air optical depths: Rayleigh tint (0.058, 0.135,
-0.331), coefficient 1, Mie coefficient 0.002, turbidity 2 and eccentricity 0.76.
-`assets/atmosphere/sky.fmat` integrates Rayleigh/Mie single scattering through a
-spherical 80 km atmosphere with 8.4/1.25 km density scale heights. Curved-Earth
+0.331), coefficient 1, Mie coefficient 0.0005, turbidity 2 and eccentricity 0.76.
+Both sunlight and sky include RGB ozone absorption (0.000650, 0.001881,
+0.000085 per km). The sky integrates a triangular 10–40 km ozone layer peaking
+at 25 km; direct terrain lighting approximates its 15 km vertical column with
+spherical-shell air mass, rather than treating ozone as sea-level haze.
+The low-aerosol clear-air baseline limits the broad warm daytime aureole; color
+changes follow solar altitude rather than a fixed local clock hour.
+`assets/atmosphere/sky.fmat` integrates Rayleigh/Mie scattering through a
+spherical 80 km atmosphere with 8.4/1.25 km density scale heights. A 64×32 lookup
+texture adds isotropic higher-order scattering using the energy-conserving closure
+from [Hillaire (2020), section 5](https://sebh.github.io/publications/egsr2020.pdf).
+This restores diffuse blue skylight that single scattering loses along thick
+horizon paths: the daytime horizon stays blue/neutral, while strong orange/red
+emerges with the Sun near the horizon, without a clock-hour or tint threshold.
+The LUT includes a neutral 0.1-albedo ground bounce. It is baked for the fixed
+clear-air coefficients above, not arbitrary aerosol/weather profiles; rebake with
+`python3 tool/build_atmosphere_lut.py` (NumPy/Pillow) when those constants change.
+The PNG is sqrt-encoded linear data, not an sRGB color texture. Its convergence
+and physical checks run with `python3 -m unittest discover -s tool -p 'test_atmosphere_lut.py'`. Curved-Earth
 shadowing leaves high atmosphere illuminated after sunset instead of switching the
-sky off at 0°. The same integration scatters moonlight with phase-dependent
-preview radiance. The Sun's actual-size disk receives path extinction; no second
-Moon disk is drawn. Observer elevation is included, clamped to 2–10,000 m.
-Performance/balanced/high use 4/8/12 view samples and 4/4/6 light-path samples.
+sky off at 0°. Twilight view integration splits at the analytic Earth-shadow exit,
+preventing coarse cells from flipping abruptly between lit and unlit sky. The same integration scatters moonlight with phase-dependent
+preview radiance. Attenuation is integrated within view cells rather than sampled
+only at their midpoints, preserving blue light on optically thick horizon paths.
+The Sun's actual-size disk has a narrow soft edge and receives extinction along
+each viewing ray, so Earth's limb clips it progressively even when its center
+is below horizontal. Its constant preview-relative radiance of 3 avoids both the
+old center-altitude fade and excessive highlight desaturation of the low red disk.
+It is not a calibrated solar radiance. No second Moon disk is drawn.
+Observer elevation is included, clamped to 2–10,000 m. Downward rays intersect
+the spherical ground and integrate only the air in front of it, instead of
+repeating a warm tangent-horizon ray across the lower hemisphere. A neutral
+Lambertian ground receives direct sunlight and the LUT's diffuse sky fill.
+Performance/balanced/high use 4/8/12 view samples and 8/8/12 light-path samples
+to resolve the elevated ozone layer. Multiple scattering adds a texture lookup
+per view sample instead of a second nested ray march.
 `hook/build.dart` compiles this custom sky with Flutter Scene's existing FMAT tools;
 generated shader assets are not committed. Astronomical positions are unchanged.
 
@@ -163,10 +191,17 @@ lighting and original clear-weather colors; its explicit weather fog still uses
 the flat fallback color. Celestial proxy meshes exclude terrestrial distance fog
 but retain exposure, tone mapping and terrain occlusion.
 
+The default **Enhanced visibility** mode now meters scene luminance through
+twilight, with 0 to +8 EV adaptation: it can lift fading skylight but never dim
+already-visible daylight. **Auto** retains its −4 to +4 EV range; **Manual**
+retains fixed photographic stop ratios and may legitimately underexpose twilight.
+These exposure changes do not shift the Sun's altitude or impose a dusk cutoff.
+
 These are approximate appearance controls, **not calibrated irradiance, exposure
 or weather simulation**. The atmospheric sky has no artificial ambient night floor.
-Lunar sky radiance is preview-relative, not photometric. Ozone, measured aerosol
-profiles and exact multiple scattering are not modeled. [Procedural cloud
+Lunar sky radiance is preview-relative, not photometric. Measured aerosol/ozone
+profiles, spectral rendering, atmospheric refraction and exact directional multiple
+scattering are not modeled. [Procedural cloud
 volumes](clouds.md) have separate bounded lighting and distance-based quality;
 their small night fill and phase-dependent moonlight are also uncalibrated.
 Direct moonlight remains a separate directional light.
@@ -187,7 +222,8 @@ visibility aid, not a simulated calibrated flashlight. It casts no extra shadows
 (the emitter shares the camera's visible line of sight). Its analytic lighting
 never enters the sky/environment bake or unlit celestial materials. Auto exposure
 holds its existing adaptation factor while fill is active, preventing terrain fill
-from re-metering the sky; the two initial Auto frames are metered without fill.
+from re-metering the sky; the two initial adapting frames (Enhanced or Auto)
+are metered without fill.
 Switching it off resumes normal adaptation. Strength persists in plans and session
 recovery; old plans default to off. Explicit exposure/time/weather edits can still
 change sky appearance. Stars and a simplified Milky Way brightness map are rendered
@@ -200,6 +236,10 @@ blue clear-sky sample, FXAA edge-pixel changes and MSAA/fallback operation witho
 geographic reloads. Captures: `linux-{sunrise,sunset,sun-day,blue-sky}.png` and
 `linux-aa-{off,fxaa}.png` in `build/validation/`. These are isolated rendering
 fixtures, not photometric reference measurements.
+`integration_test/sky_color_test.dart` additionally isolates the GPU sky without
+terrain or network access: daytime blue sky, restrained warm horizon haze,
+a distinct red/orange low disk and a visible upper limb at 0° center altitude,
+across all three sampling qualities. Captures use `sky-color-*.png`.
 
 `integration_test/atmosphere_test.dart` checks actual GPU pixel differences with
 haze and sky lighting enabled/disabled, celestial fog exclusion, sky rebaking,

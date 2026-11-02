@@ -69,7 +69,10 @@ void configurePhotography(
 }) {
   world.exposure = exposureMultiplier(state);
   world.autoExposure
-    ..enabled = state.exposureMode == ExposureMode.automatic
+    ..enabled = state.exposureMode != ExposureMode.manual
+    // Enhanced visibility adapts to twilight without dimming already-visible daylight.
+    ..minEv = state.exposureMode == ExposureMode.enhanced ? 0 : -4
+    ..maxEv = state.exposureMode == ExposureMode.enhanced ? 8 : 4
     ..strength = 1
     ..compensation = 0
     // Hold between lighting changes; the workspace re-meters unfilled frames after time/weather edits.

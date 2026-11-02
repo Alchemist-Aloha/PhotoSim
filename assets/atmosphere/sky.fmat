@@ -1,10 +1,12 @@
 material {
   name: "PhotoSimAtmosphere",
   parameters: [
+    { type: sampler2D, name: multiple_scattering, hint: default_black },
     { type: vec3, name: sun_direction, default: [0, 1, 0] },
     { type: vec3, name: moon_direction, default: [0, -1, 0] },
     { type: vec3, name: rayleigh, default: [0.0058, 0.0135, 0.0331] },
-    { type: vec3, name: mie, default: [0.0012, 0.0013, 0.0014] },
+    { type: vec3, name: mie, default: [0.0003, 0.00032, 0.00035] },
+    { type: vec3, name: ozone, default: [0.000650, 0.001881, 0.000085] },
     { type: vec3, name: ground_color, default: [0.12, 0.12, 0.13] },
     { type: float, name: solar_radius, default: 0.0047 },
     { type: float, name: energy, default: 1 },
@@ -12,11 +14,11 @@ material {
     { type: float, name: observer_height, default: 0.002 },
     { type: float, name: eccentricity, default: 0.76 },
     { type: int, name: view_samples, default: 8 },
-    { type: int, name: light_samples, default: 4 }
+    { type: int, name: light_samples, default: 8 }
   ]
 }
 sky {
-  // Spherical, single-scattering atmosphere. Distances are kilometres.
+  // Spherical Rayleigh/Mie scattering with stratospheric ozone absorption, in kilometres.
   const float ATM_R = 6371.0;
   const float ATM_TOP = 6451.0;
   const float ATM_PI = 3.14159265359;
@@ -26,19 +28,20 @@ sky {
     return -b + sqrt(max(b * b + ATM_TOP * ATM_TOP - dot(p, p), 0.0));
   }
 
-  vec2 Density(vec3 p) {
+  vec3 Density(vec3 p) {
     float height = max(length(p) - ATM_R, 0.0);
-    return exp(-height / vec2(8.4, 1.25));
+    // Earth ozone layer: triangular density from 10 to 40 km, peaking at 25 km.
+    return vec3(exp(-height / vec2(8.4, 1.25)), max(0.0, 1.0 - abs(height - 25.0) / 15.0));
   }
 
-  vec2 LightDepth(vec3 p, vec3 light) {
+  vec3 LightDepth(vec3 p, vec3 light) {
     float b = dot(p, light);
     // The curved Earth's shadow leaves high atmosphere illuminated after sunset.
-    if (b < 0.0 && dot(p, p) - b * b < ATM_R * ATM_R) return vec2(1e6);
+    if (b < 0.0 && dot(p, p) - b * b < ATM_R * ATM_R) return vec3(1e6);
     float distance = ExitAtmosphere(p, light);
-    vec2 optical = vec2(0.0);
+    vec3 optical = vec3(0.0);
     float previous = 0.0;
-    for (int j = 0; j < 6; j++) {
+    for (int j = 0; j < 12; j++) {
       if (j >= material_params.light_samples) break;
       float fraction = float(j + 1) / float(material_params.light_samples);
       float next = distance * fraction * fraction;
@@ -48,8 +51,24 @@ sky {
     return optical;
   }
 
-  vec3 Transmission(vec2 optical) {
-    return exp(-material_params.rayleigh * optical.x - material_params.mie * optical.y);
+  vec3 Extinction(vec3 optical) {
+    return material_params.rayleigh * optical.x + material_params.mie * optical.y
+      + material_params.ozone * optical.z;
+  }
+
+  vec3 Transmission(vec3 optical) {
+    return exp(-Extinction(optical));
+  }
+
+  // shortcut: LUT uses fixed clear-air coefficients; rebake if atmospheric defaults change.
+  vec3 MultipleScattering(vec3 p, vec3 light) {
+    float height = clamp((length(p) - ATM_R) / 80.0, 0.0, 1.0);
+    float mu = clamp(dot(normalize(p), light), -1.0, 1.0);
+    // Inverse of the LUT's squared height and signed-squared solar cosine grids.
+    vec2 uv = vec2(0.5 + 0.5 * sign(mu) * sqrt(abs(mu)), sqrt(height));
+    uv = (uv * vec2(63.0, 31.0) + 0.5) / vec2(64.0, 32.0);
+    vec3 encoded = texture(multiple_scattering, uv).rgb;
+    return encoded * encoded;
   }
 
   vec2 Phase(float cosine) {
@@ -59,42 +78,79 @@ sky {
   }
 
   vec3 Sky(vec3 direction) {
-    vec3 horizonRay = vec3(direction.x, max(direction.y, 0.0), direction.z);
-    vec3 ray = length(horizonRay) > 0.001 ? normalize(horizonRay) : vec3(0.0, 0.0, 1.0);
+    vec3 ray = normalize(direction);
     vec3 sun = normalize(material_params.sun_direction);
     vec3 moon = normalize(material_params.moon_direction);
     vec3 origin = vec3(0.0, ATM_R + max(material_params.observer_height, 0.002), 0.0);
     float distance = ExitAtmosphere(origin, ray);
-    vec2 sunPhase = Phase(dot(ray, sun));
+    float b = dot(origin, ray);
+    float groundDiscriminant = b * b + ATM_R * ATM_R - dot(origin, origin);
+    bool hitsGround = b < 0.0 && groundDiscriminant >= 0.0;
+    if (hitsGround) distance = min(distance, -b - sqrt(groundDiscriminant));
+    // Split at the curved Earth's shadow edge so a cell cannot abruptly flip lit/unlit.
+    float sunCosine = dot(ray, sun);
+    float originSun = dot(origin, sun);
+    float shadowA = max(1.0 - sunCosine * sunCosine, 1e-6);
+    float shadowB = b - originSun * sunCosine;
+    float shadowC = dot(origin, origin) - originSun * originSun - ATM_R * ATM_R;
+    float litStart = 0.0;
+    if (originSun < 0.0 && shadowC < 0.0) {
+      litStart = clamp((-shadowB + sqrt(max(shadowB * shadowB - shadowA * shadowC, 0.0)))
+        / shadowA, 0.0, distance);
+    }
+    vec2 sunPhase = Phase(sunCosine);
     vec2 moonPhase = Phase(dot(ray, moon));
-    vec2 optical = vec2(0.0);
+    vec3 optical = vec3(0.0);
     vec3 scattered = vec3(0.0);
     float previous = 0.0;
     for (int i = 0; i < 12; i++) {
       if (i >= material_params.view_samples) break;
       float fraction = float(i + 1) / float(material_params.view_samples);
       float next = distance * fraction * fraction;
+      if (litStart > 0.0) {
+        float local = fraction < 0.5 ? fraction * 2.0 : fraction * 2.0 - 1.0;
+        next = fraction < 0.5 ? litStart * local * local
+          : litStart + (distance - litStart) * local * local;
+      }
       vec3 p = origin + ray * (previous + next) * 0.5;
-      vec2 column = Density(p) * (next - previous);
-      vec2 viewDepth = optical + column * 0.5;
-      vec3 solar = Transmission(viewDepth + LightDepth(p, sun));
-      scattered += 20.0 * solar * (material_params.rayleigh * column.x * sunPhase.x
-        + material_params.mie * column.y * sunPhase.y);
+      vec3 column = Density(p) * (next - previous);
+      // Integrate attenuation within each cell: midpoint extinction loses blue on long horizon rays.
+      vec3 tau = Extinction(column);
+      vec3 segment = (vec3(1.0) - exp(-tau)) / max(tau, vec3(1e-6));
+      vec3 viewTransmission = Transmission(optical) * segment;
+      vec3 solar = viewTransmission * Transmission(LightDepth(p, sun));
+      vec3 scattering = material_params.rayleigh * column.x + material_params.mie * column.y;
+      scattered += 20.0 * (solar * (material_params.rayleigh * column.x * sunPhase.x
+        + material_params.mie * column.y * sunPhase.y)
+        + viewTransmission * scattering * MultipleScattering(p, sun));
       if (material_params.lunar_radiance > 0.0) {
-        vec3 lunar = Transmission(viewDepth + LightDepth(p, moon));
-        scattered += material_params.lunar_radiance * lunar
+        vec3 lunar = viewTransmission * Transmission(LightDepth(p, moon));
+        scattered += material_params.lunar_radiance * (lunar
           * (material_params.rayleigh * column.x * moonPhase.x
-          + material_params.mie * column.y * moonPhase.y);
+          + material_params.mie * column.y * moonPhase.y)
+          + viewTransmission * scattering * MultipleScattering(p, moon));
       }
       optical += column;
       previous = next;
     }
     float disk = smoothstep(cos(material_params.solar_radius),
-      cos(material_params.solar_radius * 0.5), dot(direction, sun));
-    // Keep the established preview disk ramp; diffuse twilight has no horizon cutoff.
-    float diskEnergy = 60.0 * max(0.0, 1.0 - exp(-asin(clamp(sun.y, -1.0, 1.0))));
-    vec3 direct = diskEnergy * Transmission(LightDepth(origin, sun)) * disk;
-    vec3 ground = mix(material_params.ground_color, vec3(1.0), smoothstep(-0.1, 0.1, direction.y));
-    return max((scattered * ground + direct) * material_params.energy, vec3(0.0));
+      cos(material_params.solar_radius * 0.95), dot(normalize(direction), sun));
+    // Extinction and the Earth's limb, not the center altitude, determine disk visibility.
+    // shortcut: preview-relative disk radiance avoids highlight desaturation; calibrate for photometric output.
+    vec3 direct = 3.0 * Transmission(LightDepth(origin, normalize(direction))) * disk;
+    if (hitsGround) {
+      vec3 p = origin + ray * distance;
+      vec3 up = normalize(p);
+      p += up * 0.002;
+      vec3 groundLight = 20.0 * (Transmission(LightDepth(p, sun))
+        * max(dot(up, sun), 0.0) / ATM_PI + MultipleScattering(p, sun));
+      if (material_params.lunar_radiance > 0.0) {
+        groundLight += material_params.lunar_radiance * (Transmission(LightDepth(p, moon))
+          * max(dot(up, moon), 0.0) / ATM_PI + MultipleScattering(p, moon));
+      }
+      scattered += Transmission(optical) * material_params.ground_color * groundLight;
+      direct = vec3(0.0);
+    }
+    return max((scattered + direct) * material_params.energy, vec3(0.0));
   }
 }

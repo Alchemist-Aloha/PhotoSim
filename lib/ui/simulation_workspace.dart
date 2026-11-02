@@ -393,7 +393,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final active = world, light = cameraLight;
     if (active == null || light == null) return;
     final state = widget.state;
-    if (state.exposureMode == ExposureMode.automatic) {
+    if (state.exposureMode != ExposureMode.manual) {
       autoExposureStartFrame ??= active.renderStats.frameCount;
     } else {
       autoExposureStartFrame = null;
@@ -1143,7 +1143,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         RenderQuality.balanced => 8,
         RenderQuality.high => 12,
       }
-      ..lightSamples = state.renderQuality == RenderQuality.high ? 6 : 4;
+      ..lightSamples = state.renderQuality == RenderQuality.high ? 12 : 8;
     cloudRenderer!.update(state, eye);
     final cloudTransmission = cloudLightTransmission(state);
     active.environmentIntensity = cloudTransmission;
