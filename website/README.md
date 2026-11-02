@@ -31,6 +31,15 @@ SHOWCASE_CAPTURE=1 npm test
 
 Captures go to the repository's gitignored `.impeccable/review/{desktop,mobile}.png`.
 
+## GitHub Pages
+
+Live site: https://alchemist-aloha.github.io/PhotoSim/
+
+`.github/workflows/pages.yml` builds, tests, and publishes this site on pushes to
+`main` that change `website/` or the deployment workflow. It can also be run
+manually from GitHub Actions → Deploy website. Repository Pages settings use
+**GitHub Actions** as the build source; no separate hosting branch is needed.
+
 ## Screenshots
 
 `public/screenshots/` contains six real application captures, not generated mockups:

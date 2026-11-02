@@ -10,9 +10,10 @@ for delivered features and the explicitly unfinished backlog.
 
 ## Website
 
-The [Vue 3 presentation site](website/README.md) includes real Linux and Android
-screenshots, a workflow walkthrough, and release downloads. See its README for
-local development, static hosting, and screenshot capture instructions.
+The [PhotoSim website](https://alchemist-aloha.github.io/PhotoSim/) includes real
+Linux and Android screenshots, a workflow walkthrough, and release downloads.
+See the [website README](website/README.md) for local development, GitHub Pages
+deployment, and screenshot capture instructions.
 
 ## Run on Linux
 
