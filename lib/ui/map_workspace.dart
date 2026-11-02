@@ -69,6 +69,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
+    final colors = Theme.of(context).colorScheme;
     final loadingRadiusKm = approximateTerrainLoadingRadius(state) / 1000;
     final handle = destination(state.location, state.azimuth, 450);
     final sky = state.sky;
@@ -145,8 +146,8 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                     state.mapFov,
                     1000,
                   ),
-                  color: const Color(0x4434D9B0),
-                  borderColor: const Color(0xFF169B7C),
+                  color: colors.primary.withValues(alpha: 0.20),
+                  borderColor: colors.primary,
                   borderStrokeWidth: 2,
                 ),
               ],
@@ -155,7 +156,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
               polylines: [
                 Polyline(
                   points: [state.location, handle],
-                  color: const Color(0xFF169B7C),
+                  color: colors.primary,
                   strokeWidth: 2,
                 ),
                 for (final handle in handles)
@@ -233,9 +234,12 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                           dragMarker(details, false),
                       onVerticalDragUpdate: (details) =>
                           dragMarker(details, false),
-                      child: const CircleAvatar(
-                        backgroundColor: Color(0xFF123E38),
-                        child: Icon(Icons.photo_camera, color: Colors.white),
+                      child: CircleAvatar(
+                        backgroundColor: colors.primaryContainer,
+                        child: Icon(
+                          Icons.photo_camera,
+                          color: colors.onPrimaryContainer,
+                        ),
                       ),
                     ),
                   ),
@@ -257,12 +261,12 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                           dragMarker(details, true),
                       onVerticalDragUpdate: (details) =>
                           dragMarker(details, true),
-                      child: const CircleAvatar(
-                        backgroundColor: Color(0xFF169B7C),
+                      child: CircleAvatar(
+                        backgroundColor: colors.primary,
                         child: Icon(
                           Icons.open_with,
                           size: 18,
-                          color: Colors.white,
+                          color: colors.onPrimary,
                         ),
                       ),
                     ),
@@ -313,8 +317,8 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                                 compact ||
                                         Theme.of(context).platform ==
                                             TargetPlatform.android
-                                    ? 'Tap to place camera · Drag camera to move · Drag green handle to aim'
-                                    : 'Click to place camera · Drag camera to move · Drag green handle to aim',
+                                    ? 'Tap to place camera · Drag camera to move · Drag direction handle to aim'
+                                    : 'Click to place camera · Drag camera to move · Drag direction handle to aim',
                               ),
                             ),
                             if (widget.onGuideDismissedChanged != null)
@@ -348,7 +352,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                 scrollable: true,
                 title: const Text('Map guide'),
                 content: Text(
-                  'Tap to place the camera. Drag the camera to move; drag its green handle to aim. Use Undo after a move to restore the previous position or direction.\n\n'
+                  'Tap to place the camera. Drag the camera to move; drag its direction handle to aim. Use Undo after a move to restore the previous position or direction.\n\n'
                   'For precise placement without dragging, enter latitude and longitude in Camera controls → Position & orientation.\n\n'
                   'Amber: Sun · Blue: Moon · Violet: Galactic center. Dashed bearing lines mean below horizontal.\n\n'
                   'Dashed circle: approximately ${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent. Forward fetching is directional; the circle is not an exact tile boundary or a download-status indicator. Render distance is a separate limit.\n\n'

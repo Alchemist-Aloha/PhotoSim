@@ -113,7 +113,9 @@ class _Guides extends CustomPainter {
     }
     if (state.showLevel) {
       final frame = state.cameraFrame;
-      paint.color = state.roll.abs() < 0.5 ? Colors.greenAccent : Colors.amber;
+      paint.color = state.roll.abs() < 0.5
+          ? Colors.lightBlueAccent
+          : Colors.amber;
       final h = math.tan(state.horizontalFov / 2),
           v = math.tan(state.verticalFov / 2);
       // The ENU horizontal plane projected into the actual rolled optical frustum.

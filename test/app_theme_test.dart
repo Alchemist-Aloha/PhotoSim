@@ -15,6 +15,14 @@ void main() {
       expect(theme.textTheme.titleMedium!.fontWeight, FontWeight.w600);
       expect(theme.textTheme.titleSmall!.fontWeight, FontWeight.w600);
       final colors = theme.colorScheme;
+      expect(HSVColor.fromColor(colors.primary).hue, inInclusiveRange(5, 35));
+      expect(
+        HSVColor.fromColor(colors.tertiary).hue,
+        inInclusiveRange(200, 230),
+      );
+      for (final surface in [colors.surface, colors.surfaceContainerHighest]) {
+        expect(HSVColor.fromColor(surface).saturation, lessThan(0.10));
+      }
       for (final (foreground, background) in [
         (colors.onPrimary, colors.primary),
         (colors.onPrimaryContainer, colors.primaryContainer),
