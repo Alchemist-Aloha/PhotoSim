@@ -8,6 +8,12 @@ of implemented features.
 Implementation beyond that baseline is underway; see the [full Linux spec progress](docs/linux-spec-progress.md)
 for delivered features and the explicitly unfinished backlog.
 
+## Website
+
+The [Vue 3 presentation site](website/README.md) includes real Linux and Android
+screenshots, a workflow walkthrough, and release downloads. See its README for
+local development, static hosting, and screenshot capture instructions.
+
 ## Run on Linux
 
 Requires Flutter **3.47.1 or newer** (developed with 3.47.6), Clang, CMake,
