@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -22,6 +23,7 @@ import '../data/imagery/imagery_provider.dart';
 import '../data/imagery/imagery_sources.dart';
 import '../data/terrain/terrain_provider.dart';
 import '../data/terrain/terrain_sources.dart';
+import '../data/water/water_repository.dart';
 import '../models/simulation_state.dart';
 import '../render/moon.dart';
 import '../render/atmosphere_sky.dart';
@@ -111,7 +113,14 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   final terrainProviders = <String, TerrainProvider>{};
   String terrainCredits = '';
   ImagerySources? imagery;
-  final patches = <String, ({TileId id, scene.Node node, int resolution})>{};
+  WaterRepository? water;
+  final waterNodes = <String, List<scene.Node>>{};
+  String? waterFailure;
+  final patches =
+      <
+        String,
+        ({TileId id, scene.Node node, int resolution, TerrainPatch terrain})
+      >{};
   final textures = <scene.Node, scene.Texture2D>{};
   final partialImagery = <String>{};
   final detailedImagery = <String>{};
@@ -203,12 +212,110 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       budget: budget,
       useNasa: widget.state.useNasaData,
     );
+    water = WaterRepository(
+      client: client,
+      terrain: repository!,
+      directory: budget.directory,
+      budget: budget,
+    );
     imagery = ImagerySources(
       client: client,
       directory: budget.directory,
       budget: budget,
       useNasa: widget.state.useNasaData,
     );
+  }
+
+  Future<void> loadWater(int token, Completer<void> stop, LatLng origin) async {
+    final source = water;
+    if (source == null || !widget.state.showWater) return;
+    final pending = patches.keys
+        .where((key) => !waterNodes.containsKey(key))
+        .toList();
+    for (var start = 0; start < pending.length; start += 3) {
+      if (!mounted || token != generation) return;
+      await Future.wait(
+        pending.skip(start).take(3).map((key) async {
+          final resident = patches[key];
+          if (resident == null) return;
+          try {
+            final result = await source.load(
+              resident.id,
+              resident.terrain,
+              origin,
+              abort: stop.future,
+            );
+            if (!mounted ||
+                token != generation ||
+                patches[key]?.node != resident.node) {
+              return;
+            }
+            final nodes = <scene.Node>[];
+            if (result.surface.indices.isNotEmpty) {
+              final terrain = result.terrain;
+              if (cameraGroundTile?.key == key) {
+                cameraGroundField = terrain;
+                final sampled = terrain.groundElevationAt(
+                  widget.state.location,
+                );
+                if (sampled != null) {
+                  ground = sampled;
+                  widget.onGroundElevationChanged(
+                    widget.state.location,
+                    sampled,
+                  );
+                }
+              }
+              resident.node.mesh = scene.Mesh(
+                scene.MeshGeometry.fromArrays(
+                  positions: terrain.positions,
+                  normals: terrain.normals,
+                  texCoords: terrain.uvs,
+                  indices: terrain.indices,
+                  retainCpuData: false,
+                ),
+                resident.node.mesh!.primitives.single.material,
+              );
+              for (final (mesh, isOutline) in [
+                (result.surface, false),
+                (result.outline, true),
+              ]) {
+                if (mesh.indices.isEmpty) continue;
+                final material = scene.PhysicallyBasedMaterial()
+                  ..baseColorFactor = isOutline
+                      ? vm.Vector4(0.025, 0.07, 0.065, 1)
+                      : vm.Vector4(0.035, 0.15, 0.19, 1)
+                  ..roughnessFactor = isOutline ? 0.6 : 0.2
+                  ..metallicFactor = 0
+                  ..ior = 1.333;
+                final node = scene.Node(
+                  name: '${isOutline ? 'shore' : 'water'}-$key',
+                  mesh: scene.Mesh(
+                    scene.MeshGeometry.fromArrays(
+                      positions: Float32List.fromList(mesh.positions),
+                      normals: Float32List.fromList(mesh.normals),
+                      texCoords: Float32List.fromList(mesh.uvs),
+                      indices: mesh.indices,
+                      retainCpuData: false,
+                    ),
+                    material,
+                  ),
+                )..visible = resident.node.visible;
+                world!.add(node);
+                terrainNodes.add(node);
+                nodes.add(node);
+              }
+            }
+            setState(() => waterNodes[key] = nodes);
+          } catch (failure) {
+            if (!mounted || token != generation) return;
+            setState(
+              () => waterFailure = 'Water unavailable; terrain unchanged. Retry terrain to try again.',
+            );
+          }
+        }),
+      );
+    }
   }
 
   Future<void> initializeScene() async {
@@ -331,7 +438,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.cameraElevation != next.cameraElevation) {
       world?.skyEnvironment?.invalidate();
     }
-    if (old.useNasaData != next.useNasaData && sourceBudget != null) {
+    if ((old.useNasaData != next.useNasaData ||
+            old.showWater != next.showWater) &&
+        sourceBudget != null) {
       coverageDebounce?.cancel();
       configureSources(sourceBudget!);
       unawaited(loadTerrain(resetSources: true));
@@ -446,6 +555,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       patch.node.visible =
           terrainDistance(patch.id, widget.state.location) <=
           widget.state.terrainRenderKm * 1000;
+      for (final node in waterNodes[patch.id.key] ?? <scene.Node>[]) {
+        node.visible = patch.node.visible;
+      }
     }
   }
 
@@ -485,6 +597,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final stop = cancellation = Completer<void>();
     for (final key in patches.keys.toList()) {
       if (!rebase && !resetSources && wanted.contains(key)) continue;
+      for (final waterNode in waterNodes.remove(key) ?? <scene.Node>[]) {
+        world!.remove(waterNode);
+        terrainNodes.remove(waterNode);
+      }
       final node = patches.remove(key)!.node;
       world!.remove(node);
       terrainNodes.remove(node);
@@ -495,6 +611,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       detailedImagery.remove(key);
     }
     setState(() {
+      waterFailure = null;
       imageryLoading = false;
       imageryFailures = 0;
       imageryFailure = null;
@@ -535,6 +652,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               indices: patch.indices,
               retainCpuData: false,
             );
+            for (final waterNode
+                in waterNodes.remove(id.key) ?? <scene.Node>[]) {
+              world!.remove(waterNode);
+              terrainNodes.remove(waterNode);
+            }
             final previous = patches[id.key]?.node;
             final material =
                 previous?.mesh!.primitives.single.material ??
@@ -561,6 +683,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
               id: id,
               node: node,
               resolution: patch.resolution,
+              terrain: patch,
             );
             if (id.key == center.key) {
               final sampled = patch.groundElevationAt(widget.state.location);
@@ -597,6 +720,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
     if (mounted && token == generation) {
       setState(() => loading = false);
+      // Masks/level estimation never hold up terrain or imagery jobs.
+      unawaited(loadWater(token, stop, origin));
       await Future.wait([
         if (centerImagery != null) centerImagery!,
         ?nearbyImagery,
@@ -657,7 +782,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             ),
           );
     Future<void> update(
-      ({TileId id, scene.Node node, int resolution}) patch,
+      ({TileId id, scene.Node node, int resolution, TerrainPatch terrain})
+      patch,
       int size,
     ) async {
       final key = (token, patch.id.key);
@@ -779,6 +905,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           ...imageProviders.values
               .expand((providers) => providers)
               .map((provider) => provider.attribution),
+          if (waterNodes.values.any((nodes) => nodes.isNotEmpty))
+            waterAttribution,
           'Sky catalog: D3-Celestial / XHIP · BSD-3-Clause',
         }.join(' · ');
         final width = (region.width * ratio).round();
@@ -932,6 +1060,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     world?.dispose();
     terrainNodes.clear();
     patches.clear();
+    waterNodes.clear();
     textures.clear();
     world = null;
     super.dispose();
@@ -951,6 +1080,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'a coarse mesh and does not display native lidar detail. '
             'Global zoom-12 tiles are cropped where higher zooms are absent. '
             'Mapzen remains the independent fallback.\n\n'
+            'Static water surfaces: $waterAttribution. HydroLAKES v1.0 polygons preserve islands and share one dataset elevation per identified lake, including across atlas boundaries. Heights are pour-point estimates, not surveyed or live levels. MODIS/DEM lake masks remain an outage fallback. Coastline-classified ocean uses approximate mean sea level (0 m in the uncorrected terrain reference), with coarse historical mask coverage. No tides, waves or flowing rivers. Water is clipped to source coverage. Toggle in Settings → Data sources.\n\n'
             'Optional NASA sources (Settings → Data sources; no API key): '
             'NASA WorldWind USGS NED 10 m (contiguous US) and NASA/METI ASTER GDEM v2 30 m '
             'are tried after Mapterhorn, before Mapzen. ASTER GDEM is a product of METI and NASA. '
@@ -1075,6 +1205,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       );
     }
     final credits = {
+      if (waterNodes.values.any((nodes) => nodes.isNotEmpty)) waterAttribution,
       ...terrainProviders.values.map((provider) => provider.attribution),
       ...imageProviders.values
           .expand((providers) => providers)
@@ -1440,6 +1571,24 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                               ? null
                                               : () => loadTerrain(retry: true),
                                           child: const Text('Retry terrain'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                if (!widget.cleanPreview &&
+                                    waterFailure != null)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(child: Text(waterFailure!)),
+                                        TextButton(
+                                          onPressed: loading
+                                              ? null
+                                              : () => loadTerrain(retry: true),
+                                          child: const Text('Retry water'),
                                         ),
                                       ],
                                     ),

@@ -62,6 +62,16 @@ void main() {
     },
   );
 
+  test('water preference persists, defaults on for legacy plans, and validates types', () {
+    final plan = SavedPlan('Water', state.copyWith(showWater: false));
+    expect(SavedPlan.decode(plan.encode()).state.showWater, isFalse);
+    expect(state.copyWith(pitch: 1).showWater, isTrue);
+    final json = plan.toJson()..remove('showWater');
+    expect(SavedPlan.decode(jsonEncode(json)).state.showWater, isTrue);
+    json['showWater'] = 'false';
+    expect(() => SavedPlan.decode(jsonEncode(json)), throwsFormatException);
+  });
+
   test('an explicitly disabled NASA preference survives saving', () {
     final restored = SavedPlan.decode(
       SavedPlan('NASA off', state.copyWith(useNasaData: false)).encode(),

@@ -81,6 +81,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Account-free Mapterhorn terrain: Copernicus GLO-30 plus finer open regional
   DEMs, with Mapzen fallback, rendered in a camera-relative WGS84 frame.
 - Terrain-derived camera height, progressive loading, distance/FOV quadtree LOD, and tile skirts.
+- [Static water surfaces and shore outlines](docs/data-sources/water.md): HydroLAKES lake polygons with shared lake elevations, NASA/OSM ocean masks and static mean sea level; enabled by default under **Settings → Data sources**.
 - **Terrain range** inspector section: live surrounding radius, FOV-aware forward fetching and render distance; the map shows a dashed approximate requested-range circle.
 - Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
   a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile
@@ -157,6 +158,7 @@ flutter test integration_test/linux_wasd_test.dart -d linux
 flutter test integration_test/linux_loading_test.dart -d linux
 flutter test integration_test/startup_test.dart -d linux
 flutter test integration_test/camera_light_test.dart -d linux
+flutter test integration_test/water_test.dart -d linux
 flutter test integration_test/linux_planning_ui_test.dart -d linux
 flutter build linux --release
 ./build/linux/x64/release/bundle/photosim
@@ -236,7 +238,9 @@ boundary or download-status indicator; render distance does not shrink the fetch
 
 **Settings → Data sources → NASA terrain & imagery** optionally adds account-free NASA WorldWind NED/ASTER elevation fallbacks and NASA GIBS Landsat imagery. It is enabled by default and can be switched off; no NASA API key is needed. Regional aerial imagery stays preferred. NASA's historical 30 m Landsat mosaic is not necessarily sharper than the default Sentinel-2 or regional imagery. The preference persists in plans/session recovery and reloads the preview when changed.
 
-Terrain and imagery share a persistent LRU disk budget configured under **Settings → Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
+Lakes use HydroLAKES polygons and one approximate dataset elevation per identified lake, preserving islands and cross-tile continuity. Oceans retain coarse (~250 m) NASA/OSM masks; raster lake/DEM coverage is an outage fallback. Heights are not surveyed or live levels, and ocean mean sea level is not datum-corrected. No tides, flowing rivers or live water levels are modeled. See [water data notes](docs/data-sources/water.md).
+
+Terrain, imagery, lake polygons and water masks share a persistent LRU disk budget configured under **Settings → Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
 loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,
 but current mesh density does not display their finest native detail. Cached terrain works without network access, but this is not a complete
 offline-region feature. Source vertical datums are uncorrected; do not use the

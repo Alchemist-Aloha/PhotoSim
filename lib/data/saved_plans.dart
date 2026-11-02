@@ -39,6 +39,7 @@ class SavedPlan {
     'target': state.target.name,
     'relitImagery': state.relitImagery,
     'useNasaData': state.useNasaData,
+    'showWater': state.showWater,
     'cameraLightStrength': state.cameraLightStrength,
     'showConstellations': state.showConstellations,
     'terrainRings': state.terrainRings,
@@ -106,6 +107,7 @@ class SavedPlan {
           target: CelestialTarget.values.byName(json['target'] as String),
           relitImagery: json['relitImagery'] as bool,
           useNasaData: json['useNasaData'] as bool? ?? true,
+          showWater: json['showWater'] as bool? ?? true,
           cameraLightStrength:
               (json['cameraLightStrength'] as num?)?.toDouble() ?? 0,
           showConstellations: json['showConstellations'] as bool? ?? false,

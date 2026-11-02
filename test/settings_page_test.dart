@@ -36,6 +36,16 @@ void main() {
       await tester.tap(toggle);
       await tester.pumpAndSettle();
       expect(state.useNasaData, isTrue);
+      final water = find.widgetWithText(
+        SwitchListTile,
+        'Static water surfaces',
+      );
+      await tester.ensureVisible(water);
+      expect(tester.widget<SwitchListTile>(water).value, isTrue);
+      await tester.tap(water);
+      await tester.pumpAndSettle();
+      expect(state.showWater, isFalse);
+      expect(tester.widget<SwitchListTile>(water).value, isFalse);
       expect(tester.takeException(), isNull);
     });
   }

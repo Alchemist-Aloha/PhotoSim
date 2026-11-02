@@ -32,6 +32,9 @@ class RasterCache {
   static final _rasterName = RegExp(r'^\d+-\d+-\d+\.png$');
 
   Iterable<Directory> get _directories sync* {
+    yield Directory('${directory.path}/modis-water-2015-256-v1');
+    yield Directory('${directory.path}/osm-coast-mask-256-v1');
+    yield Directory('${directory.path}/hydrolakes-v10-polygons-v1');
     for (final provider in TerrainProvider.values) {
       yield Directory('${directory.path}/${provider.cacheKey}');
     }

@@ -154,6 +154,17 @@ class _SettingsPageState extends State<SettingsPage> {
                     'No API key needed. Adds NED 10 m / ASTER 30 m elevation fallbacks after Mapterhorn, and prefers NASA Landsat imagery outside regional aerial coverage. Landsat is a historical 30 m mosaic, not necessarily sharper than the default. Changing this reloads the preview.',
                   ),
                   const Divider(height: 32),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Static water surfaces'),
+                    value: state.showWater,
+                    onChanged: (value) =>
+                        update(state.copyWith(showWater: value)),
+                    subtitle: const Text(
+                      'HydroLAKES lake polygons with one estimated level per lake, plus approximate 250 m NASA/OSM ocean coverage. Raster lake coverage is used if the polygon service is unavailable. No tides or flowing rivers. Reloads the preview; independent of NASA terrain & imagery.',
+                    ),
+                  ),
+                  const Divider(height: 32),
                   Text('Storage', style: textTheme.titleMedium),
                   const SizedBox(height: 8),
                   CacheSettingsPanel(

@@ -56,6 +56,7 @@ void main() {
       });
       var state = SimulationState(
         useNasaData: false,
+        showWater: false,
         latitude: -33.86,
         longitude: 151.21,
         height: 100,
