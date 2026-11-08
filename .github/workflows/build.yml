@@ -33,7 +33,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
-      - name: Release metadata and tag validation
+      - name: Release metadata
         id: metadata
         run: python3 tool/build_release.py metadata >> "$GITHUB_OUTPUT"
       - run: flutter pub get --enforce-lockfile

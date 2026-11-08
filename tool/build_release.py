@@ -43,11 +43,6 @@ def version_from(source):
     return version, number
 
 
-def check_tag(version, ref):
-    if ref.startswith('refs/tags/') and ref != f'refs/tags/v{version}':
-        raise ValueError(f'Tag must match pubspec.yaml: expected v{version}, got {ref}')
-
-
 def native_versions(version, number):
     base, _, prerelease = version.partition('-')
     arch = base if not prerelease else base + 'pre.' + prerelease.replace('-', '.')
@@ -267,7 +262,6 @@ def main():
     if args.installer and args.platform != 'windows':
         parser.error('--installer is supported only for windows')
     version, number = version_from((ROOT / 'pubspec.yaml').read_text())
-    check_tag(version, os.environ.get('GITHUB_REF', ''))
     if args.platform == 'metadata':
         print(f'version={version}\nbuild_number={number}')
         return

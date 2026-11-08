@@ -11,14 +11,14 @@ builds artifacts without publishing.
 1. Configure the four Android signing secrets below once.
 2. Update `pubspec.yaml`, increasing both the public version and numeric build
    number, e.g. `version: 0.2.0+2`. Commit the change.
-3. Push the matching tag: `git tag v0.2.0 && git push origin v0.2.0`.
+3. Push a release tag: `git tag v0.2.0 && git push origin v0.2.0`.
 4. After all platform jobs succeed, the workflow creates the GitHub release
    (or adds files to an existing release) and uploads binaries, a tagged source
    archive and `SHA256SUMS`.
 
-The tag **must match the version before `+`**. A mismatch fails before builds.
-Prerelease versions such as `0.2.0-rc.1+2` use tag `v0.2.0-rc.1`; automatically
-created releases are marked prerelease. A published release on an existing tag
+The tag does not need to match the version in `pubspec.yaml`; artifact names
+and package versions still use `pubspec.yaml`. For prerelease versions such as
+`0.2.0-rc.1+2`, automatically created releases are marked prerelease. A published release on an existing tag
 also triggers the build. Rerunning on a tag replaces matching asset names using
 `gh release upload --clobber`; unrelated assets are not deleted. No release is
 created by the workflow if a build fails or a required artifact is missing.

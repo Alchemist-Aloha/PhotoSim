@@ -19,16 +19,20 @@ class ReleaseTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(relative.encode())
 
-    def test_version_and_tag_are_consistent(self):
+    def test_version_validation(self):
         self.assertEqual(release.version_from('name: photosim\nversion: 1.2.3+4\n'), ('1.2.3', 4))
         self.assertEqual(release.version_from('version: 1.2.3-rc.1+5\n'), ('1.2.3-rc.1', 5))
-        release.check_tag('1.2.3', 'refs/tags/v1.2.3')
-        release.check_tag('1.2.3', 'refs/heads/main')
-        with self.assertRaises(ValueError):
-            release.check_tag('1.2.3', 'refs/tags/v2.0.0')
         for source in ('version: ../bad', 'version: 1.2.3+0', 'version: 1.2.3+9999999999', 'version: 1.2.3\nversion: 2.0.0'):
             with self.assertRaises(ValueError):
                 release.version_from(source)
+
+    def test_metadata_allows_mismatched_tag(self):
+        version, number = release.version_from((release.ROOT / 'pubspec.yaml').read_text())
+        with patch('sys.argv', ['build_release.py', 'metadata']), \
+                patch.dict('os.environ', {'GITHUB_REF': 'refs/tags/v999.0.0'}), \
+                patch('builtins.print') as output:
+            release.main()
+        output.assert_called_once_with(f'version={version}\nbuild_number={number}')
 
     def test_native_prerelease_versions(self):
         self.assertEqual(release.native_versions('1.2.3', 4), ('1.2.3-4', '1.2.3-4'))
