@@ -9,6 +9,7 @@ void main(List<String> args) async {
       materials: [
         'assets/atmosphere/sky.fmat',
         'assets/atmosphere/clouds.fmat',
+        'assets/atmosphere/water.fmat',
       ],
     );
   });

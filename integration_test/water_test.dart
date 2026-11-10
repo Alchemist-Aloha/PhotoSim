@@ -148,9 +148,10 @@ void main() {
       );
       final material =
           nodes.first.mesh!.primitives.single.material
-              as scene.PhysicallyBasedMaterial;
-      expect(material.ior, 1.333);
-      expect(material.roughnessFactor, 0.2);
+              as scene.PreprocessedMaterial;
+      expect(material.parameters.getFloat('roughness'), closeTo(0.05, 1e-6));
+      expect(material.parameters.getFloat('wave_strength'), closeTo(0.8, 1e-6));
+      expect(material.parameters.getFloat('animation_time'), greaterThan(0));
       expect(
         requests.where(
           (uri) => uri.queryParameters['LAYERS'] == waterProvider.layer,

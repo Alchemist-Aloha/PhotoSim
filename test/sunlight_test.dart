@@ -22,6 +22,18 @@ void main() {
       last = current;
     }
     expect(sunlight(-10).intensity, 0);
+    for (final altitude in [double.nan, double.infinity, -91.0, 91.0]) {
+      expect(() => sunTransmission(altitude), throwsArgumentError);
+    }
+    var lastColor = sunTransmission(2);
+    for (final altitude in [1.0, 0.5, 0.1, 0.0, -0.5, -1.0]) {
+      final color = sunTransmission(altitude);
+      expect(color.green, lessThan(lastColor.green));
+      expect(color.blue, lessThanOrEqualTo(lastColor.blue));
+      lastColor = color;
+    }
+    // Below the clamp the color is constant rather than dividing by zero.
+    expect(sunTransmission(-4).green, sunTransmission(-1).green);
     expect(sunlight(0.00001).intensity, lessThan(0.001));
     for (final altitude in [double.nan, double.infinity, -91.0, 91.0]) {
       expect(() => sunlight(altitude), throwsArgumentError);

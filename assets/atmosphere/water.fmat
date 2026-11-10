@@ -1,0 +1,57 @@
+material {
+  name: "PhotoSimWater",
+  shading_model: lit,
+  parameters: [
+    { type: float, name: wave_strength, default: 0.8 },
+    { type: float, name: animation_time, default: 0 },
+    { type: vec3, name: deep_color, default: [0.010, 0.032, 0.042] },
+    { type: float, name: roughness, default: 0.05 }
+  ]
+}
+
+fragment {
+  float Hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  vec2 NoiseSlope(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    vec2 du = 6.0 * f * (1.0 - f);
+    float a = Hash12(i), b = Hash12(i + vec2(1.0, 0.0));
+    float c = Hash12(i + vec2(0.0, 1.0)), d = Hash12(i + vec2(1.0));
+    // Exact height-field derivatives keep highlights aligned with wave crests.
+    return du * vec2(mix(b - a, d - c, u.y), mix(c - a, d - b, u.x));
+  }
+
+  void Surface(inout MaterialInputs material) {
+    vec3 world = GetWorldPosition();
+    float time = material_params.animation_time;
+    vec2 uv = world.xz;
+    vec2 footprint = max(abs(dFdx(uv)), abs(dFdy(uv)));
+    vec2 f1 = vec2(0.05, 0.13), f2 = vec2(0.17, 0.31), f3 = vec2(0.52, 0.83);
+    // Filter each wavelength at its pixel footprint, not just camera distance.
+    float w1 = 1.0 - smoothstep(0.2, 0.8, length(footprint * f1));
+    float w2 = 1.0 - smoothstep(0.2, 0.8, length(footprint * f2));
+    float w3 = 1.0 - smoothstep(0.2, 0.8, length(footprint * f3));
+    vec2 slope = NoiseSlope(uv * f1 + vec2(0.055, 0.022) * time) * f1 * 1.2 * w1;
+    slope += NoiseSlope(uv * f2 - vec2(0.095, 0.040) * time) * f2 * 0.28 * w2;
+    slope += NoiseSlope(uv * f3 + vec2(0.15, -0.075) * time) * f3 * 0.06 * w3;
+    // A broad travelling swell stays legible beyond the fine wind ripples.
+    vec2 swell = normalize(vec2(0.8, 0.6));
+    slope += swell * cos(dot(uv, swell) * 0.24 - time * 0.72) * 0.028 * w1;
+    slope *= material_params.wave_strength;
+    vec3 up = normalize(GetWorldNormal());
+    vec3 tangent = normalize(vec3(1.0, 0.0, 0.0) - up * up.x);
+    vec3 bitangent = normalize(cross(tangent, up));
+    material.normal = normalize(up - tangent * slope.x - bitangent * slope.y);
+    material.base_color = vec4(material_params.deep_color, 1.0);
+    material.metallic = 0.0;
+    // Water's F0 is ~0.02, half the 0.04 dielectric default.
+    material.specular = 0.5;
+    material.roughness = mix(material_params.roughness, 0.18, 1.0 - (w1 + w2 + w3) / 3.0);
+    material.occlusion = 1.0;
+  }
+}

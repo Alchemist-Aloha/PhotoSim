@@ -151,6 +151,10 @@ void main() {
         }
         state = state.copyWith(cloudType: CloudType.cumulus, cloudAmount: 0.65);
         expect(await pixels('cumulus-restored'), orderedEquals(samples.first));
+        clouds.material.parameters.setFloat('animation_time', 20);
+        expect(await pixels('moving'), isNot(orderedEquals(samples.first)));
+        clouds.material.parameters.setFloat('animation_time', 0);
+        expect(await pixels('phase-restored'), orderedEquals(samples.first));
         state = state.copyWith(cloudSeed: 4722);
         expect(await pixels('randomized'), isNot(orderedEquals(samples.first)));
         state = state.copyWith(cloudAmount: 1);

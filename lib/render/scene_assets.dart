@@ -16,12 +16,14 @@ class SceneAssets {
     required this.milkyWay,
     required this.cloudMaterial,
     required this.cloudNoise,
+    required this.waterMaterial,
   });
 
   final AtmosphereSky atmosphere;
   final scene.Texture2D lunarAlbedo, milkyWay;
   final scene.PreprocessedMaterial cloudMaterial;
   final scene.Texture2D cloudNoise;
+  final scene.PreprocessedMaterial waterMaterial;
 
   static Future<SceneAssets>? _pending;
 
@@ -36,11 +38,12 @@ class SceneAssets {
   );
 
   static Future<SceneAssets> _load() async {
-    final (atmosphere, lunarAlbedo, milkyWay, clouds) = await (
+    final (atmosphere, lunarAlbedo, milkyWay, clouds, water) = await (
       AtmosphereSky.load(),
       scene.Texture2D.fromAsset('assets/moon/lroc_color_2k.jpg', maxSize: 2048),
       scene.Texture2D.fromAsset('assets/sky/milky_way.png'),
       CloudRenderer.loadShared(),
+      scene.loadFmatMaterial('assets/atmosphere/water.fmat'),
     ).wait;
     return SceneAssets._(
       atmosphere: atmosphere,
@@ -48,6 +51,7 @@ class SceneAssets {
       milkyWay: milkyWay,
       cloudMaterial: clouds.material,
       cloudNoise: clouds.noise,
+      waterMaterial: water,
     );
   }
 }

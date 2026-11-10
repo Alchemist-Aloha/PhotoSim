@@ -10,7 +10,7 @@ import 'photo_framing.dart';
 ({double base, double thickness, double scale, double extinction}) cloudLayer(
   CloudType type,
 ) => switch (type) {
-  CloudType.cumulus => (base: 1.6, thickness: 2.4, scale: 1.8, extinction: 3.5),
+  CloudType.cumulus => (base: 1.6, thickness: 2.4, scale: 1.3, extinction: 3.5),
   CloudType.stratocumulus => (
     base: 1.0,
     thickness: 0.9,
@@ -36,8 +36,9 @@ const cloudRenderDistanceKm = 256.0;
 ) {
   final dip =
       math.acos(6371 / (6371 + altitudeKm.clamp(0, 30))) * 180 / math.pi;
-  // Preserve some multiply-scattered green/blue instead of the ground model's below-horizon pure red.
-  final light = sunlight((sunAltitude + dip).clamp(1.5, 90));
+  // No 1.5° floor: a setting deck keeps reddening through the last degree, which
+  // is what turns cloud undersides from gold to crimson after ground sunset.
+  final light = sunTransmission((sunAltitude + dip).clamp(-1.0, 90.0));
   return (red: light.red, green: light.green, blue: light.blue);
 }
 

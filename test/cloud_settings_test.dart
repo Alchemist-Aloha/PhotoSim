@@ -17,6 +17,8 @@ void main() {
     expect(low.blue, lessThan(day.blue));
     expect(afterSunset.green, greaterThan(0));
     expect(afterSunset.blue, greaterThan(0));
+    // Elevated decks keep reddening through their last degree of sunlight.
+    expect(cloudSunColor(0.5, 8).green, lessThan(cloudSunColor(3.0, 8).green));
     for (final altitude in [-90.0, -6.0, -2.0, 0.0, 5.0, 45.0, 90.0]) {
       for (final height in [0.0, 2.0, 8.0, 30.0]) {
         final color = cloudSunColor(altitude, height);

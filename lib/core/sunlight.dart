@@ -7,14 +7,7 @@ const clearSkyMie = 0.0005;
 // RGB ozone absorption per km at peak density; 10–40 km triangular layer.
 const clearSkyOzone = (red: 0.000650, green: 0.001881, blue: 0.000085);
 
-/// Approximate RGB extinction, not calibrated irradiance or photographic exposure.
-({double intensity, double red, double green, double blue}) sunlight(
-  double altitude,
-) {
-  if (!altitude.isFinite || altitude < -90 || altitude > 90) {
-    throw ArgumentError.value(altitude, 'altitude');
-  }
-  if (altitude <= 0) return (intensity: 0, red: 1, green: 0, blue: 0);
+({double red, double green, double blue}) _transmission(double altitude) {
   // Kasten–Young air mass, with the same clear-air optical depths as the sky.
   final mass =
       1 /
@@ -28,15 +21,41 @@ const clearSkyOzone = (red: 0.000650, green: 0.001881, blue: 0.000085);
             mass -
         ozone * 15 * ozoneMass,
   );
-  final red = transmission(clearSkyRayleigh.red, 0.69, clearSkyOzone.red);
-  final green = transmission(clearSkyRayleigh.green, 0.73, clearSkyOzone.green);
-  final blue = transmission(clearSkyRayleigh.blue, 0.81, clearSkyOzone.blue);
+  return (
+    red: transmission(clearSkyRayleigh.red, 0.69, clearSkyOzone.red),
+    green: transmission(clearSkyRayleigh.green, 0.73, clearSkyOzone.green),
+    blue: transmission(clearSkyRayleigh.blue, 0.81, clearSkyOzone.blue),
+  );
+}
+
+/// Spectral color of direct sunlight normalized to red.
+///
+/// [altitude] may dip below the geometric horizon: elevated clouds keep their
+/// last red light after ground sunset. The path is clamped at -1° so the color
+/// stays finite. Use [sunlight] for ground-level illumination.
+({double red, double green, double blue}) sunTransmission(double altitude) {
+  if (!altitude.isFinite || altitude < -90 || altitude > 90) {
+    throw ArgumentError.value(altitude, 'altitude');
+  }
+  final light = _transmission(altitude.clamp(-1.0, 90.0));
+  return (red: 1, green: light.green / light.red, blue: light.blue / light.red);
+}
+
+/// Approximate RGB extinction, not calibrated irradiance or photographic exposure.
+({double intensity, double red, double green, double blue}) sunlight(
+  double altitude,
+) {
+  if (!altitude.isFinite || altitude < -90 || altitude > 90) {
+    throw ArgumentError.value(altitude, 'altitude');
+  }
+  if (altitude <= 0) return (intensity: 0, red: 1, green: 0, blue: 0);
+  final light = _transmission(altitude);
   // shortcut: fade direct lighting over the last solar diameter, not a refracted limb calculation.
   final limb = (altitude / 0.53).clamp(0.0, 1.0);
   return (
-    intensity: 3 * red * limb,
+    intensity: 3 * light.red * limb,
     red: 1,
-    green: green / red,
-    blue: blue / red,
+    green: light.green / light.red,
+    blue: light.blue / light.red,
   );
 }

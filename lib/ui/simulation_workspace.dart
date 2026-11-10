@@ -85,6 +85,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   final prompt = TextEditingController();
   Timer? renderActivity;
   final renderActive = ValueNotifier(true);
+  final animationClock = Stopwatch()..start();
+
+  void animateScene() {
+    // The engine's GetTime wraps every 100 seconds; use one continuous clock.
+    final seconds = animationClock.elapsedMicroseconds / 1e6;
+    cloudRenderer?.material.parameters.setFloat('animation_time', seconds);
+    waterMaterial?.parameters.setFloat('animation_time', seconds);
+    updateCameraLight();
+  }
 
   void wakeRenderer() {
     renderActive.value = true;
@@ -115,6 +124,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   ImagerySources? imagery;
   WaterRepository? water;
   final waterNodes = <String, List<scene.Node>>{};
+  scene.PreprocessedMaterial? waterMaterial;
   String? waterFailure;
   final patches =
       <
@@ -281,13 +291,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 (result.outline, true),
               ]) {
                 if (mesh.indices.isEmpty) continue;
-                final material = scene.PhysicallyBasedMaterial()
-                  ..baseColorFactor = isOutline
-                      ? vm.Vector4(0.025, 0.07, 0.065, 1)
-                      : vm.Vector4(0.035, 0.15, 0.19, 1)
-                  ..roughnessFactor = isOutline ? 0.6 : 0.2
-                  ..metallicFactor = 0
-                  ..ior = 1.333;
+                final material = isOutline || waterMaterial == null
+                    ? (scene.PhysicallyBasedMaterial()
+                        ..baseColorFactor = isOutline
+                            ? vm.Vector4(0.025, 0.07, 0.065, 1)
+                            : vm.Vector4(0.035, 0.15, 0.19, 1)
+                        ..roughnessFactor = isOutline ? 0.6 : 0.2
+                        ..metallicFactor = 0
+                        ..ior = 1.333)
+                    : waterMaterial!;
                 final node = scene.Node(
                   name: '${isOutline ? 'shore' : 'water'}-$key',
                   mesh: scene.Mesh(
@@ -333,6 +345,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     skySource = atmosphere;
     if (!mounted) return;
     cloudRenderer = clouds;
+    waterMaterial = assets.waterMaterial;
     world = scene.Scene()..skybox = scene.Skybox(skySource!);
     world!.add(clouds.node);
     world!.directionalLight = scene.DirectionalLight(
@@ -1051,6 +1064,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     prompt.dispose();
     renderActivity?.cancel();
     renderActive.dispose();
+    animationClock.stop();
     coverageDebounce?.cancel();
     generation++;
     if (cancellation != null && !cancellation!.isCompleted) {
@@ -1217,6 +1231,10 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     }
     final state = widget.state;
     final frame = state.cameraFrame;
+    // Drifting clouds and rippling water need frames even when the camera is idle.
+    final animating =
+        state.cloudAmount > 0 ||
+        waterNodes.values.any((nodes) => nodes.isNotEmpty);
     final eye = vm.Vector3(
       0,
       state.cameraElevation ?? (ground ?? 0) + state.height,
@@ -1384,11 +1402,17 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                               ) => TickerMode(
                                                 // A draw-rate cap leaves the vsync ticker running even when nothing changes.
                                                 enabled:
-                                                    exporting || activeRefresh,
+                                                    exporting ||
+                                                    activeRefresh ||
+                                                    animating,
                                                 child: scene.SceneView(
                                                   active,
+                                                  maxFrameRate:
+                                                      activeRefresh || exporting
+                                                      ? null
+                                                      : 24,
                                                   onTick: (_, _) =>
-                                                      updateCameraLight(),
+                                                      animateScene(),
                                                   camera: scene.PerspectiveCamera(
                                                     position: eye,
                                                     target: eye + direction,

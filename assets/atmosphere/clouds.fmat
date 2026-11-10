@@ -9,6 +9,8 @@ material {
     { type: sampler2D, name: cloud_noise, hint: default_white },
     { type: vec3, name: cloud_origin, default: [0, 0, 0] },
     { type: vec3, name: seed_offset, default: [0, 0, 0] },
+    { type: vec2, name: wind, default: [0.020, 0.008] },
+    { type: float, name: animation_time, default: 0 },
     { type: vec4, name: layer, default: [1.6, 2.4, 1.8, 3.5] },
     { type: vec3, name: sun_direction, default: [0, 1, 0] },
     { type: vec3, name: sun_color, default: [1, 1, 1] },
@@ -26,6 +28,8 @@ material {
 fragment {
   precision highp float;
 
+  const mat2 CloudTurn = mat2(0.85717, 0.51504, -0.51504, 0.85717);
+
   vec3 CloudNoise(vec3 p) {
     // 64³ tileable volume in an 8×8 slice atlas, with one-voxel wrap gutters.
     vec3 voxel = fract(p / 8.0) * 64.0;
@@ -42,6 +46,13 @@ fragment {
     float h = (p.y - layer.x) / layer.y;
     if (h <= 0.0 || h >= 1.0) return 0.0;
     vec3 q = vec3(p.x, p.y - layer.x, p.z) / layer.z + material_params.seed_offset;
+    // Wind in km/s, so every deck drifts at the same physical speed.
+    q.xz -= material_params.wind * material_params.animation_time / layer.z;
+    // Bounded warp avoids stretching distant geographic coordinates into streaks.
+    vec2 weatherXZ = CloudTurn * q.xz * 0.13 + vec2(3.7, 9.2);
+    vec3 weather = CloudNoise(vec3(weatherXZ.x, 2.7, weatherXZ.y));
+    q.xz += (weather.gb - 0.5) * 2.4;
+    q.xz = CloudTurn * q.xz;
     float bottom = smoothstep(0.0, 0.08, h);
     float top = 1.0 - smoothstep(0.72, 1.0, h);
     if (material_params.cloud_type == 3) {
@@ -50,13 +61,17 @@ fragment {
       q.x = q.x * 0.32 + (warp.g - 0.5) * 1.8;
       q.z = q.z * 2.2 + (warp.b - 0.5) * 1.2;
       vec3 ice = CloudNoise(q * 2.0);
-      float wisps = ice.r * 0.7 + ice.g * 0.3;
+      // A rotated second octave hides the 4-5 km repeat of the cirrus tile.
+      vec2 turn = CloudTurn * q.xz * 1.9 + vec2(4.3, 7.1);
+      float ice2 = CloudNoise(vec3(turn.x, q.y * 1.3, turn.y)).r;
+      float wisps = ice.r * 0.55 + ice.g * 0.24 + ice2 * 0.21;
       return max(0.0, wisps - mix(0.76, 0.36, material_params.amount)) * bottom * top * 1.2;
     }
-    vec3 noise = CloudNoise(q);
-    float weather = 0.5;
-    if (detail > 0.01) weather = mix(0.5, CloudNoise(vec3(q.x * 0.25, material_params.seed_offset.y, q.z * 0.25)).r, detail);
-    float shape = noise.r - 0.47 + (material_params.amount - 0.5) * 0.75 + (weather - 0.5) * 0.3;
+    vec3 base = CloudNoise(q);
+    float bias = (material_params.amount - 0.5) * 0.75;
+    if (base.r < 0.47 - bias - 0.30) return 0.0;
+    // The rotated weather field breaks the small volume's regularly spaced banks.
+    float shape = base.r - 0.47 + bias + (weather.r - 0.5) * 0.5;
     if (material_params.cloud_type == 2) {
       return max(0.0, shape + 0.08) * bottom * top * 6.0;
     }
@@ -66,7 +81,7 @@ fragment {
     } else {
       shape -= h * 0.12;
     }
-    float erosion = mix(0.06, (1.0 - noise.g * 0.7 - noise.b * 0.3) * 0.18, detail);
+    float erosion = mix(0.06, (1.0 - base.g * 0.7 - base.b * 0.3) * 0.28, detail);
     return max(0.0, shape - erosion) * bottom * top * 7.5;
   }
 
@@ -119,8 +134,8 @@ fragment {
     }
     if (end <= start) return;
     // Far banks need fewer steps; quadratic spacing preserves detail near the camera.
-    int steps = int(max(8.0, float(material_params.view_steps) *
-      mix(1.0, 0.35, smoothstep(20.0, 120.0, start))));
+    int steps = int(max(16.0, float(material_params.view_steps) *
+      mix(1.0, 0.55, smoothstep(20.0, 120.0, start))));
 
     vec3 sun = normalize(material_params.sun_direction);
     float mu = dot(ray, sun);
@@ -151,17 +166,18 @@ fragment {
       // Cool violet shadows contrast with warm, still sunlit upper billows.
       ambient = mix(ambient, vec3(0.18, 0.12, 0.22) * material_params.daylight, sunset * 0.6);
       ambient *= mix(0.45, 1.2, height);
-      vec3 direct = material_params.sun_color * lightVisible * phase * (0.16 + 1.7 * shadow);
+      float underlight = sunset * (1.0 - height) * 0.22;
+      vec3 direct = material_params.sun_color * lightVisible * phase * (0.12 + (1.7 + underlight) * shadow);
       vec3 moon = vec3(0.0);
       if (material_params.moon_strength > 0.001) {
         float lunarShadow = detail > 0.05 ? CloudShadow(p, normalize(material_params.moon_direction)) : shadow;
         moon = vec3(0.0010, 0.0014, 0.0022) * material_params.moon_strength * (0.25 + 0.75 * lunarShadow);
       }
-      vec3 radiance = (ambient + direct + moon) * material_params.energy;
+      vec3 radiance = ambient + direct + moon;
       float haze = 1.0 - exp(-t * 0.018);
       vec3 horizonColor = mix(ambient * 1.8, material_params.sun_color * 0.35,
-        sunset * pow(max(mu, 0.0), 2.0) * 0.5);
-      radiance = mix(radiance, horizonColor, haze * 0.65);
+        sunset * lightVisible * pow(max(mu, 0.0), 2.0) * 0.5);
+      radiance = mix(radiance, horizonColor, haze * 0.65) * material_params.energy;
       color += transmission * opacity * radiance;
       transmission *= 1.0 - opacity;
     }

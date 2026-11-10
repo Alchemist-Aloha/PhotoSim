@@ -133,8 +133,25 @@ sky {
       optical += column;
       previous = next;
     }
-    float disk = smoothstep(cos(material_params.solar_radius),
-      cos(material_params.solar_radius * 0.95), dot(normalize(direction), sun));
+    // Belt of Venus: the anti-solar twilight arch beside the Earth's shadow. The
+    // isotropic multiple-scattering LUT cannot produce it, so add it spectrally;
+    // it fades in from ~+3° and is gone by ~-6° solar altitude.
+    vec3 flatRay = normalize(vec3(ray.x, 0.0, ray.z) + vec3(1e-5, 0.0, 0.0));
+    vec3 antiSun = normalize(vec3(-sun.x, 0.0, -sun.z) + vec3(1e-5, 0.0, 0.0));
+    float antisolar = max(dot(flatRay, antiSun), 0.0);
+    float twilight = exp(-pow((sun.y + 0.025) / 0.05, 2.0));
+    // Earth's shadow and its rose rim climb together as the Sun descends.
+    float shadowEdge = max(-sun.y, 0.0);
+    float beltBand = exp(-pow((ray.y - shadowEdge - 0.10) / 0.09, 2.0));
+    float shadowBand = 1.0 - smoothstep(shadowEdge, shadowEdge + 0.06, ray.y);
+    if (!hitsGround) {
+      scattered *= 1.0 - 0.18 * twilight * pow(antisolar, 3.0) * shadowBand;
+      scattered += vec3(0.040, 0.015, 0.018) * twilight * pow(antisolar, 6.0) * beltBand;
+    }
+    float diskDistance = length(cross(ray, sun));
+    float diskWidth = max(fwidth(diskDistance), material_params.solar_radius * 0.025);
+    float disk = (1.0 - smoothstep(material_params.solar_radius - diskWidth,
+      material_params.solar_radius + diskWidth, diskDistance)) * step(0.0, dot(ray, sun));
     // Extinction and the Earth's limb, not the center altitude, determine disk visibility.
     // shortcut: preview-relative disk radiance avoids highlight desaturation; calibrate for photometric output.
     vec3 direct = 3.0 * Transmission(LightDepth(origin, normalize(direction))) * disk;

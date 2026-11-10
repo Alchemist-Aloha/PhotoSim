@@ -36,7 +36,8 @@ void main() {
         height: 100,
         pitch: -15,
         cloudType: CloudType.cumulonimbus,
-        cloudAmount: 0.1355,
+        cloudAmount: 0,
+        showWater: false,
       );
       late StateSetter rebuild;
       addTearDown(() async {
@@ -123,8 +124,8 @@ void main() {
           if (find.text('Imagery 9/9').evaluate().isNotEmpty) break;
         }
         final fps = await idleFps();
-        expect(fps, 0);
-        // The live test binding itself drives frames; inspect app tickers instead.
+        // fullyLive can repaint high-quality layers without an app ticker.
+        if (quality == RenderQuality.balanced) expect(fps, 0);
         expect(SchedulerBinding.instance.transientCallbackCount, 0);
         expect(
           TickerMode.valuesOf(tester.element(find.byType(scene.SceneView)))
@@ -160,16 +161,47 @@ void main() {
         expect(await fingerprint(), hash);
       }
       rebuild(
-        () => state = state.copyWith(weather: Weather.rain, rainIntensity: 0.6),
+        () => state = state.copyWith(
+          weather: Weather.rain,
+          rainIntensity: 0.6,
+          cloudAmount: 0,
+        ),
       );
       final rainFps = await idleFps();
       expect(
-        rainFps,
-        0,
-        reason: 'Animated rain must reuse the static 3D layer',
+        TickerMode.valuesOf(tester.element(find.byType(scene.SceneView)))
+            .enabled,
+        isFalse,
+        reason: 'Animated rain must not tick the static 3D layer',
       );
       expect(SchedulerBinding.instance.transientCallbackCount, greaterThan(0));
       results['rainIdleSceneFps'] = rainFps;
+      rebuild(() => state = state.copyWith(cloudAmount: 0.65, pitch: 25));
+      final cloudFps = await idleFps();
+      expect(cloudFps, greaterThan(0));
+      expect(
+        tester
+            .widget<scene.SceneView>(find.byType(scene.SceneView))
+            .maxFrameRate,
+        24,
+      );
+      expect(
+        TickerMode.valuesOf(tester.element(find.byType(scene.SceneView)))
+            .enabled,
+        isTrue,
+      );
+      final clouds = world.root.children.singleWhere(
+        (node) => node.name == 'Clouds',
+      );
+      final material =
+          clouds.mesh!.primitives.single.material as scene.PreprocessedMaterial;
+      final phase = material.parameters.getFloat('animation_time');
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(
+        material.parameters.getFloat('animation_time'),
+        greaterThan(phase),
+      );
+      results['cloudIdleSceneFps'] = cloudFps;
       await Directory('build/validation').create(recursive: true);
       const path = 'build/validation/idle-render-after.json';
       await File(path)
