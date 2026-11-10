@@ -50,3 +50,4 @@ app.*.map.json
 .impeccable/
 outputs/
 .unipi/
+ref/

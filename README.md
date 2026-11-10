@@ -72,7 +72,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - **Night calendar** with month/week views, explained Galactic-core observing windows,
   keyless Open-Meteo forecasts and a modeled light-pollution site baseline.
   See [night planning, sources and limits](docs/night-calendar.md).
-- Interactive OpenStreetMap map centered on Yosemite.
+- Interactive OpenStreetMap map centered on Yosemite. Enter a town, landmark, or address in the map's search field and press **Search** to see dropdown candidates from the free, keyless Photon API. Choose a result to center the map, then tap to place the camera; searching does not change your current composition.
 - Tap/click to place a camera; drag its marker to move it and its green handle to aim.
 - Geographic field-of-view wedge calculated from physical sensor and focal length.
 - Full-frame / APS-C sensor pills and a single 8–600 mm focal-length slider.
@@ -251,6 +251,12 @@ Map tiles require internet access. This prototype uses the public OSM standard
 tile service with attribution and an identifying user agent; it does not bulk
 download or prefetch regions. Review [OSM's usage policy](https://operations.osmfoundation.org/policies/tiles/)
 before distribution or scaling. No paid API or credentials are required.
+
+Place search uses [Photon](https://github.com/komoot/photon)'s free public demo
+API with OpenStreetMap data. Only explicitly submitted search terms are sent to
+`photon.komoot.io`; camera coordinates and saved plans are not sent. The service
+may throttle or block heavy use and provides no availability guarantee. Use a
+hosted/self-hosted instance before scaling; search needs internet access.
 
 Linux remains the completed MVP baseline. The Android phone/tablet version
 shares its planning/rendering core and has emulator workflow coverage; physical

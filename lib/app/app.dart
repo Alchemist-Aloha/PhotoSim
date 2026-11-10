@@ -1101,6 +1101,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
         : workspace == Workspace.map
         ? MapWorkspace(
             key: ValueKey(openedPlan),
+            httpClient: terrainClient,
             state: state,
             initialCenter: mapCenter,
             initialZoom: mapZoom,

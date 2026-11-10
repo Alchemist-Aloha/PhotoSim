@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:http/http.dart' as http;
 
 import '../core/geo.dart';
 import '../core/terrain_coverage.dart';
 import '../models/simulation_state.dart';
+import '../data/place_search.dart';
+import 'place_search.dart';
 
 class MapWorkspace extends StatefulWidget {
   const MapWorkspace({
@@ -17,7 +20,9 @@ class MapWorkspace extends StatefulWidget {
     this.guideDismissed = false,
     this.onGuideDismissedChanged,
     this.onMoveCompleted,
+    this.httpClient,
   });
+  final http.Client? httpClient;
   final SimulationState state;
   final ValueChanged<SimulationState> onChanged;
   final LatLng? initialCenter;
@@ -36,6 +41,16 @@ class _MapWorkspaceState extends State<MapWorkspace> {
   final mapKey = GlobalKey();
   bool tileError = false;
   SimulationState? moveStart;
+
+  void locatePlace(PlaceSearchResult result) {
+    controller.move(
+      LatLng(
+        result.location.latitude.clamp(-85.05112878, 85.05112878),
+        result.location.longitude,
+      ),
+      13,
+    );
+  }
 
   void beginMove(DragStartDetails _) => moveStart = widget.state;
 
@@ -304,6 +319,11 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      PlaceSearch(
+                        httpClient: widget.httpClient,
+                        onSelected: locatePlace,
+                      ),
+                      const SizedBox(height: 8),
                       if (tileError)
                         const Text(
                           'Map tiles unavailable. Check your connection. Camera controls still work; switch workspaces to retry.',
@@ -353,6 +373,8 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                 title: const Text('Map guide'),
                 content: Text(
                   'Tap to place the camera. Drag the camera to move; drag its direction handle to aim. Use Undo after a move to restore the previous position or direction.\n\n'
+                  'Enter a town, landmark, or address and press Search. Choose a dropdown result to center the map without moving your camera, then tap the map to place it.\n\n'
+                  'Search uses Photon with © OpenStreetMap contributors data. Submitted search terms are sent to photon.komoot.io.\n\n'
                   'For precise placement without dragging, enter latitude and longitude in Camera controls → Position & orientation.\n\n'
                   'Amber: Sun · Blue: Moon · Violet: Galactic center. Dashed bearing lines mean below horizontal.\n\n'
                   'Dashed circle: approximately ${loadingRadiusKm.toStringAsFixed(1)} km requested terrain extent. Forward fetching is directional; the circle is not an exact tile boundary or a download-status indicator. Render distance is a separate limit.\n\n'
