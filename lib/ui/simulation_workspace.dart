@@ -938,6 +938,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           if (waterNodes.values.any((nodes) => nodes.isNotEmpty))
             waterAttribution,
           'Sky catalog: D3-Celestial / XHIP · BSD-3-Clause',
+          'Milky Way: ESO/S. Brunier · CC BY 4.0',
         }.join(' · ');
         final width = (region.width * ratio).round();
         final height = (region.height * ratio).round();
@@ -1151,8 +1152,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'Solar direction is calculated locally with Astronomia (Meeus, MIT); brightness and sky appearance are approximate. '
             'Sun/Moon readouts omit atmospheric refraction. The Moon uses NASA SVS/LRO surface color with approximate pole orientation, no libration or crater relief; '
             'moonlight brightness is an artistic approximation, not calibrated exposure. '
-            'Stars: XHIP (Anderson & Francis, 2012); Milky Way outlines: Jose R. Vieira, '
-            'via D3-Celestial (Olaf Frohn, BSD-3-Clause). Constellation names and illustrative connecting figures '
+            'Stars: XHIP (Anderson & Francis, 2012), via D3-Celestial (Olaf Frohn, BSD-3-Clause). '
+            'Milky Way: ESO/S. Brunier panorama (CC BY 4.0), reprojected with stars removed. Constellation names and illustrative connecting figures '
             'also come from D3-Celestial; figures are not official IAU boundaries. Night-sky brightness and star sizes are artistic.\n\n'
             'Mapterhorn upstream source credits and license references:\n\n$terrainCredits',
           ),

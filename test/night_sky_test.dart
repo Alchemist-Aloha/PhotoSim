@@ -24,15 +24,15 @@ void main() {
     final map = img.decodePng(
       File('assets/sky/milky_way.png').readAsBytesSync(),
     )!;
-    expect(map.width, 1024);
-    expect(map.height, 512);
-    expect(map.getPixel(245, 338).a, greaterThan(0)); // Galactic center.
-    final poleX = ((192.85948 - 180) / 360 * 1024).round();
-    final poleY = ((90 - 27.12825) / 180 * 512).round();
+    expect(map.width, 2048);
+    expect(map.height, 1024);
+    expect(map.getPixel(490, 676).a, greaterThan(25)); // Galactic center.
+    final poleX = ((192.85948 - 180) / 360 * 2048).round();
+    final poleY = ((90 - 27.12825) / 180 * 1024).round();
     expect(map.getPixel(poleX, poleY).a, 0); // Galactic north pole.
     expect(
       File('assets/sky/LICENSE.txt').readAsStringSync(),
-      contains('Olaf Frohn'),
+      allOf(contains('Olaf Frohn'), contains('ESO/S. Brunier')),
     );
   });
 
@@ -67,12 +67,14 @@ void main() {
       File('assets/sky/milky_way.png').readAsBytesSync(),
     )!;
     const poleRa = 192.85948 * radians, poleDec = 27.12825 * radians;
-    var lit = 0, nearPlane = 0, sumLatitude = 0.0;
+    // Alpha-weighted: the photograph also holds faint glow, the Magellanic Clouds
+    // and Andromeda off the plane, but nearly all band light must sit on it.
+    var lit = 0.0, nearPlane = 0.0, sumLatitude = 0.0;
     for (var y = 0; y < map.height; y++) {
       for (var x = 0; x < map.width; x++) {
-        final alpha = map.getPixel(x, y).a.toInt();
+        final alpha = map.getPixel(x, y).a.toDouble();
         if (alpha == 0) continue;
-        lit++;
+        lit += alpha;
         // Mesh mapping: u spans RA -180..180, v spans Dec +90..-90.
         final ra = (-180 + (x + 0.5) / map.width * 360) * radians;
         final dec = (90 - (y + 0.5) / map.height * 180) * radians;
@@ -80,12 +82,12 @@ void main() {
             math.sin(dec) * math.sin(poleDec) +
             math.cos(dec) * math.cos(poleDec) * math.cos(ra - poleRa);
         final latitude = math.asin(sinLatitude.clamp(-1.0, 1.0)) / radians;
-        sumLatitude += latitude.abs();
-        if (latitude.abs() <= 20) nearPlane++;
+        sumLatitude += latitude.abs() * alpha;
+        if (latitude.abs() <= 20) nearPlane += alpha;
       }
     }
     // A misplaced band shows up as lit pixels far from b=0.
-    expect(nearPlane / lit, greaterThan(0.98));
+    expect(nearPlane / lit, greaterThan(0.95));
     expect(sumLatitude / lit, lessThan(8));
   });
 

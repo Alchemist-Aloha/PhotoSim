@@ -9,6 +9,7 @@ import 'constellations.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 import '../core/astronomy.dart';
+import '../core/exposure.dart';
 import '../core/geo.dart';
 import '../core/night_sky.dart';
 import '../core/planets.dart';
@@ -240,7 +241,11 @@ class NightSkyRenderer {
     );
     final up = vm.Vector3(frame.up.x, frame.up.y, frame.up.z);
     final right = vm.Vector3(frame.right.x, frame.right.y, frame.right.z);
-    final visible = starMaterial.baseColorFactor.x > 0 && viewport.height > 0;
+    // Names are part of the constellation guide and toggle with it.
+    final visible =
+        state.showConstellations &&
+        starMaterial.baseColorFactor.x > 0 &&
+        viewport.height > 0;
     node.visible = visible;
     if (!visible) return;
     geometry.worldUp = up;
@@ -272,6 +277,7 @@ class NightSkyRenderer {
   }
 
   static const starDistance = 40000.0, bandDistance = 45000.0;
+  static const milkyWayRadiance = 0.0025;
   static const planetDistance = 39500.0;
   late final scene.Node root, starNode, bandNode, marker;
   late final scene.MeshGeometry starGeometry;
@@ -334,8 +340,21 @@ class NightSkyRenderer {
     starNode.visible = stars > 0;
     bandNode.visible = band > 0.001;
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);
-    bandMaterial.baseColorFactor = vm.Vector4(1, 1, 1, band);
-    marker.visible = state.target == CelestialTarget.galacticCenter;
+    // The texture's alpha uses its full 8-bit range for detail; this scale keeps the
+    // brightest core (alpha 1) near 0.65 at the mode's dark-sky auto-exposure ceiling
+    // instead of clipping the whole band to white (Auto stops 4 EV short of Enhanced).
+    final ceiling = state.exposureMode == ExposureMode.manual
+        ? 256.0
+        : math.pow(2, autoExposureMaxEv(state)).toDouble();
+    bandMaterial.baseColorFactor = vm.Vector4(
+      1,
+      1,
+      1,
+      band * milkyWayRadiance * 256 / ceiling,
+    );
+    // The unlit marker reads as a dark blot under daylight exposure.
+    marker.visible =
+        state.target == CelestialTarget.galacticCenter && stars > 0;
     for (final node in planets.values) {
       node.visible = stars > 0;
     }

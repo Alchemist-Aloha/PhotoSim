@@ -81,19 +81,28 @@ fragment {
     vec2 lowUv = (anchor + ray.xz * lowProjection) * 0.18 + seed + vec2(wind, wind * 0.35);
     vec2 highUv = (anchor + ray.xz * highProjection) * 0.11 + seed + vec2(wind * 1.4, -wind * 0.25);
     float scale = clamp(1.3 / material_params.layer.z, 0.45, 1.5);
-    float base = CloudFbm(lowUv * 1.4 * scale);
-    float detail = CloudFbm(lowUv * 3.8 * scale - vec2(wind * 0.4, 0.0));
-    float raw = mix(base, detail, 0.32);
     float threshold = mix(0.84, 0.30, material_params.amount);
+    bool stratus = material_params.cloud_type == 2;
+    bool lowVisible = !cirrus && lowDistance > 0.0 && lowDistance < limitKm;
+    bool highVisible = highDistance > 0.0 && highDistance < limitKm;
+    // Skip noise that cannot change the result: occluded decks, and detail octaves
+    // where even a maximal detail (< 0.97) cannot lift raw past the threshold.
+    if (!lowVisible && !highVisible) return vec4(0.0);
+    float base = CloudFbm(lowUv * 1.4 * scale);
+    float raw = mix(base, 0.5, 0.32);
+    if (stratus || (lowVisible && mix(base, 0.97, 0.32) > threshold)) {
+      raw = mix(base, CloudFbm(lowUv * 3.8 * scale - vec2(wind * 0.4, 0.0)), 0.32);
+    }
     float low = smoothstep(threshold, threshold + 0.24, raw);
-    float highNoise = CloudFbm(highUv * vec2(2.2, 0.65));
-    float highThreshold = mix(0.82, 0.34, material_params.amount);
-    float high = smoothstep(highThreshold, highThreshold + 0.28, highNoise);
+    float high = 0.0;
+    if (highVisible) {
+      float highThreshold = mix(0.82, 0.34, material_params.amount);
+      high = smoothstep(highThreshold, highThreshold + 0.28, CloudFbm(highUv * vec2(2.2, 0.65)));
+    }
     if (material_params.cloud_type == 1) low = min(low * 1.35, 1.0);
-    if (material_params.cloud_type == 2) low = mix(low, 1.0, material_params.amount * 0.85);
+    if (stratus) low = mix(low, 1.0, material_params.amount * 0.85);
     if (material_params.cloud_type == 4) low = min(low * 1.5, 1.0);
-    if (cirrus || lowDistance <= 0.0 || lowDistance >= limitKm) low = 0.0;
-    if (highDistance <= 0.0 || highDistance >= limitKm) high = 0.0;
+    if (!lowVisible) low = 0.0;
     high *= cirrus ? 1.0 : 0.35;
     // Spherical decks remain visible at the geometric horizon, including high observers.
     float horizonFade = origin.y > lowHeight ? 1.0 : smoothstep(-0.07, 0.09, ray.y);
@@ -105,9 +114,12 @@ fragment {
     float horizonDip = -sqrt(max(0.0, 2.0 * height / 6371.0)) - 0.012;
     float sunlight = smoothstep(horizonDip - 0.055, horizonDip + 0.03, dip);
     float mu = max(dot(ray, sun), 0.0);
-    float forwardGlow = pow(mu, 6.0) * 1.4 + pow(mu, 32.0) * 2.2;
+    // Thin edges forward-scatter (silver lining); thick backlit cores stay dark.
+    float forwardGlow = (pow(mu, 6.0) * 1.4 + pow(mu, 32.0) * 2.2) *
+      mix(1.8, 0.45, clamp(low + high * 0.72, 0.0, 1.0));
     float selfShadow = smoothstep(0.0, 0.85, raw);
-    float night = 1.0 - smoothstep(-0.14, 0.08, sun.y);
+    // Twilight sky keeps lighting cloud bases through civil twilight (~-3.5° to -14°).
+    float night = 1.0 - smoothstep(-0.24, -0.06, sun.y);
     vec3 ambient = mix(skyColor * 0.55,
       vec3(0.00004, 0.00007, 0.00014), night);
     vec3 direct = material_params.sun_color * sunlight *

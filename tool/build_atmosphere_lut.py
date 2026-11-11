@@ -2,7 +2,8 @@
 
 Isotropic higher-order closure from Hillaire (2020), section 5:
 https://sebh.github.io/publications/egsr2020.pdf
-Stores mean incident sky radiance per unit solar irradiance, sqrt-encoded RGB.
+Stores mean incident sky radiance per unit solar irradiance, log2-encoded RGB
+(see encode/decode) so twilight keeps its hue in 8 bits.
 Run from any directory; constants must match core/sunlight.dart and sky.fmat.
 """
 from pathlib import Path
@@ -13,9 +14,22 @@ from PIL import Image
 RADIUS, TOP = 6371.0, 6451.0
 RAYLEIGH = np.array([0.0058, 0.0135, 0.0331])
 MIE = np.array([0.69, 0.73, 0.81]) * (2 * 0.0005 * 0.434)
-OZONE = np.array([0.000650, 0.001881, 0.000085])
+# Red uses the sRGB red channel's ~600 nm Chappuis-band weight, not 680 nm.
+OZONE = np.array([0.001800, 0.001881, 0.000085])
 G = 0.76
 WIDTH, HEIGHT = 64, 32
+# Must match MultipleScattering() in sky.fmat.
+SCALE, STOPS = 0.0625, 24.0
+
+
+def encode(value):
+    code = 1 + np.log2(np.maximum(value, 1e-30) / SCALE) / STOPS
+    return np.clip(np.rint(code * 255), 0, 255).astype(np.uint8)
+
+
+def decode(code):
+    code = np.asarray(code) / 255.0
+    return np.where(code > 0, SCALE * np.exp2((code - 1) * STOPS), 0)
 
 
 def density(p):
@@ -95,7 +109,7 @@ def bake(width=WIDTH, height=HEIGHT, directions=64, steps=24):
         assert np.all(mean_feedback < 1), "Multiple scattering must conserve energy"
         output[row] = np.mean(radiance, axis=1) / (1 - mean_feedback)
     assert np.all(np.isfinite(output)) and np.all(output >= 0)
-    assert np.max(output) < 1, "LUT sqrt encoding would clip"
+    assert np.max(output) < SCALE, "LUT encoding would clip"
     # At ground level, indirect daylight is blue and disappears deep at night.
     assert output[0, -1, 2] > output[0, -1, 0]
     assert np.max(output[0, 0]) < 1e-8
@@ -105,5 +119,5 @@ def bake(width=WIDTH, height=HEIGHT, directions=64, steps=24):
 if __name__ == '__main__':
     result = bake()
     target = Path(__file__).resolve().parents[1] / 'assets/atmosphere/multiple_scattering.png'
-    Image.fromarray(np.rint(np.sqrt(result) * 255).astype(np.uint8)).save(target)
+    Image.fromarray(encode(result)).save(target)
     print(f'Wrote {target}: {WIDTH}x{HEIGHT}, radiance range {result.min():.6g}–{result.max():.6g}')

@@ -145,7 +145,19 @@ class CloudRenderer {
         sky.sun.altitude,
         optics: state.atmosphereOptics,
       );
+      // Matches the unlit Moon node (~0.15 linear albedo); glitter energy scales with the lit fraction.
+      final lunar = sunDiskTransmission(
+        sky.moon.altitude,
+        optics: state.atmosphereOptics,
+      );
+      final lunarScale = 0.15 * sky.moonIllumination;
       reflectionMaterial.parameters
+        ..setVec3('moon_direction', vm.Vector3(moon.x, moon.y, moon.z))
+        ..setVec3(
+          'moon_disk_color',
+          vm.Vector3(lunar.red, lunar.green, lunar.blue) * lunarScale,
+        )
+        ..setFloat('lunar_radius', sky.moon.angularRadius)
         ..setFloat('solar_radius', sky.sun.angularRadius)
         ..setVec3(
           'sun_disk_color',

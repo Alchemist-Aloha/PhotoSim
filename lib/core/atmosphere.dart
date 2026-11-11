@@ -116,7 +116,8 @@ class AtmosphereOptics {
         blue: absorption[2],
       ),
       ozone: (
-        red: 0.000650 * ozoneScale,
+        // sRGB red is weighted toward the ~600 nm Chappuis peak, not 680 nm.
+        red: 0.001800 * ozoneScale,
         green: 0.001881 * ozoneScale,
         blue: 0.000085 * ozoneScale,
       ),

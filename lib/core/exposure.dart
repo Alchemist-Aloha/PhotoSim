@@ -12,3 +12,7 @@ double exposureMultiplier(SimulationState state) {
       : 1.0;
   return manual * math.pow(2, state.exposureCompensation);
 }
+
+/// Brightest auto-exposure boost; Enhanced visibility may lift night scenes further than Auto.
+double autoExposureMaxEv(SimulationState state) =>
+    state.exposureMode == ExposureMode.enhanced ? 8 : 4;

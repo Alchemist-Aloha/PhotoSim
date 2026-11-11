@@ -3,20 +3,24 @@
 ## Bundled sources and licensing
 
 The app bundles **5,044 XHIP stars through visual magnitude 6**, from
-[D3-Celestial](https://github.com/ofrohn/d3-celestial), and its five Milky Way
-brightness contours. Star source: Anderson & Francis (2012), XHIP, VizieR
-V/137D. Milky Way source: Jose R. Vieira's Milky Way Outline Catalog.
-D3-Celestial redistribution uses **BSD-3-Clause**, copyright Olaf Frohn (2015).
+[D3-Celestial](https://github.com/ofrohn/d3-celestial). Star source: Anderson &
+Francis (2012), XHIP, VizieR V/137D. D3-Celestial redistribution uses
+**BSD-3-Clause**, copyright Olaf Frohn (2015). The Milky Way is derived from the
+[ESO/S. Brunier all-sky panorama](https://www.eso.org/public/images/eso0932a/),
+**CC BY 4.0**.
 The full notice is bundled in `assets/sky/LICENSE.txt`, registered with Flutter's
 license registry, and accessible from the 3D sources dialog.
 
 `assets/sky/provenance.json` records pinned upstream commit
 `7e720a3de062059d4c5400a379146a601d9010e0`, exact source URLs and SHA-256 digests.
-`tool/build_sky_assets.py` reproduces the compact star rows and 1024×512 RGBA
-Milky Way map (development-only Python 3/Pillow; no new app dependency).
-The five contours are rasterized, preserve polygon holes and receive slight
-feathering. Contour alpha increases in five artistic steps, **not radiometric
-measurements**. No network access is used for sky calculations or asset loading.
+`tool/build_sky_assets.py` reproduces the compact star rows and
+`tool/build_milky_way.py` the 2048×1024 RGBA Milky Way map (development-only
+Python 3/NumPy/Pillow; no new app dependency). The panorama is downsampled,
+point stars are removed by grey opening (the catalog draws them), the sky
+background is subtracted and the galactic plate carrée is reprojected to J2000
+RA/Dec. Alpha is linear luminance from a stretched photograph, so the dust lanes
+and bulge are real but brightness is **not a radiometric measurement**. No
+network access is used for sky calculations or asset loading.
 
 ## Constellation names and highlights
 
@@ -85,7 +89,7 @@ against the Moon, loaded terrain and foreground objects, and cast no shadows.
 Visibility fades from zero at solar altitude −6° to dark-sky visibility at −18°.
 Above-horizontal lunar illumination suppresses stars and suppresses the band
 more strongly. This is an artistic clear-sky model, without light pollution,
-weather, exposure controls, photorealistic Galactic detail or individual star labels.
+weather, exposure controls or individual star labels.
 Occlusion is limited to loaded terrain; no complete Earth/terrain-horizon service
 or rise/set windows are provided. Sky meshes can trigger the backend's existing
 near-plane/depth-precision warning; long-run GPU profiling remains open.

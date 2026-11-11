@@ -6,12 +6,18 @@ import hashlib
 import json
 from pathlib import Path
 from urllib.request import urlopen
-from PIL import Image, ImageDraw, ImageChops, ImageFilter
 
 COMMIT = "7e720a3de062059d4c5400a379146a601d9010e0"
 BASE = f"https://raw.githubusercontent.com/ofrohn/d3-celestial/{COMMIT}/"
 OUT = Path(__file__).resolve().parents[1] / "assets/sky"
 OUT.mkdir(parents=True, exist_ok=True)
+ESO_NOTICE = b"""
+milky_way.png is derived from "The Milky Way panorama" (eso0932a),
+credit ESO/S. Brunier, licensed CC BY 4.0:
+https://creativecommons.org/licenses/by/4.0/ and
+https://www.eso.org/public/images/eso0932a/
+Changes: downsampled, stars removed, background subtracted, reprojected.
+"""
 
 
 def download(path):
@@ -30,27 +36,6 @@ assert all(-180 <= r[1] <= 180 and -90 <= r[2] <= 90 and r[3] <= 6 for r in rows
 assert next(r for r in rows if r[0] == 32349)[3] == -1.44  # Sirius
 (OUT / "stars.json").write_text(json.dumps(rows, separators=(",", ":")) + "\n")
 
-mw_raw = download("data/mw.json")
-mw = json.loads(mw_raw)["features"]
-assert len(mw) == 5
-# GeoJSON already splits contours at the RA seam. Preserve holes in each polygon.
-width, height = 1024, 512
-brightness = Image.new("L", (width, height))
-for level, feature in enumerate(mw, 1):
-    assert feature["geometry"]["type"] == "MultiPolygon"
-    layer = Image.new("L", (width, height))
-    draw = ImageDraw.Draw(layer)
-    for polygon in feature["geometry"]["coordinates"]:
-        for ring_index, ring in enumerate(polygon):
-            points = [((ra + 180) / 360 * width, (90 - dec) / 180 * height)
-                      for ra, dec in ring]
-            draw.polygon(points, fill=level * 12 if ring_index == 0 else 0)
-    brightness = ImageChops.lighter(brightness, layer)
-# Slight contour feathering is an artistic planning aid, not measured radiance.
-brightness = brightness.filter(ImageFilter.GaussianBlur(1))
-image = Image.new("RGBA", brightness.size, (190, 205, 255, 0))
-image.putalpha(brightness)
-image.save(OUT / "milky_way.png")
 names_raw = download("data/constellations.json")
 lines_raw = download("data/constellations.lines.json")
 names = json.loads(names_raw)["features"]
@@ -61,13 +46,14 @@ constellations = [[n["properties"]["name"], *n["geometry"]["coordinates"],
                    line["geometry"]["coordinates"]] for n, line in zip(names, lines)]
 assert len({n["id"] for n in names}) == 88
 (OUT / "constellations.json").write_text(json.dumps(constellations, separators=(",", ":")) + "\n")
-(OUT / "LICENSE.txt").write_bytes(download("LICENSE"))
-(OUT / "provenance.json").write_text(json.dumps({
+(OUT / "LICENSE.txt").write_bytes(download("LICENSE") + ESO_NOTICE)
+# The Milky Way raster and its provenance keys come from build_milky_way.py.
+previous = json.loads((OUT / "provenance.json").read_text())
+milky_way = {k: v for k, v in previous.items() if k.startswith("milkyWay")}
+(OUT / "provenance.json").write_text(json.dumps({**milky_way, **{
     "commit": COMMIT,
     "starsSource": BASE + "data/stars.6.json",
     "starsSha256": hashlib.sha256(stars_raw).hexdigest(),
-    "milkyWaySource": BASE + "data/mw.json",
-    "milkyWaySha256": hashlib.sha256(mw_raw).hexdigest(),
     "constellationNamesSource": BASE + "data/constellations.json",
     "constellationNamesSha256": hashlib.sha256(names_raw).hexdigest(),
     "constellationLinesSource": BASE + "data/constellations.lines.json",
@@ -75,8 +61,7 @@ assert len({n["id"] for n in names}) == 88
     "constellations": "IAU names and D3-Celestial illustrative connecting figures (not IAU boundaries)",
     "epoch": "J2000.0",
     "stars": "XHIP (Anderson & Francis, 2012), via D3-Celestial",
-    "milkyWay": "Jose R. Vieira Milky Way Outline Catalog, via D3-Celestial",
-    "changes": "Compact star and constellation rows; rasterized and feathered five brightness contours",
-    "license": "D3-Celestial BSD-3-Clause; see LICENSE.txt",
-}, indent=2) + "\n")
-print(f"Bundled {len(rows)} stars and {len(mw)} Milky Way contours")
+    "changes": "Compact star and constellation rows",
+    "license": "D3-Celestial BSD-3-Clause; Milky Way ESO CC BY 4.0; see LICENSE.txt",
+}}, indent=2) + "\n")
+print(f"Bundled {len(rows)} stars")

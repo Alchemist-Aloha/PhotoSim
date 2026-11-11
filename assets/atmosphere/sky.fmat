@@ -7,7 +7,7 @@ material {
     { type: vec3, name: rayleigh, default: [0.0058, 0.0135, 0.0331] },
     { type: vec3, name: mie, default: [0.0003, 0.00032, 0.00035] },
     { type: vec3, name: mie_absorption, default: [0, 0, 0] },
-    { type: vec3, name: ozone, default: [0.000650, 0.001881, 0.000085] },
+    { type: vec3, name: ozone, default: [0.001800, 0.001881, 0.000085] },
     { type: vec3, name: ground_color, default: [0.12, 0.12, 0.13] },
     { type: float, name: solar_radius, default: 0.0047 },
     { type: float, name: aerosol_height, default: 1.25 },
@@ -79,8 +79,9 @@ sky {
     // Inverse of the LUT's squared height and signed-squared solar cosine grids.
     vec2 uv = vec2(0.5 + 0.5 * sign(mu) * sqrt(abs(mu)), sqrt(height));
     uv = (uv * vec2(63.0, 31.0) + 0.5) / vec2(64.0, 32.0);
+    // log2 encoding from tool/build_atmosphere_lut.py (SCALE 1/16, 24 stops).
     vec3 encoded = texture(multiple_scattering, uv).rgb;
-    return encoded * encoded;
+    return step(vec3(0.5 / 255.0), encoded) * 0.0625 * exp2((encoded - 1.0) * 24.0);
   }
 
   vec2 Phase(float cosine) {
@@ -115,6 +116,8 @@ sky {
     }
     vec2 sunPhase = Phase(sunCosine);
     vec2 moonPhase = Phase(dot(ray, moon));
+    // Moonlit sky is ~1% of the twilight sky above -4°: skip its march (halves the cost by day).
+    bool lunar = material_params.lunar_radiance > 0.0 && sun.y < -0.07;
     vec3 optical = vec3(0.0);
     vec3 scattered = vec3(0.0);
     float previous = 0.0;
@@ -138,9 +141,9 @@ sky {
       scattered += 20.0 * (solar * (material_params.rayleigh * column.x * sunPhase.x
         + material_params.mie * column.y * sunPhase.y)
         + viewTransmission * scattering * MultipleScattering(p, sun));
-      if (material_params.lunar_radiance > 0.0) {
-        vec3 lunar = viewTransmission * Transmission(LightDepth(p, moon));
-        scattered += material_params.lunar_radiance * (lunar
+      if (lunar) {
+        vec3 lunarLight = viewTransmission * Transmission(LightDepth(p, moon));
+        scattered += material_params.lunar_radiance * (lunarLight
           * (material_params.rayleigh * column.x * moonPhase.x
           + material_params.mie * column.y * moonPhase.y)
           + viewTransmission * scattering * MultipleScattering(p, moon));
@@ -194,7 +197,7 @@ sky {
       p += up * 0.002;
       vec3 groundLight = 20.0 * (Transmission(LightDepth(p, sun))
         * max(dot(up, sun), 0.0) / ATM_PI + MultipleScattering(p, sun));
-      if (material_params.lunar_radiance > 0.0) {
+      if (lunar) {
         groundLight += material_params.lunar_radiance * (Transmission(LightDepth(p, moon))
           * max(dot(up, moon), 0.0) / ATM_PI + MultipleScattering(p, moon));
       }

@@ -18,6 +18,9 @@ material {
     { type: float, name: wave_strength, default: 0.8 },
     { type: vec3, name: deep_color, default: [0.008, 0.022, 0.040] },
     { type: float, name: solar_radius, default: 0.0047 },
+    { type: vec3, name: moon_direction, default: [0, -1, 0] },
+    { type: vec3, name: moon_disk_color, default: [0, 0, 0] },
+    { type: float, name: lunar_radius, default: 0.0045 },
     { type: float, name: roughness, default: 0.025 }
   ]
 }
@@ -81,19 +84,28 @@ fragment {
     vec2 lowUv = (anchor + ray.xz * lowProjection) * 0.18 + seed + vec2(wind, wind * 0.35);
     vec2 highUv = (anchor + ray.xz * highProjection) * 0.11 + seed + vec2(wind * 1.4, -wind * 0.25);
     float scale = clamp(1.3 / material_params.layer.z, 0.45, 1.5);
-    float base = CloudFbm(lowUv * 1.4 * scale);
-    float detail = CloudFbm(lowUv * 3.8 * scale - vec2(wind * 0.4, 0.0));
-    float raw = mix(base, detail, 0.32);
     float threshold = mix(0.84, 0.30, material_params.amount);
+    bool stratus = material_params.cloud_type == 2;
+    bool lowVisible = !cirrus && lowDistance > 0.0 && lowDistance < limitKm;
+    bool highVisible = highDistance > 0.0 && highDistance < limitKm;
+    // Skip noise that cannot change the result: occluded decks, and detail octaves
+    // where even a maximal detail (< 0.97) cannot lift raw past the threshold.
+    if (!lowVisible && !highVisible) return vec4(0.0);
+    float base = CloudFbm(lowUv * 1.4 * scale);
+    float raw = mix(base, 0.5, 0.32);
+    if (stratus || (lowVisible && mix(base, 0.97, 0.32) > threshold)) {
+      raw = mix(base, CloudFbm(lowUv * 3.8 * scale - vec2(wind * 0.4, 0.0)), 0.32);
+    }
     float low = smoothstep(threshold, threshold + 0.24, raw);
-    float highNoise = CloudFbm(highUv * vec2(2.2, 0.65));
-    float highThreshold = mix(0.82, 0.34, material_params.amount);
-    float high = smoothstep(highThreshold, highThreshold + 0.28, highNoise);
+    float high = 0.0;
+    if (highVisible) {
+      float highThreshold = mix(0.82, 0.34, material_params.amount);
+      high = smoothstep(highThreshold, highThreshold + 0.28, CloudFbm(highUv * vec2(2.2, 0.65)));
+    }
     if (material_params.cloud_type == 1) low = min(low * 1.35, 1.0);
-    if (material_params.cloud_type == 2) low = mix(low, 1.0, material_params.amount * 0.85);
+    if (stratus) low = mix(low, 1.0, material_params.amount * 0.85);
     if (material_params.cloud_type == 4) low = min(low * 1.5, 1.0);
-    if (cirrus || lowDistance <= 0.0 || lowDistance >= limitKm) low = 0.0;
-    if (highDistance <= 0.0 || highDistance >= limitKm) high = 0.0;
+    if (!lowVisible) low = 0.0;
     high *= cirrus ? 1.0 : 0.35;
     // Spherical decks remain visible at the geometric horizon, including high observers.
     float horizonFade = origin.y > lowHeight ? 1.0 : smoothstep(-0.07, 0.09, ray.y);
@@ -105,9 +117,12 @@ fragment {
     float horizonDip = -sqrt(max(0.0, 2.0 * height / 6371.0)) - 0.012;
     float sunlight = smoothstep(horizonDip - 0.055, horizonDip + 0.03, dip);
     float mu = max(dot(ray, sun), 0.0);
-    float forwardGlow = pow(mu, 6.0) * 1.4 + pow(mu, 32.0) * 2.2;
+    // Thin edges forward-scatter (silver lining); thick backlit cores stay dark.
+    float forwardGlow = (pow(mu, 6.0) * 1.4 + pow(mu, 32.0) * 2.2) *
+      mix(1.8, 0.45, clamp(low + high * 0.72, 0.0, 1.0));
     float selfShadow = smoothstep(0.0, 0.85, raw);
-    float night = 1.0 - smoothstep(-0.14, 0.08, sun.y);
+    // Twilight sky keeps lighting cloud bases through civil twilight (~-3.5° to -14°).
+    float night = 1.0 - smoothstep(-0.24, -0.06, sun.y);
     vec3 ambient = mix(skyColor * 0.55,
       vec3(0.00004, 0.00007, 0.00014), night);
     vec3 direct = material_params.sun_color * sunlight *
@@ -158,6 +173,26 @@ fragment {
     material.specular = 0.5;
   }
 
+  // Analytic reflection of a disk of the given angular radius: sharp on calm water,
+  // energy-conserving glitter where unresolved waves spread it. Slopes tilt the
+  // reflection by the full spread in elevation but only spread·sin(e) in azimuth,
+  // so a low Sun or Moon makes a long narrow column, not a disc.
+  float DiskGlint(vec3 reflection, vec3 light, float radius, float spread) {
+    float angle = length(cross(reflection, light));
+    float width = max(fwidth(angle), radius * 0.1);
+    float disk = 1.0 - smoothstep(radius - width, radius + width, angle);
+    float floorVariance = radius * radius * 0.25;
+    float verticalVariance = max(spread * spread, floorVariance);
+    float sinElevation = max(light.y, 0.0);
+    float sideVariance = max(spread * spread * sinElevation * sinElevation, floorVariance);
+    vec3 side = normalize(cross(vec3(0.0, 1.0, 0.0), light) + vec3(1e-5, 0.0, 0.0));
+    float dv = asin(clamp(reflection.y, -1.0, 1.0)) - asin(clamp(light.y, -1.0, 1.0));
+    float dh = dot(reflection, side);
+    float glitter = exp(-dv * dv / (2.0 * verticalVariance) - dh * dh / (2.0 * sideVariance)) *
+      radius * radius / (2.0 * sqrt(verticalVariance * sideVariance));
+    return mix(disk, glitter, smoothstep(0.0, 0.015, spread)) * step(0.0, dot(reflection, light));
+  }
+
   // The reference mixes the reflected scene with deep water, not diffuse-lit paint.
   vec4 Composite(MaterialInputs material, LightingResult result) {
     vec3 incident = -normalize(v_viewvector);
@@ -167,27 +202,29 @@ fragment {
     vec3 origin = GetWorldPosition() / 1000.0;
     vec4 clouds = CloudDeck(reflection, origin, sky, material_params.max_distance);
     vec3 reflected = mix(sky, clouds.rgb, clouds.a);
-    // The low-resolution IBL cannot resolve the disk; integrate it analytically for glitter.
+    // The low-resolution IBL cannot resolve the disks; integrate them analytically.
     vec3 sun = normalize(material_params.sun_direction);
-    float angle = length(cross(reflection, sun));
-    float width = max(fwidth(angle), material_params.solar_radius * 0.1);
-    float disk = (1.0 - smoothstep(material_params.solar_radius - width,
-      material_params.solar_radius + width, angle)) * step(0.0, dot(reflection, sun));
-    // Spread unresolved glitter without increasing the reflected solar energy.
-    float spread = max(material.roughness - material_params.roughness, 0.0) * 0.6;
-    float variance = max(spread * spread, material_params.solar_radius * material_params.solar_radius * 0.25);
-    float glitter = exp(-angle * angle / (2.0 * variance)) *
-      material_params.solar_radius * material_params.solar_radius / (2.0 * variance);
-    glitter *= step(0.0, dot(reflection, sun));
-    disk = mix(disk, glitter, smoothstep(0.0, 0.015, spread));
+    // Capillary ripples below the normal map's resolution (half the base roughness)
+    // always spread the disk a little, so even near water shows a glitter path.
+    float spread = max(material.roughness - material_params.roughness * 0.5, 0.0) * 0.6;
     // Use the disk's absolute extinction, not the red-normalized elevated-cloud tint.
-    reflected += material_params.sun_disk_color * disk * 48.0 *
+    reflected += material_params.sun_disk_color *
+      DiskGlint(reflection, sun, material_params.solar_radius, spread) * 48.0 *
       smoothstep(-0.012, 0.008, sun.y) * (1.0 - clouds.a) * material_params.energy;
+    // The Moon node is not in the IBL bake, so its path on the water is added here.
+    vec3 moon = normalize(material_params.moon_direction);
+    reflected += material_params.moon_disk_color *
+      DiskGlint(reflection, moon, material_params.lunar_radius, spread) *
+      smoothstep(-0.01, 0.01, moon.y) * (1.0 - clouds.a) * material_params.energy;
     float cosV = clamp(dot(-incident, material.normal), 0.0, 1.0);
     float fresnel = 0.03 + 0.97 * pow(1.0 - cosV, 4.5);
     vec3 horizon = normalize(vec3(incident.x, 0.005, incident.z));
     vec3 haze = SampleRadianceEnv(prefiltered_radiance, horizon, 0.0);
-    vec3 deepWater = material.base_color.rgb * material_params.energy + haze * 0.045;
+    // The water body only scatters light it receives: scale by sky light so night
+    // water is as dark as the night sky instead of a fixed daytime color.
+    vec3 skyLight = SampleRadianceEnv(prefiltered_radiance, vec3(0.0, 1.0, 0.0), 1.0);
+    float daylight = clamp(dot(skyLight, vec3(0.2126, 0.7152, 0.0722)) / 0.25, 0.0, 1.0);
+    vec3 deepWater = material.base_color.rgb * material_params.energy * daylight + haze * 0.045;
     vec3 color = mix(deepWater, reflected, clamp(fresnel * 1.08, 0.08, 0.98));
     float seam = exp(-abs(incident.y) * 55.0);
     return vec4(mix(color, haze, seam * 0.7), 1.0);

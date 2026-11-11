@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from build_atmosphere_lut import bake, density, extinction, RADIUS
+from build_atmosphere_lut import bake, decode, density, encode, extinction, RADIUS
 
 
 class AtmosphereLutTest(unittest.TestCase):
@@ -23,10 +23,16 @@ class AtmosphereLutTest(unittest.TestCase):
         self.assertGreater(reference[0, -1, 2], reference[0, -1, 0])
         np.testing.assert_array_equal(reference[0, 0], 0)
         target = Path(__file__).resolve().parents[1] / 'assets/atmosphere/multiple_scattering.png'
-        image = np.asarray(Image.open(target)) / 255.0
+        image = np.asarray(Image.open(target))
         self.assertEqual(image.shape, (32, 64, 3))
-        np.testing.assert_allclose(image[0, -1] ** 2, reference[0, -1], rtol=0.05)
+        np.testing.assert_allclose(decode(image[0, -1]), reference[0, -1], rtol=0.05)
         np.testing.assert_array_equal(image[0, 0], 0)
+
+    def test_encoding_keeps_twilight_hue(self):
+        # Civil-to-nautical twilight radiances span ~1e-3..1e-6; 8-bit sqrt lost their hue.
+        values = np.array([4e-2, 1e-3, 3e-5, 1e-6])
+        np.testing.assert_allclose(decode(encode(values)), values, rtol=0.04)
+        self.assertEqual(decode(encode(np.array([0.0])))[0], 0)
 
 
 if __name__ == '__main__':
