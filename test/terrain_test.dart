@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image;
 import 'package:latlong2/latlong.dart';
 import 'package:photosim/core/terrain_geo.dart';
 import 'package:photosim/data/terrain/terrain_patch.dart';
@@ -78,6 +79,21 @@ void main() {
     final field = decodeTerrarium(terrainFixture());
     expect(field.heights.length, 65536);
     expect(field.sample(0.3, 0.7), 1234.5);
+  });
+  test('Terrarium decoding preserves every pixel across row boundaries', () {
+    final png = image.Image(width: 256, height: 256, numChannels: 3);
+    for (var y = 0; y < 256; y++) {
+      for (var x = 0; x < 256; x++) {
+        final value = 32768 - 500 + x * 2;
+        png.setPixelRgb(x, y, value ~/ 256, value % 256, y);
+      }
+    }
+    final field = decodeTerrarium(image.encodePng(png));
+    for (var y = 0; y < 256; y++) {
+      for (var x = 0; x < 256; x++) {
+        expect(field.heights[y * 256 + x], -500 + x * 2 + y / 256);
+      }
+    }
   });
   test('bilinear sampling uses pixel centers and clamps boundaries', () {
     final field = HeightField(Float32List.fromList([0, 10, 20, 30]), 2);

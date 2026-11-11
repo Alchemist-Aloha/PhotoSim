@@ -118,9 +118,10 @@ HeightField decodeMapterhorn(Uint8List bytes) {
 
 HeightField _heightField(image.Image decoded, int size) {
   final heights = Float32List(size * size);
+  final pixel = decoded.getPixel(0, 0);
   for (var y = 0; y < size; y++) {
     for (var x = 0; x < size; x++) {
-      final pixel = decoded.getPixel(x, y);
+      decoded.getPixel(x, y, pixel);
       final height = terrariumHeight(
         pixel.r.toInt(),
         pixel.g.toInt(),
