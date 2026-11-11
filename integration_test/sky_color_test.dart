@@ -10,6 +10,7 @@ import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/render/atmosphere_sky.dart';
 import 'package:photosim/render/photography.dart';
+import 'package:photosim/render/moon.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -222,6 +223,21 @@ void main() {
         lessThan(5),
         reason: 'Exposure adaptation must not add an artificial daylight floor',
       );
+      sky
+        ..moonDirection = direction(45, 180)
+        ..lunarRadiance = 0.2 * moonlightScale;
+      world.autoExposure.reset();
+      final moonlit = await sample('enhanced-moonlit-night', -24, 45, 90);
+      final moonlitBrightness =
+          moonlit.$1 * 0.2126 + moonlit.$2 * 0.7152 + moonlit.$3 * 0.0722;
+      expect(moonlitBrightness, greaterThan(0));
+      expect(
+        moonlitBrightness,
+        lessThan(15),
+        reason:
+            'Full moonlight must remain dark after enhanced exposure adapts',
+      );
+      sky.lunarRadiance = 0;
       camera.fovRadiansY = 60 * math.pi / 180;
       await sample('enhanced-sunset-wide', 0, 20, 0);
       await sample('enhanced-twilight-wide', -6, 20, 0);

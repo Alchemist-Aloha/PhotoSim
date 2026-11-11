@@ -1315,7 +1315,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         sky.moon.direction.z,
       )
       // shortcut: preview-relative lunar radiance, calibrate together with direct moonlight for photometry.
-      ..lunarRadiance = 0.2 * sky.moonIllumination * sky.moonIllumination
+      ..lunarRadiance =
+          0.2 * moonlightScale * sky.moonIllumination * sky.moonIllumination
       ..observerHeight = eye.y
       ..viewSamples = switch (state.renderQuality) {
         RenderQuality.performance => 4,

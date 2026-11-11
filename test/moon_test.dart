@@ -111,7 +111,7 @@ void main() {
 
   test('moonlight varies with phase, elevation and darkness', () {
     final full = moonlightIntensity(sky(1, 90));
-    expect(full, closeTo(0.03, 1e-12));
+    expect(full, closeTo(0.0003, 1e-12));
     expect(moonlightIntensity(sky(0.5, 90)), closeTo(full / 4, 1e-12));
     expect(moonlightIntensity(sky(1, 30)), closeTo(full / 2, 1e-12));
     expect(moonlightIntensity(sky(0, 90)), 0);

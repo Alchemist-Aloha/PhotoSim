@@ -148,8 +148,13 @@ fragment {
     float antiAlias = smoothstep(0.0, 0.002, -dot(incident, up));
     gradient *= material_params.wave_strength * 1.16875 * antiAlias;
     material.normal = normalize(up + tangent * gradient.x + bitangent * gradient.y);
-    material.base_color = vec4(material_params.deep_color, 1.0);
-    material.roughness = material_params.roughness;
+    // Subpixel waves still scatter light; filtering normals must not turn water into a mirror.
+    float wind = Noise2(world.xz * 0.002 + vec2(time * 0.003, -time * 0.002));
+    float unresolved = (1.0 - a1) * material_params.wave_strength;
+    float slope = unresolved * 0.08 * mix(0.75, 1.25, wind);
+    material.base_color = vec4(material_params.deep_color *
+      mix(1.0, mix(0.92, 1.08, wind), clamp(unresolved, 0.0, 1.0)), 1.0);
+    material.roughness = sqrt(material_params.roughness * material_params.roughness + slope * slope);
     material.specular = 0.5;
   }
 
@@ -168,6 +173,13 @@ fragment {
     float width = max(fwidth(angle), material_params.solar_radius * 0.1);
     float disk = (1.0 - smoothstep(material_params.solar_radius - width,
       material_params.solar_radius + width, angle)) * step(0.0, dot(reflection, sun));
+    // Spread unresolved glitter without increasing the reflected solar energy.
+    float spread = max(material.roughness - material_params.roughness, 0.0) * 0.6;
+    float variance = max(spread * spread, material_params.solar_radius * material_params.solar_radius * 0.25);
+    float glitter = exp(-angle * angle / (2.0 * variance)) *
+      material_params.solar_radius * material_params.solar_radius / (2.0 * variance);
+    glitter *= step(0.0, dot(reflection, sun));
+    disk = mix(disk, glitter, smoothstep(0.0, 0.015, spread));
     // Use the disk's absolute extinction, not the red-normalized elevated-cloud tint.
     reflected += material_params.sun_disk_color * disk * 48.0 *
       smoothstep(-0.012, 0.008, sun.y) * (1.0 - clouds.a) * material_params.energy;
@@ -175,7 +187,7 @@ fragment {
     float fresnel = 0.03 + 0.97 * pow(1.0 - cosV, 4.5);
     vec3 horizon = normalize(vec3(incident.x, 0.005, incident.z));
     vec3 haze = SampleRadianceEnv(prefiltered_radiance, horizon, 0.0);
-    vec3 deepWater = material_params.deep_color * material_params.energy + haze * 0.045;
+    vec3 deepWater = material.base_color.rgb * material_params.energy + haze * 0.045;
     vec3 color = mix(deepWater, reflected, clamp(fresnel * 1.08, 0.08, 0.98));
     float seam = exp(-abs(incident.y) * 55.0);
     return vec4(mix(color, haze, seam * 0.7), 1.0);

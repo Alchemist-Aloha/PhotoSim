@@ -9,9 +9,13 @@ import '../core/astronomy.dart';
 import '../core/geo.dart';
 import 'celestial_material.dart';
 
+// Keep moonlit sky, terrain and clouds dark even with enhanced exposure.
+const moonlightScale = 0.01;
+
 /// Approximate appearance, deliberately not calibrated irradiance/exposure.
 double moonlightIntensity(SkyState sky) =>
     0.03 *
+    moonlightScale *
     math.pow(sky.moonIllumination, 2) *
     math.max(0, math.sin(sky.moon.altitude * radians)) *
     (-sky.sun.altitude / 6).clamp(0.0, 1.0);

@@ -12,6 +12,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/render/celestial_material.dart';
 import 'package:photosim/render/atmosphere_sky.dart';
+import 'package:photosim/render/moon.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -210,7 +211,7 @@ void main() {
         final moonless = twilight[-24]!;
         source
           ..moonDirection = atAltitude(20)
-          ..lunarRadiance = 0.2;
+          ..lunarRadiance = 0.2 * moonlightScale;
         world.skyEnvironment!.invalidate();
         await settleLighting();
         final moonlit = skyBrightness(await pixels('moonlit-sky'));

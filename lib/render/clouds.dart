@@ -7,6 +7,7 @@ import '../core/atmosphere.dart';
 import '../core/sunlight.dart';
 import '../models/simulation_state.dart';
 import 'photo_framing.dart';
+import 'moon.dart';
 
 ({double base, double thickness, double scale, double extinction}) cloudLayer(
   CloudType type,
@@ -93,6 +94,7 @@ class CloudRenderer {
     final day = ((sky.sun.altitude + 6) / 11).clamp(0.0, 1.0);
     final moon = sky.moon.direction;
     final moonStrength =
+        moonlightScale *
         sky.moonIllumination *
         sky.moonIllumination *
         math.max(0.0, moon.y) *

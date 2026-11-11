@@ -10,6 +10,7 @@ import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/render/atmosphere_sky.dart';
+import 'package:photosim/render/moon.dart';
 import 'package:photosim/render/clouds.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -90,7 +91,10 @@ void main() {
             state.sky.moon.direction.z,
           )
           ..lunarRadiance =
-              0.2 * state.sky.moonIllumination * state.sky.moonIllumination;
+              0.2 *
+              moonlightScale *
+              state.sky.moonIllumination *
+              state.sky.moonIllumination;
         final forward = state.cameraFrame.forward;
         camera.target = eye + vm.Vector3(forward.x, forward.y, forward.z);
         clouds.update(state, eye, reflectionMaterial: water);
@@ -250,6 +254,8 @@ void main() {
           state = state.copyWith(azimuth: state.sky.sun.azimuth);
           expect(await pixels(sample.$1), isNotEmpty);
         }
+        // Resolve faint moonlight at enhanced mode's maximum exposure.
+        world.exposure = 256;
         state = state.copyWith(
           timestamp: DateTime.utc(2026, 6, 30, 7),
           cloudType: CloudType.stratus,

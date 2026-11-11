@@ -49,22 +49,20 @@ void main() {
         ),
       ),
     );
+    final camera = scene.PerspectiveCamera(
+      position: vm.Vector3(0, 8, 0),
+      target: vm.Vector3(0, 0, -100),
+      fovRadiansY: 0.6,
+      fovNear: 0.5,
+      fovFar: 50000,
+    );
     final capture = GlobalKey();
     try {
       await tester.pumpWidget(
         MaterialApp(
           home: RepaintBoundary(
             key: capture,
-            child: scene.SceneView(
-              world,
-              camera: scene.PerspectiveCamera(
-                position: vm.Vector3(0, 8, 0),
-                target: vm.Vector3(0, 0, -100),
-                fovRadiansY: 0.6,
-                fovNear: 0.5,
-                fovFar: 50000,
-              ),
-            ),
+            child: scene.SceneView(world, camera: camera),
           ),
         ),
       );
@@ -163,6 +161,73 @@ void main() {
         ..setFloat('amount', 0)
         ..setFloat('wave_strength', 0);
       expect(await pixels(0, 'clear-reflection-restored'), orderedEquals(flat));
+      final highSun = vm.Vector3(0, 1, -1).normalized();
+      sky.sunDirection = highSun;
+      final highDisk = sunDiskTransmission(45);
+      water.parameters
+        ..setFloat('wave_strength', 0.8)
+        ..setVec3('sun_direction', highSun)
+        ..setVec3(
+          'sun_disk_color',
+          vm.Vector3(highDisk.red, highDisk.green, highDisk.blue),
+        );
+      for (final altitude in [2000.0, 8000.0]) {
+        sky.observerHeight = altitude;
+        world.skyEnvironment!.invalidate();
+        // Environment re-bakes are time-sliced; wait for every radiance band.
+        await pumpUntilRendered(tester, world, frames: 24);
+        camera
+          ..position = vm.Vector3(0, altitude, 0)
+          ..target = vm.Vector3(0, 0, -altitude);
+        final aerial = await pixels(0, 'aerial-${altitude.round()}');
+        final aerialMoving = await pixels(
+          15,
+          'aerial-${altitude.round()}-moving',
+        );
+        expect(
+          waterDifference(aerial, aerialMoving, start: 0, end: 1),
+          greaterThan(0.02),
+          reason: 'Resolved wind patches must not freeze at high altitude',
+        );
+        water.parameters.setFloat('wave_strength', 0);
+        final aerialCalm = await pixels(0, 'aerial-${altitude.round()}-calm');
+        expect(
+          waterDifference(aerial, aerialCalm, start: 0, end: 1),
+          greaterThan(0.5),
+          reason: 'Unresolved waves must still soften aerial water reflections',
+        );
+        ({int area, double peak}) glint(Uint8List bytes) {
+          final image = img.decodePng(bytes)!;
+          double luminance(int x, int y) {
+            final p = image.getPixel(x, y);
+            return p.r * 0.2126 + p.g * 0.7152 + p.b * 0.0722;
+          }
+
+          final background = luminance(image.width ~/ 4, image.height ~/ 2);
+          var area = 0, peak = 0.0;
+          for (var y = image.height ~/ 4; y < image.height * 0.75; y++) {
+            for (var x = image.width ~/ 4; x < image.width * 0.75; x++) {
+              final value = luminance(x, y);
+              if (value > background + 12) area++;
+              peak = math.max(peak, value);
+            }
+          }
+          return (area: area, peak: peak);
+        }
+
+        final roughGlint = glint(aerial), calmGlint = glint(aerialCalm);
+        expect(
+          roughGlint.area,
+          greaterThan(calmGlint.area * 1.25),
+          reason: 'Subpixel waves must broaden the solar glint, not sharpen it',
+        );
+        expect(
+          roughGlint.peak,
+          lessThan(calmGlint.peak),
+          reason: 'Broader glitter must not make the reflection brighter',
+        );
+        water.parameters.setFloat('wave_strength', 0.8);
+      }
       expect(world.environment, isNotNull);
       expect(tester.takeException(), isNull);
     } finally {
