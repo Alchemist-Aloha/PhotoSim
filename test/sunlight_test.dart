@@ -40,6 +40,32 @@ void main() {
     }
   });
 
+  test('water disk transmission dims at sunset and in haze without normalizing red', () {
+    final noon = sunDiskTransmission(60);
+    final sunset = sunDiskTransmission(0);
+    expect(noon.red, greaterThan(0.9));
+    expect(sunset.red, lessThan(0.15));
+    expect(sunset.green, lessThan(sunset.red));
+    expect(sunset.blue, lessThan(sunset.green));
+    final hazy = sunDiskTransmission(
+      3,
+      optics: SimulationState(aerosolOpticalDepth: 0.8).atmosphereOptics,
+    );
+    expect(hazy.red, lessThan(sunDiskTransmission(3).red / 10));
+    var previous = 0.0;
+    for (final altitude in [-90.0, -1.0, 0.0, 1.0, 3.0, 15.0, 60.0, 90.0]) {
+      final light = sunDiskTransmission(altitude);
+      expect(light.red, greaterThanOrEqualTo(previous));
+      for (final channel in [light.red, light.green, light.blue]) {
+        expect(channel, inInclusiveRange(0, 1));
+      }
+      previous = light.red;
+    }
+    for (final altitude in [double.nan, double.infinity, -91.0, 91.0]) {
+      expect(() => sunDiskTransmission(altitude), throwsArgumentError);
+    }
+  });
+
   test('AA persists independently of quality; legacy plans enable FXAA', () {
     final state = SimulationState();
     expect(state.antialiasing, Antialiasing.fxaa);

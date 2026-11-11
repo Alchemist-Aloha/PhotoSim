@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image/image.dart' as image;
 import 'package:integration_test/integration_test.dart';
+import 'package:photosim/core/sunlight.dart';
 import 'package:photosim/core/terrain_geo.dart';
 import 'package:photosim/data/raster_cache.dart';
 import 'package:photosim/data/water/water_repository.dart';
@@ -152,6 +153,14 @@ void main() {
       expect(material.parameters.getFloat('roughness'), closeTo(0.025, 1e-6));
       expect(material.parameters.getFloat('wave_strength'), closeTo(0.8, 1e-6));
       expect(material.parameters.getFloat('animation_time'), greaterThan(0));
+      final disk = sunDiskTransmission(
+        state.sky.sun.altitude,
+        optics: state.atmosphereOptics,
+      );
+      final reflectedDisk = material.parameters.getVec3('sun_disk_color');
+      expect(reflectedDisk.x, closeTo(disk.red, 1e-6));
+      expect(reflectedDisk.y, closeTo(disk.green, 1e-6));
+      expect(reflectedDisk.z, closeTo(disk.blue, 1e-6));
       expect(
         requests.where(
           (uri) => uri.queryParameters['LAYERS'] == waterProvider.layer,

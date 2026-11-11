@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -8,6 +9,7 @@ import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
+import 'package:photosim/core/sunlight.dart';
 import 'package:photosim/render/atmosphere_sky.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -25,9 +27,11 @@ void main() {
     sky
       ..sunDirection = sun
       ..sunAngularRadius = 0.0047;
+    final disk = sunDiskTransmission(math.asin(sun.y) * 180 / math.pi);
     water.parameters
       ..setVec3('sun_direction', sun)
-      ..setVec3('sun_color', vm.Vector3(1, 0.4, 0.15));
+      ..setVec3('sun_color', vm.Vector3(1, 0.4, 0.15))
+      ..setVec3('sun_disk_color', vm.Vector3(disk.red, disk.green, disk.blue));
     final world = scene.Scene()
       ..skybox = scene.Skybox(sky)
       ..skyEnvironment = scene.SkyEnvironment(sky, faceResolution: 64)
@@ -83,10 +87,15 @@ void main() {
         }
       }
 
-      double waterDifference(Uint8List first, Uint8List second) {
+      double waterDifference(
+        Uint8List first,
+        Uint8List second, {
+        double start = 0.5,
+        double end = 1,
+      }) {
         final a = img.decodePng(first)!, b = img.decodePng(second)!;
         var delta = 0.0, count = 0;
-        for (var y = a.height ~/ 2; y < a.height; y += 4) {
+        for (var y = (a.height * start).round(); y < a.height * end; y += 4) {
           for (var x = 0; x < a.width; x += 4) {
             final p = a.getPixel(x, y), q = b.getPixel(x, y);
             delta += (p.r - q.r).abs() + (p.g - q.g).abs() + (p.b - q.b).abs();
@@ -99,6 +108,28 @@ void main() {
       final initial = await pixels(0, 'sunset');
       final moving = await pixels(15, 'moving');
       expect(waterDifference(initial, moving), greaterThan(1));
+      // This narrow band lies just below the horizon, beyond the old wave fade.
+      expect(
+        waterDifference(initial, moving, start: 0.39, end: 0.44),
+        greaterThan(0.3),
+      );
+      final sunset = img.decodePng(initial)!;
+      double peak(double start, double end) {
+        var value = 0.0;
+        for (
+          var y = (sunset.height * start).round();
+          y < sunset.height * end;
+          y++
+        ) {
+          for (var x = 0; x < sunset.width; x++) {
+            final p = sunset.getPixel(x, y);
+            value = math.max(value, p.r * 0.2126 + p.g * 0.7152 + p.b * 0.0722);
+          }
+        }
+        return value;
+      }
+
+      expect(peak(0.38, 1), lessThan(peak(0, 0.37)));
       expect(await pixels(0, 'restored'), orderedEquals(initial));
       final before = await pixels(99.9, 'before-100s');
       final middle = await pixels(100.0, 'at-100s');

@@ -138,9 +138,17 @@ class CloudRenderer {
         });
     }
     material.parameters.setFloat('scene_far', previewFarDistanceMeters);
-    reflectionMaterial?.parameters.setFloat(
-      'solar_radius',
-      sky.sun.angularRadius,
-    );
+    if (reflectionMaterial != null) {
+      final disk = sunDiskTransmission(
+        sky.sun.altitude,
+        optics: state.atmosphereOptics,
+      );
+      reflectionMaterial.parameters
+        ..setFloat('solar_radius', sky.sun.angularRadius)
+        ..setVec3(
+          'sun_disk_color',
+          vm.Vector3(disk.red, disk.green, disk.blue),
+        );
+    }
   }
 }
