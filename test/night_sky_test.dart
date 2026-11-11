@@ -26,7 +26,10 @@ void main() {
     )!;
     expect(map.width, 4096);
     expect(map.height, 2048);
-    expect(map.getPixel(983, 1354).a, greaterThan(10)); // Galactic center, behind dust.
+    expect(
+      map.getPixel(983, 1354).a,
+      greaterThan(10),
+    ); // Galactic center, behind dust.
     final poleX = ((192.85948 - 180) / 360 * 4096).round();
     final poleY = ((90 - 27.12825) / 180 * 2048).round();
     expect(map.getPixel(poleX, poleY).a, 0); // Galactic north pole.
