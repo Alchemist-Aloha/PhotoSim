@@ -90,7 +90,7 @@ See [Android support](docs/android.md) for tests and device limitations.
 - Collapsible inspector sections for optics, position/orientation, depth of field, weather and composition guides.
 - **Settings** page (app-bar gear) for rendering quality, antialiasing, relighting/camera light, constellation guides and disk cache.
 - Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
-- [Procedural volumetric clouds](docs/clouds.md): five cloud types, amount and randomization controls, 256 km cloud range with distance-based quality, warm twilight and dark moonlit shading. Type/amount/seed survive save and restart.
+- [Layered procedural clouds](docs/clouds.md): two wind-driven decks with five cloud types, amount and randomization controls, 256 km range with distance-based quality, warm twilight and dark moonlit shading. Type/amount/seed survive save and restart, and water reflects the same moving clouds.
 - Persistent terrain/imagery disk caching with one adjustable size limit under **Settings → Storage** (512 MiB default), LRU eviction, corruption recovery and source metadata.
 - Drag the 3D preview to look around, with finer aiming when zoomed in; use the focal-length slider in whole millimeters or type an exact 8–600 mm value and apply it.
 - Enter decimal-degree latitude/longitude under **Position & orientation** for precise, keyboard-accessible placement. Map placement, marker drags and coordinate edits offer a one-step **Undo** for 10 seconds; undo preserves other lens/time settings.

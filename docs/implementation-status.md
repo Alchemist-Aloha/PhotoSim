@@ -104,10 +104,10 @@ requirements separately from excluded platform work.
   The atmosphere Linux GPU regression verifies nine 1024px textures, quality
   transitions, supersampling and changed pixels with GTAO disabled. Android
   GPU/performance validation of these additions remains outstanding.
-- Manual illustrative Clear/Cloudy/Fog/Rain, with [procedural volumetric clouds](clouds.md),
+- Manual illustrative Clear/Cloudy/Fog/Rain, with [layered procedural clouds](clouds.md),
   fog, attenuation and clipped animated rain; 3D weather controls make no forecast requests.
   Five cloud types, amount and saved random seed; 256 km cloud range, distance-based
-  quality, twilight coloring and dim phase-dependent night lighting.
+  quality, twilight coloring, dim phase-dependent night lighting and wind drift.
   Collapsible inspector sections expose preset, visibility, light transmission
   and rain intensity with reset and saved-plan compatibility. Native tests verify
   the parameter uniforms, rain density and no geographic resource reloads.

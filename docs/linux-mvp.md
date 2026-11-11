@@ -64,7 +64,7 @@ fetch new data. Viewport/screen-error terrain and imagery refinement remains fut
 
 **Weather**: Clear, Cloudy, Fog, Rain. These are deterministic, illustrative manual
 presets, not forecasts or observations. The Weather panel also selects five
-[procedural volumetric cloud types](clouds.md), amount and a randomized pattern.
+[layered procedural cloud types](clouds.md), amount and a randomized pattern.
 Fog and rain reduce visibility; cloud density controls sky occlusion and presets
 attenuate light. Rain includes animated,
 screen-space streaks clipped to the photograph. No weather service, account,

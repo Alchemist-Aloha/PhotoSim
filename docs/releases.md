@@ -1,5 +1,9 @@
 # Builds and GitHub releases
 
+Curated user-facing notes for the current version are in
+[release notes](release-notes.md); the workflow also attaches GitHub's generated
+commit notes.
+
 `.github/workflows/build.yml` checks pushes to `main`/`master`, pull requests,
 `v*` tags, published GitHub releases, and manual runs. It pins Flutter 3.47.6,
 checks formatting/analysis/tests, builds Linux, Windows and Android and retains workflow

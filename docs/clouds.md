@@ -14,22 +14,22 @@ No cloud control triggers geographic downloads.
 
 ## Rendering
 
-`assets/atmosphere/clouds.fmat` ray-marches a spherical cloud layer to **256 km**,
-independently of terrain's 2–100 km render range. Earth curvature determines layer
-intersections and which cloud heights still receive sunlight. Opaque scene depth
-stops clouds at terrain; the sky's empty far-plane depth is not treated as terrain.
-Cloud compositing occurs after the Moon, stars and Milky Way, with their proxy
-meshes excluded from the opaque-depth limit.
+`assets/atmosphere/clouds.fmat` renders two procedural decks on curved layers out
+to **256 km**, independently of terrain's 2–100 km render range. Earth curvature
+determines layer intersections and which cloud heights still receive sunlight.
+Opaque scene depth stops clouds at terrain; the sky's empty far-plane depth is not
+treated as terrain. Cloud compositing occurs after the Moon, stars and Milky Way,
+with their proxy meshes excluded from the opaque-depth limit.
 
-Each type has its own height, thickness, density and shape profile. A bundled,
-tileable 64³ fBM/Worley noise volume supplies coherent structure and erosion.
-Regenerate it with `python3 tool/build_cloud_noise.py` (NumPy and Pillow are
-**development-only** requirements). No noise library or runtime download is added.
+Each type has its own height, thickness and form. Sums of 2D cubic value noise
+supply structure; nothing is sampled from a repeating 3D volume. Low and high
+decks drift at different speeds and are projected with the reference renderer's
+soft horizon projection. Five fBM octaves are evaluated per deck at High quality,
+four at Balanced and three at Performance.
 
-Performance/Balanced/High use at most 24/48/64 near-view steps. Distant layers
-reduce the count toward 35% (minimum eight); quadratic spacing favors nearby
-samples. Fine erosion and extra density/self-shadow samples fade out over
-12–48 km. Far clouds retain coarse structure and atmospheric haze.
+`assets/atmosphere/water.fmat` contains the same cloud block so reflections match
+the sky. Keep the two copies identical; `test/cloud_shader_test.dart` compares
+them.
 
 Sunrise/sunset shading includes elevated cloud illumination, warm lit regions,
 cool violet shade and distance haze. Daylight cloud fill fades out by −6° solar
@@ -40,9 +40,10 @@ show almost black silhouettes. Long-exposure/manual settings can brighten them.
 ## Limits and checks
 
 This is illustrative rendering, **not a forecast, measured cloud field or
-calibrated cloud photometry**. Cloud placement is static, with no wind or weather
-evolution. Terrain lighting uses average cloud attenuation, not spatial cloud
-shadow maps. The baked sky environment does not include the cloud geometry.
+calibrated cloud photometry**. Clouds drift with a fixed wind, but there is no
+weather evolution or forecast. Terrain lighting uses average cloud attenuation,
+not spatial cloud shadow maps. The baked sky environment does not include the
+clouds; water reflects them procedurally.
 There is no water-content simulation, precipitation physics or exact multiple
 scattering. Noise and finite view/light sampling limit close-up detail.
 
