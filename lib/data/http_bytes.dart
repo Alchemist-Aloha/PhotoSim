@@ -161,11 +161,18 @@ Future<Uint8List> downloadBytes(
           throw const FormatException('Raster response exceeds size limit');
         }
         final builder = BytesBuilder(copy: false);
-        await for (final chunk in response.stream) {
-          if (builder.length + chunk.length > maxBytes) {
-            throw const FormatException('Raster response exceeds size limit');
+        final chunks = StreamIterator(response.stream);
+        final stopped = stop.future.then((_) => false);
+        try {
+          while (await Future.any([chunks.moveNext(), stopped])) {
+            final chunk = chunks.current;
+            if (builder.length + chunk.length > maxBytes) {
+              throw const FormatException('Raster response exceeds size limit');
+            }
+            builder.add(chunk);
           }
-          builder.add(chunk);
+        } finally {
+          await chunks.cancel();
         }
         if (stop.isCompleted) throw http.RequestAbortedException(uri);
         host.failures = 0;

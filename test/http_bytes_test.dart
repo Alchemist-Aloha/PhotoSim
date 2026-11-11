@@ -41,6 +41,57 @@ void main() {
     );
   });
 
+  for (final cancel in [false, true]) {
+    test(
+      'stalled response bodies ${cancel ? 'cancel' : 'expire'} and release request slots',
+      () async {
+        final bodies = <StreamController<List<int>>>[];
+        final started = Completer<void>();
+        var calls = 0, cancelled = 0;
+        final client = MockClient.streaming((_, _) async {
+          if (++calls > 3) return http.StreamedResponse(Stream.value([1]), 200);
+          final body = StreamController<List<int>>(onCancel: () => cancelled++);
+          bodies.add(body);
+          addTearDown(body.close);
+          body.add([1]);
+          if (bodies.length == 3) started.complete();
+          return http.StreamedResponse(body.stream, 200);
+        });
+        addTearDown(client.close);
+        final stop = Completer<void>();
+        final rejected = [
+          for (var i = 0; i < 3; i++)
+            expectLater(
+              fetch(
+                client,
+                abort: stop.future,
+                timeout: cancel
+                    ? const Duration(seconds: 20)
+                    : const Duration(milliseconds: 50),
+              ).timeout(const Duration(seconds: 1)),
+              throwsA(isA<http.RequestAbortedException>()),
+            ),
+        ];
+        await started.future;
+        if (cancel) stop.complete();
+        await Future.wait(rejected);
+        expect(cancelled, 3);
+        expect(
+          await Future.wait([
+            for (var i = 0; i < 3; i++)
+              fetch(client).timeout(const Duration(seconds: 1)),
+          ]),
+          [
+            [1],
+            [1],
+            [1],
+          ],
+        );
+        expect(calls, 6);
+      },
+    );
+  }
+
   test('header failures propagate and release their request slots', () async {
     final failure = http.ClientException('Connection failed', uri);
     var calls = 0;
