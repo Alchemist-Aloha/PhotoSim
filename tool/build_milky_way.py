@@ -1,63 +1,26 @@
-"""Regenerate assets/sky/milky_way.png. Development only: Python 3, NumPy, Pillow.
+"""Regenerate assets/sky/milky_way.png. Development only: Python 3, NumPy, Pillow, OpenEXR.
 
-Source: ESO/S. Brunier all-sky panorama (CC BY 4.0), a plate carree in galactic
-coordinates centred on l=0 with l increasing to the left. Bright stars are drawn
-separately from the catalog, so they are removed here; the diffuse glow, dust
-lanes and faint unresolved stars remain. Output is the RA/Dec grid the sphere
-mesh uses: u spans RA -180..180, v spans Dec +90..-90.
+Source: NASA/Goddard SVS Deep Star Maps 2020 Milky Way layer (built from Gaia DR2,
+ESA/Gaia/DPAC), a linear half-float plate carree in J2000 RA/Dec centred on 0h
+with RA increasing to the left. Hipparcos/Tycho stars are already omitted, so the
+catalog stars drawn separately are not doubled. Output is the RA/Dec grid the
+sphere mesh uses: u spans RA -180..180, v spans Dec +90..-90.
 """
 import hashlib
-import io
 import json
+import sys
+import tempfile
 from pathlib import Path
 from urllib.request import urlopen
 
 import numpy as np
-from PIL import Image, ImageFilter
+import OpenEXR
+from PIL import Image
 
-SOURCE = "https://cdn.eso.org/images/large/eso0932a.jpg"
-SHA256 = "60400c92c54b7c1bd12299c69e83b16e5b6256e7dabacc478c021758ecd28179"
+SOURCE = "https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/milkyway_2020_4k.exr"
+SHA256 = "2eb802d6e68d170b410f766c7fec07f7518619f6b6708fdc81e9302d93e74fdb"
 OUT = Path(__file__).resolve().parents[1] / "assets/sky"
-WIDTH, HEIGHT = 2048, 1024
-CONTRAST, DESATURATE = 1.6, 0.35
-# J2000 equatorial -> galactic rotation (Hipparcos, ESA 1997, vol. 1 sec. 1.5.3).
-EQ_TO_GAL = np.array([
-    [-0.0548755604, -0.8734370902, -0.4838350155],
-    [+0.4941094279, -0.4448296300, +0.7469822445],
-    [-0.8676661490, -0.1980763734, +0.4559837762],
-])
-
-
-def remove_stars(image):
-    # Grey opening (min then max) at twice the output resolution removes features
-    # under ~0.45°, i.e. point stars, but keeps the extended glow and dark lanes;
-    # the box downsample then hides the square structuring element.
-    opened = image.filter(ImageFilter.MinFilter(5)).filter(ImageFilter.MaxFilter(5))
-    return opened.filter(ImageFilter.GaussianBlur(1.0)).resize((WIDTH, HEIGHT), Image.Resampling.BOX)
-
-
-def galactic_grid(width, height):
-    ra = np.radians(-180 + (np.arange(width) + 0.5) / width * 360)
-    dec = np.radians(90 - (np.arange(height) + 0.5) / height * 180)
-    ra, dec = np.meshgrid(ra, dec)
-    eq = np.stack((np.cos(dec) * np.cos(ra), np.cos(dec) * np.sin(ra), np.sin(dec)), axis=-1)
-    gal = eq @ EQ_TO_GAL.T
-    lon = np.degrees(np.arctan2(gal[..., 1], gal[..., 0]))
-    lat = np.degrees(np.arcsin(np.clip(gal[..., 2], -1, 1)))
-    return lon, lat
-
-
-def sample(source, lon, lat):
-    h, w = source.shape[:2]
-    x = (0.5 - lon / 360) * w - 0.5
-    y = (90 - lat) / 180 * h - 0.5
-    x0 = np.floor(x).astype(int)
-    y0 = np.clip(np.floor(y).astype(int), 0, h - 2)
-    fx, fy = (x - x0)[..., None], np.clip(y - y0, 0, 1)[..., None]
-    x0, x1 = x0 % w, (x0 + 1) % w
-    top = source[y0, x0] * (1 - fx) + source[y0, x1] * fx
-    bottom = source[y0 + 1, x0] * (1 - fx) + source[y0 + 1, x1] * fx
-    return top * (1 - fy) + bottom * fy
+WIDTH, HEIGHT = 4096, 2048
 
 
 def blur(values, sigma):
@@ -69,57 +32,68 @@ def blur(values, sigma):
     return sum(k * padded[taps[-1] + t:taps[-1] + t + values.shape[0]] for k, t in zip(kernel, taps))
 
 
-def build(panorama):
-    starless = remove_stars(panorama.convert("RGB").resize((WIDTH * 2, HEIGHT * 2), Image.Resampling.BOX))
-    display = np.asarray(starless, dtype=np.float64) / 255
-    lon, lat = galactic_grid(*starless.size)
-    # Subtract the photograph's sky background, measured near the galactic poles.
-    pole_rows = np.r_[0:HEIGHT // 12, HEIGHT - HEIGHT // 12:HEIGHT]
-    display = np.maximum(display - np.median(display[pole_rows].reshape(-1, 3), axis=0), 0)
-    radiance = sample(display, lon, lat)
+def build(radiance):
+    # Source RA increases to the left from +180 at x=0; the mesh wants -180 at u=0.
+    radiance = np.maximum(radiance[:, ::-1].astype(np.float64), 0)
+    assert radiance.shape == (HEIGHT, WIDTH, 3), radiance.shape
     luminance = radiance @ [0.2126, 0.7152, 0.0722]
-    # The panorama is already stretched; a full sRGB decode crushes the faint
-    # unresolved-star glow into blotches. A milder power keeps the band continuous
-    # while the core and dust lanes keep their contrast.
-    level = np.clip(luminance / np.percentile(luminance, 99.9), 0, 1)
-    # Low-signal outskirts are grainy after star removal: smooth them, keep the band sharp.
-    smooth = blur(level, 3.0)
-    blend = np.clip((level - 0.05) / 0.25, 0, 1)
-    level = smooth + (level - smooth) * blend * blend * (3 - 2 * blend)
-    # Power for core/lane contrast plus a linear toe so the faint halo fades gradually.
-    alpha = (level ** CONTRAST + 0.3 * level) / 1.3
-    # Unresolved disk stars give a broad halo that background subtraction removed.
-    alpha = np.clip(alpha + 0.3 * blur(alpha, 12.0), 0, 1)
-    # Wide soft knee on the smoothed glow: the band fades out, with no contour.
-    knee = np.clip((blur(alpha, 4.0) - 0.5 / 255) / (24 / 255), 0, 1)
-    alpha *= knee * knee * (3 - 2 * knee)
-    chroma = radiance / np.maximum(radiance.max(axis=-1, keepdims=True), 1e-9)
-    # Faint pixels' colour is mostly noise, and the eye sees the band near-neutral.
-    chroma = chroma * (1 - DESATURATE) + (chroma @ [0.2126, 0.7152, 0.0722])[..., None] * DESATURATE
+    # Integrated starlight off the band is fainter than natural airglow and reads as
+    # haze across the whole frame; subtract it so the band stands out like a photo.
+    floor, peak = np.percentile(luminance, [70, 99.9])
+    # Fade in over 4x above the floor (log-smoothstep), so the band ends softly on the
+    # black night sky; the ^0.75 body matches the stretch a night photo gets.
+    fade = np.clip(np.log(np.maximum(luminance, 1e-12) / floor) / np.log(4), 0, 1)
+    alpha = np.clip(luminance / peak, 0, 1) ** 0.75 * fade * fade * (3 - 2 * fade)
+    # Faint Gaia stars leave shot-noise grain in the halo (and bloat the PNG): smooth
+    # the low-signal outskirts, keep the band and its dust lanes sharp.
+    smooth = blur(alpha, 3.0)
+    blend = np.clip((alpha - 0.15) / 0.25, 0, 1)
+    alpha = smooth + (alpha - smooth) * blend * blend * (3 - 2 * blend)
+    # A broad skirt, as scattered light gives a photo, so the tone curve's toe does not
+    # crush the fade into an edge.
+    alpha = np.rint(np.clip(alpha + 0.3 * blur(alpha, 12.0), 0, 1) * 255) / 255
+    # Colour varies slowly; per-pixel chroma is noise the eye cannot resolve.
+    chroma = np.dstack([blur(radiance[..., i], 4.0) for i in range(3)])
     chroma /= np.maximum(chroma.max(axis=-1, keepdims=True), 1e-9)
-    rgba = np.dstack((chroma, alpha))
-    return Image.fromarray(np.rint(rgba * 255).astype(np.uint8), "RGBA"), (lon, lat, alpha)
+    # The faint fringe's colour is halo noise (it reads green); fade it to neutral.
+    grey = np.clip(alpha / 0.15, 0, 1)[..., None]
+    chroma = 1 - grey + chroma * grey
+    # Source colour is linear sRGB with a D65 white, so the in-app white balance
+    # setting (6500 K = neutral) shifts it like a camera. The unlit shader decodes
+    # texture RGB as sRGB; encode it or the warm core over-saturates.
+    chroma = np.where(chroma <= 0.0031308, 12.92 * chroma, 1.055 * chroma ** (1 / 2.4) - 0.055)
+    rgba = np.dstack((chroma * (alpha > 0)[..., None], alpha))
+    return Image.fromarray(np.rint(rgba * 255).astype(np.uint8), "RGBA"), alpha
+
+
+def pixel(ra, dec):
+    return int((90 - dec) / 180 * HEIGHT), int(((ra + 180) % 360) / 360 * WIDTH)
 
 
 if __name__ == "__main__":
-    with urlopen(SOURCE, timeout=120) as response:
-        data = response.read(16 * 1024 * 1024 + 1)
-    assert hashlib.sha256(data).hexdigest() == SHA256, "Unexpected panorama"
-    image, (lon, lat, alpha) = build(Image.open(io.BytesIO(data)))
-    # The galactic centre is lit and the north galactic pole is dark.
-    centre = np.unravel_index(np.argmin(lon ** 2 + lat ** 2), lon.shape)
-    pole = np.unravel_index(np.argmax(lat), lat.shape)
-    assert alpha[centre] > 0.1 and alpha[pole] == 0
+    # Optional argument: an already-downloaded copy of SOURCE.
+    if len(sys.argv) > 1:
+        data = Path(sys.argv[1]).read_bytes()
+    else:
+        with urlopen(SOURCE, timeout=300) as response:
+            data = response.read(64 * 1024 * 1024 + 1)
+    assert hashlib.sha256(data).hexdigest() == SHA256, "Unexpected Milky Way map"
+    with tempfile.NamedTemporaryFile(suffix=".exr") as exr:
+        exr.write(data)
+        exr.flush()
+        with OpenEXR.File(exr.name) as file:
+            image, alpha = build(file.channels()["RGB"].pixels)
+    # Sgr A* is lit (dimly: it sits behind dust) and the north galactic pole is dark.
+    assert alpha[pixel(266.4168 - 360, -29.0078)] > 0.04 and alpha[pixel(192.8595 - 360, 27.1283)] == 0
     image.save(OUT / "milky_way.png", optimize=True)
     provenance = json.loads((OUT / "provenance.json").read_text())
     provenance.update({
         "milkyWaySource": SOURCE,
         "milkyWaySha256": SHA256,
-        "milkyWay": "ESO/S. Brunier all-sky panorama (CC BY 4.0), "
-                    "https://www.eso.org/public/images/eso0932a/",
-        "milkyWayChanges": "Downsampled, point stars removed by grey opening, sky "
-                           "background subtracted, reprojected from galactic to J2000 "
-                           "RA/Dec; alpha is (luminance^1.6 + 0.3 luminance) / 1.3, RGB is 35%-desaturated chromaticity",
+        "milkyWay": "NASA/Goddard Space Flight Center Scientific Visualization Studio, "
+                    "Deep Star Maps 2020 (Gaia DR2: ESA/Gaia/DPAC), https://svs.gsfc.nasa.gov/4851",
+        "milkyWayChanges": "Mirrored to RA -180..180, 70th-percentile floor faded in over 4x; alpha is "
+                           "luminance^0.75 normalised to the 99.9th percentile, RGB is smoothed source chromaticity, sRGB-encoded",
     })
     (OUT / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     print(f"Wrote {OUT / 'milky_way.png'}: {WIDTH}x{HEIGHT}")

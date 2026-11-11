@@ -6,20 +6,21 @@ The app bundles **5,044 XHIP stars through visual magnitude 6**, from
 [D3-Celestial](https://github.com/ofrohn/d3-celestial). Star source: Anderson &
 Francis (2012), XHIP, VizieR V/137D. D3-Celestial redistribution uses
 **BSD-3-Clause**, copyright Olaf Frohn (2015). The Milky Way is derived from the
-[ESO/S. Brunier all-sky panorama](https://www.eso.org/public/images/eso0932a/),
-**CC BY 4.0**.
+[NASA/Goddard SVS Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851) Milky Way
+layer (credit NASA/Goddard Space Flight Center Scientific Visualization Studio;
+Gaia DR2: ESA/Gaia/DPAC).
 The full notice is bundled in `assets/sky/LICENSE.txt`, registered with Flutter's
 license registry, and accessible from the 3D sources dialog.
 
 `assets/sky/provenance.json` records pinned upstream commit
 `7e720a3de062059d4c5400a379146a601d9010e0`, exact source URLs and SHA-256 digests.
 `tool/build_sky_assets.py` reproduces the compact star rows and
-`tool/build_milky_way.py` the 2048×1024 RGBA Milky Way map (development-only
-Python 3/NumPy/Pillow; no new app dependency). The panorama is downsampled,
-point stars are removed by grey opening (the catalog draws them), the sky
-background is subtracted and the galactic plate carrée is reprojected to J2000
-RA/Dec. Alpha is linear luminance from a stretched photograph, so the dust lanes
-and bulge are real but brightness is **not a radiometric measurement**. No
+`tool/build_milky_way.py` the 4096×2048 RGBA Milky Way map (development-only
+Python 3/NumPy/Pillow/OpenEXR; no new app dependency). The source is a linear
+J2000 RA/Dec plate carrée rendered from Gaia DR2 with Hipparcos/Tycho stars
+omitted (the catalog draws them). Alpha is luminance^0.75, faded in above a 70th-percentile
+halo floor with smoothed outskirts, so the dust lanes and bulge follow measured star
+light but brightness is **not a radiometric measurement**. No
 network access is used for sky calculations or asset loading.
 
 ## Constellation names and highlights

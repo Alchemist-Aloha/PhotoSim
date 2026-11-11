@@ -142,7 +142,7 @@ void main() {
           'note': 'Nominal illustrative layer, not measured meteorology.',
         },
         'weather_note': 'Manually specified clear sky, 0% cloud amount, no rain, 500 km visibility control and 100% light transmission. Not historical weather or a forecast.',
-        'limitations': 'Terrain and imagery resolution, captured imagery lighting, approximate exposure and atmospheric scattering. Milky Way uses a reprojected, star-removed ESO panorama and 5,044 bundled stars, not calibrated astrophotography; no star tracking or long-exposure trail simulation. AI enhancement may invent detail.',
+        'limitations': 'Terrain and imagery resolution, captured imagery lighting, approximate exposure and atmospheric scattering. Milky Way uses the NASA SVS Gaia Milky Way map and 5,044 bundled stars, not calibrated astrophotography; no star tracking or long-exposure trail simulation. AI enhancement may invent detail.',
       };
       await File('${output.path}/metadata.json').writeAsString(
         '${const JsonEncoder.withIndent('  ').convert(metadata)}\n',

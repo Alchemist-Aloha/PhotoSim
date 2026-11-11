@@ -938,7 +938,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           if (waterNodes.values.any((nodes) => nodes.isNotEmpty))
             waterAttribution,
           'Sky catalog: D3-Celestial / XHIP · BSD-3-Clause',
-          'Milky Way: ESO/S. Brunier · CC BY 4.0',
+          'Milky Way: NASA/GSFC SVS · Gaia DR2: ESA/Gaia/DPAC',
         }.join(' · ');
         final width = (region.width * ratio).round();
         final height = (region.height * ratio).round();
@@ -1153,7 +1153,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'Sun/Moon readouts omit atmospheric refraction. The Moon uses NASA SVS/LRO surface color with approximate pole orientation, no libration or crater relief; '
             'moonlight brightness is an artistic approximation, not calibrated exposure. '
             'Stars: XHIP (Anderson & Francis, 2012), via D3-Celestial (Olaf Frohn, BSD-3-Clause). '
-            'Milky Way: ESO/S. Brunier panorama (CC BY 4.0), reprojected with stars removed. Constellation names and illustrative connecting figures '
+            'Milky Way: NASA/Goddard SVS Deep Star Maps 2020 (Gaia DR2: ESA/Gaia/DPAC). Constellation names and illustrative connecting figures '
             'also come from D3-Celestial; figures are not official IAU boundaries. Night-sky brightness and star sizes are artistic.\n\n'
             'Mapterhorn upstream source credits and license references:\n\n$terrainCredits',
           ),
@@ -1354,13 +1354,18 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       ..faceResolution = faceResolution
       ..equirectWidth = faceResolution * 4;
     final moon = sky.moon.direction;
-    // The one shadow-casting light follows the Moon once the Sun is below horizontal.
+    // The one shadow-casting light follows the Moon once the Sun is below horizontal;
+    // after moonset it carries only the skyglow, from overhead like the whole sky.
     active.directionalLight!
       ..direction = sun.altitude > 0
           ? -sunDirection
-          : -vm.Vector3(moon.x, moon.y, moon.z)
+          : moon.y > 0
+          ? -vm.Vector3(moon.x, moon.y, moon.z)
+          : vm.Vector3(0, -1, 0)
       ..intensity =
-          (sun.altitude > 0 ? solarLight.intensity : moonlightIntensity(sky)) *
+          (sun.altitude > 0
+              ? solarLight.intensity
+              : moonlightIntensity(sky) + skyglowIntensity(sky)) *
           transmission
       ..color = sun.altitude > 0
           ? vm.Vector3(solarLight.red, solarLight.green, solarLight.blue)

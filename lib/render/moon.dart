@@ -20,6 +20,11 @@ double moonlightIntensity(SkyState sky) =>
     math.max(0, math.sin(sky.moon.altitude * radians)) *
     (-sky.sun.altitude / 6).clamp(0.0, 1.0);
 
+/// Starlight and airglow from the whole sky once twilight ends; artistic, so a
+/// moonless foreground keeps a faint shape instead of rendering pure black.
+double skyglowIntensity(SkyState sky) =>
+    0.6 * moonlightScale * ((-sky.sun.altitude - 6) / 12).clamp(0.0, 1.0);
+
 Float32List moonColors(Float32List normals, Vector3 lightDirection) {
   final colors = Float32List(normals.length ~/ 3 * 4);
   moonColorsInto(normals, lightDirection, colors);

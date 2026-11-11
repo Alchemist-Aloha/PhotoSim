@@ -277,7 +277,7 @@ class NightSkyRenderer {
   }
 
   static const starDistance = 40000.0, bandDistance = 45000.0;
-  static const milkyWayRadiance = 0.0025;
+  static const milkyWayRadiance = 0.002;
   static const planetDistance = 39500.0;
   late final scene.Node root, starNode, bandNode, marker;
   late final scene.MeshGeometry starGeometry;
@@ -341,7 +341,7 @@ class NightSkyRenderer {
     bandNode.visible = band > 0.001;
     starMaterial.baseColorFactor = vm.Vector4(stars, stars, stars, 1);
     // The texture's alpha uses its full 8-bit range for detail; this scale keeps the
-    // brightest core (alpha 1) near 0.65 at the mode's dark-sky auto-exposure ceiling
+    // brightest core (alpha 1) near 0.5 at the mode's dark-sky auto-exposure ceiling
     // instead of clipping the whole band to white (Auto stops 4 EV short of Enhanced).
     final ceiling = state.exposureMode == ExposureMode.manual
         ? 256.0

@@ -130,7 +130,10 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 1));
     expect(world.postProcess.colorGrading.enabled, isTrue);
-    expect(world.postProcess.colorGrading.temperature, greaterThan(0));
+    // 9000 K corrects for cool light: warmer red, weaker blue.
+    final gain = world.postProcess.colorGrading.gain;
+    expect(gain.x, greaterThan(1));
+    expect(gain.z, lessThan(1));
     final camera =
         tester.widget<scene.SceneView>(find.byType(scene.SceneView)).camera!
             as scene.PerspectiveCamera;

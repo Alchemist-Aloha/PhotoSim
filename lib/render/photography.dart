@@ -78,10 +78,13 @@ void configurePhotography(
     // Hold between lighting changes; the workspace re-meters unfilled frames after time/weather edits.
     ..speedUp = state.relitImagery && state.cameraLightStrength > 0 ? 0 : 3
     ..speedDown = state.relitImagery && state.cameraLightStrength > 0 ? 0 : 1;
+  // Per-channel gains like a camera's white balance; colorGrading.temperature is
+  // only a ±20% red/blue tilt, far weaker than a real Kelvin change.
+  final balance = whiteBalanceGain(state.whiteBalance);
   world.postProcess.colorGrading
     ..enabled = state.whiteBalance != 6500
-    // shortcut: approximate color-temperature correction, use calibrated chromatic adaptation for colorimetry.
-    ..temperature = ((state.whiteBalance - 6500) / 6500).clamp(-1.0, 1.0);
+    ..temperature = 0
+    ..gain = vm.Vector3(balance.red, balance.green, balance.blue);
   final quality = state.renderQuality;
   world.renderScale = switch (quality) {
     RenderQuality.performance => 0.7,

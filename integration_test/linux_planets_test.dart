@@ -110,10 +110,14 @@ void main() {
       expect(node.position.length, closeTo(39500, 1));
       expect(node.scale.x, greaterThan(0));
     }
-    expect(
-      sky.children.singleWhere((child) => child.name == 'Planet names').visible,
-      isTrue,
-    );
+    // Planet names belong to the constellation guide, default off.
+    bool namesVisible() => sky.children
+        .singleWhere((child) => child.name == 'Planet names')
+        .visible;
+    expect(namesVisible(), isFalse);
+    change(inspector().state.copyWith(showConstellations: true));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(namesVisible(), isTrue);
     expect(
       sky.children.singleWhere((child) => child.name == 'Stars').visible,
       isTrue,

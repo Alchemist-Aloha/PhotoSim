@@ -11,12 +11,12 @@ COMMIT = "7e720a3de062059d4c5400a379146a601d9010e0"
 BASE = f"https://raw.githubusercontent.com/ofrohn/d3-celestial/{COMMIT}/"
 OUT = Path(__file__).resolve().parents[1] / "assets/sky"
 OUT.mkdir(parents=True, exist_ok=True)
-ESO_NOTICE = b"""
-milky_way.png is derived from "The Milky Way panorama" (eso0932a),
-credit ESO/S. Brunier, licensed CC BY 4.0:
-https://creativecommons.org/licenses/by/4.0/ and
-https://www.eso.org/public/images/eso0932a/
-Changes: downsampled, stars removed, background subtracted, reprojected.
+MILKY_WAY_NOTICE = b"""
+milky_way.png is derived from the Deep Star Maps 2020 Milky Way layer.
+Credit: NASA/Goddard Space Flight Center Scientific Visualization Studio.
+Gaia DR2: ESA/Gaia/DPAC. https://svs.gsfc.nasa.gov/4851 (NASA media guidelines:
+https://www.nasa.gov/multimedia/guidelines/index.html)
+Changes: tone-mapped to 8-bit alpha, colour smoothed, mirrored to the app's RA grid.
 """
 
 
@@ -46,7 +46,7 @@ constellations = [[n["properties"]["name"], *n["geometry"]["coordinates"],
                    line["geometry"]["coordinates"]] for n, line in zip(names, lines)]
 assert len({n["id"] for n in names}) == 88
 (OUT / "constellations.json").write_text(json.dumps(constellations, separators=(",", ":")) + "\n")
-(OUT / "LICENSE.txt").write_bytes(download("LICENSE") + ESO_NOTICE)
+(OUT / "LICENSE.txt").write_bytes(download("LICENSE") + MILKY_WAY_NOTICE)
 # The Milky Way raster and its provenance keys come from build_milky_way.py.
 previous = json.loads((OUT / "provenance.json").read_text())
 milky_way = {k: v for k, v in previous.items() if k.startswith("milkyWay")}
@@ -62,6 +62,6 @@ milky_way = {k: v for k, v in previous.items() if k.startswith("milkyWay")}
     "epoch": "J2000.0",
     "stars": "XHIP (Anderson & Francis, 2012), via D3-Celestial",
     "changes": "Compact star and constellation rows",
-    "license": "D3-Celestial BSD-3-Clause; Milky Way ESO CC BY 4.0; see LICENSE.txt",
+    "license": "D3-Celestial BSD-3-Clause; Milky Way NASA SVS / ESA Gaia credit; see LICENSE.txt",
 }}, indent=2) + "\n")
 print(f"Bundled {len(rows)} stars")

@@ -24,15 +24,15 @@ void main() {
     final map = img.decodePng(
       File('assets/sky/milky_way.png').readAsBytesSync(),
     )!;
-    expect(map.width, 2048);
-    expect(map.height, 1024);
-    expect(map.getPixel(490, 676).a, greaterThan(25)); // Galactic center.
-    final poleX = ((192.85948 - 180) / 360 * 2048).round();
-    final poleY = ((90 - 27.12825) / 180 * 1024).round();
+    expect(map.width, 4096);
+    expect(map.height, 2048);
+    expect(map.getPixel(983, 1354).a, greaterThan(10)); // Galactic center, behind dust.
+    final poleX = ((192.85948 - 180) / 360 * 4096).round();
+    final poleY = ((90 - 27.12825) / 180 * 2048).round();
     expect(map.getPixel(poleX, poleY).a, 0); // Galactic north pole.
     expect(
       File('assets/sky/LICENSE.txt').readAsStringSync(),
-      allOf(contains('Olaf Frohn'), contains('ESO/S. Brunier')),
+      allOf(contains('Olaf Frohn'), contains('NASA/Goddard')),
     );
   });
 

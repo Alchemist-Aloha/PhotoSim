@@ -225,4 +225,18 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test('white balance gains follow the Planckian locus, neutral at 6500 K', () {
+    final neutral = whiteBalanceGain(6500);
+    expect(neutral.red, closeTo(1, 1e-9));
+    expect(neutral.blue, closeTo(1, 1e-9));
+    // A 3822 K setting cancels warm light: about 0.66 red and 1.97 blue.
+    final tungsten = whiteBalanceGain(3822);
+    expect(tungsten.green, 1);
+    expect(tungsten.red, closeTo(0.662, 0.005));
+    expect(tungsten.blue, closeTo(1.97, 0.02));
+    final shade = whiteBalanceGain(9000);
+    expect(shade.red, greaterThan(1));
+    expect(shade.blue, lessThan(1));
+  });
 }
