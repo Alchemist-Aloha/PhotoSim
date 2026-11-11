@@ -21,6 +21,9 @@ void main() {
   testWidgets(
     'slow imagery cannot block meshes; storage settings trim without rebuilding',
     (tester) async {
+      // Profile mode needs a registered client for synthetic text input.
+      tester.testTextInput.register();
+      addTearDown(tester.testTextInput.unregister);
       final directory = await Directory.systemTemp.createTemp(
         'photosim-loading-',
       );
@@ -219,6 +222,7 @@ void main() {
       final field = find.byKey(const PageStorageKey('cache-limit'));
       await tester.ensureVisible(field);
       await tester.enterText(field, '0');
+      expect(tester.widget<TextFormField>(field).controller!.text, '0');
       await tester.ensureVisible(find.text('Apply cache limit'));
       await tester.tap(find.text('Apply cache limit'));
       for (
