@@ -6,9 +6,13 @@ material {
     { type: vec3, name: moon_direction, default: [0, -1, 0] },
     { type: vec3, name: rayleigh, default: [0.0058, 0.0135, 0.0331] },
     { type: vec3, name: mie, default: [0.0003, 0.00032, 0.00035] },
+    { type: vec3, name: mie_absorption, default: [0, 0, 0] },
     { type: vec3, name: ozone, default: [0.000650, 0.001881, 0.000085] },
     { type: vec3, name: ground_color, default: [0.12, 0.12, 0.13] },
     { type: float, name: solar_radius, default: 0.0047 },
+    { type: float, name: aerosol_height, default: 1.25 },
+    { type: float, name: sun_flatten, default: 0 },
+    { type: float, name: sun_disk_scale, default: 80 },
     { type: float, name: energy, default: 1 },
     { type: float, name: lunar_radiance, default: 0 },
     { type: float, name: observer_height, default: 0.002 },
@@ -31,13 +35,20 @@ sky {
   vec3 Density(vec3 p) {
     float height = max(length(p) - ATM_R, 0.0);
     // Earth ozone layer: triangular density from 10 to 40 km, peaking at 25 km.
-    return vec3(exp(-height / vec2(8.4, 1.25)), max(0.0, 1.0 - abs(height - 25.0) / 15.0));
+    return vec3(exp(-height / vec2(8.4, material_params.aerosol_height)), max(0.0, 1.0 - abs(height - 25.0) / 15.0));
   }
 
   vec3 LightDepth(vec3 p, vec3 light) {
     float b = dot(p, light);
-    // The curved Earth's shadow leaves high atmosphere illuminated after sunset.
-    if (b < 0.0 && dot(p, p) - b * b < ATM_R * ATM_R) return vec3(1e6);
+    float shadowDepth = 0.0;
+    // The curved Earth's shadow has a soft terminator, so the setting Sun fades
+    // through the refracted limb instead of switching off at the horizon.
+    if (b < 0.0) {
+      float miss = sqrt(max(dot(p, p) - b * b, 0.0)) - ATM_R;
+      float shadow = smoothstep(-8.0, 8.0, miss);
+      if (shadow <= 0.0) return vec3(1e6);
+      shadowDepth = -log(shadow);
+    }
     float distance = ExitAtmosphere(p, light);
     vec3 optical = vec3(0.0);
     float previous = 0.0;
@@ -48,11 +59,12 @@ sky {
       optical += Density(p + light * (previous + next) * 0.5) * (next - previous);
       previous = next;
     }
-    return optical;
+    return optical + vec3(shadowDepth);
   }
 
   vec3 Extinction(vec3 optical) {
-    return material_params.rayleigh * optical.x + material_params.mie * optical.y
+    return material_params.rayleigh * optical.x
+      + (material_params.mie + material_params.mie_absorption) * optical.y
       + material_params.ozone * optical.z;
   }
 
@@ -73,8 +85,11 @@ sky {
 
   vec2 Phase(float cosine) {
     float g = material_params.eccentricity;
+    float g2 = g * g;
+    // Cornette–Shanks: the reference aureole, stronger forward scattering than Henyey–Greenstein.
     return vec2(3.0 * (1.0 + cosine * cosine) / (16.0 * ATM_PI),
-      (1.0 - g * g) / (4.0 * ATM_PI * pow(max(1.0 + g * g - 2.0 * g * cosine, 0.001), 1.5)));
+      3.0 * (1.0 - g2) * (1.0 + cosine * cosine)
+        / (8.0 * ATM_PI * (2.0 + g2) * pow(max(1.0 + g2 - 2.0 * g * cosine, 0.001), 1.5)));
   }
 
   vec3 Sky(vec3 direction) {
@@ -148,13 +163,31 @@ sky {
       scattered *= 1.0 - 0.18 * twilight * pow(antisolar, 3.0) * shadowBand;
       scattered += vec3(0.040, 0.015, 0.018) * twilight * pow(antisolar, 6.0) * beltBand;
     }
-    float diskDistance = length(cross(ray, sun));
-    float diskWidth = max(fwidth(diskDistance), material_params.solar_radius * 0.025);
-    float disk = (1.0 - smoothstep(material_params.solar_radius - diskWidth,
-      material_params.solar_radius + diskWidth, diskDistance)) * step(0.0, dot(ray, sun));
+    // Refraction flattens the setting Sun; the limb is darker than the center.
+    vec3 sunOffset = ray - sun;
+    vec3 zenith = normalize(origin);
+    float vertical = dot(sunOffset, zenith);
+    vec3 horizontal = sunOffset - zenith * vertical;
+    float flattened = length(horizontal + zenith * vertical * (1.0 + material_params.sun_flatten));
+    float limbX = clamp(flattened / material_params.solar_radius, 0.0, 1.0);
+    float limb = 1.0 - 0.6 * (1.0 - sqrt(1.0 - limbX * limbX));
+    float edgeWidth = max(material_params.solar_radius * 0.06, fwidth(flattened));
+    float edge = (1.0 - smoothstep(material_params.solar_radius - edgeWidth,
+      material_params.solar_radius + edgeWidth, flattened)) * step(0.0, dot(ray, sun));
     // Extinction and the Earth's limb, not the center altitude, determine disk visibility.
     // shortcut: preview-relative disk radiance avoids highlight desaturation; calibrate for photometric output.
-    vec3 direct = 3.0 * Transmission(LightDepth(origin, normalize(direction))) * disk;
+    // A horizon-grazing light path crosses the dense layer within the first few
+    // kilometres; a coarse numerical march skips it, so use the Kasten-Young
+    // air mass for the disk's extinction instead.
+    float sunElevation = asin(clamp(normalize(direction).y, -1.0, 1.0)) * 180.0 / ATM_PI;
+    float sunMass = 1.0 / max(sin(sunElevation * ATM_PI / 180.0) +
+      0.50572 * pow(max(sunElevation + 6.07995, 0.01), -1.6364), 0.001);
+    vec3 sunOptical = material_params.rayleigh * 8.4 * sunMass +
+      (material_params.mie + material_params.mie_absorption) *
+        material_params.aerosol_height * sunMass +
+      material_params.ozone * 15.0 * sunMass;
+    vec3 sunTint = exp(-sunOptical);
+    vec3 direct = material_params.sun_disk_scale * limb * edge * sunTint;
     if (hitsGround) {
       vec3 p = origin + ray * distance;
       vec3 up = normalize(p);

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:photosim/core/atmosphere.dart';
 import 'package:photosim/data/saved_plans.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/camera_inspector.dart';
@@ -244,4 +245,48 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('advanced atmosphere edits aerosol type, AOD and ozone', (
+    tester,
+  ) async {
+    var state = SimulationState();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, update) => CameraInspector(
+              state: state,
+              onChanged: (next) => update(() => state = next),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Advanced atmosphere'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Advanced atmosphere'));
+    await tester.pumpAndSettle();
+    final type = find.byType(DropdownButtonFormField<AerosolType>);
+    tester.widget<DropdownButtonFormField<AerosolType>>(type).onChanged!(
+      AerosolType.urban,
+    );
+    await tester.pumpAndSettle();
+    for (final edit in [
+      ('Aerosol optical depth', 0.32),
+      ('Relative humidity', 88.0),
+      ('Ozone column', 140.0),
+    ]) {
+      tester.widget<Slider>(find.byKey(ValueKey(edit.$1))).onChanged!(edit.$2);
+      await tester.pump();
+    }
+    expect(state.aerosolType, AerosolType.urban);
+    expect(state.aerosolOpticalDepth, 0.32);
+    expect(state.humidity, 88);
+    expect(state.ozoneColumnDu, 140);
+    expect(state.atmosphereOptics.aerosolHeightKm, 1.0);
+    expect(tester.takeException(), isNull);
+  });
 }

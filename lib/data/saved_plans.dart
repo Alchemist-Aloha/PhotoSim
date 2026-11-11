@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../core/atmosphere.dart';
 import '../models/simulation_state.dart';
 
 class SavedPlan {
@@ -54,6 +55,10 @@ class SavedPlan {
     'cloudType': state.cloudType.name,
     'cloudAmount': state.cloudAmount,
     'cloudSeed': state.cloudSeed,
+    'aerosolType': state.aerosolType.name,
+    'aerosolOpticalDepth': state.aerosolOpticalDepth,
+    'humidity': state.humidity,
+    'ozoneColumnDu': state.ozoneColumnDu,
     'depthOfField': state.depthOfField,
     'aperture': state.aperture,
     'focusDistance': state.focusDistance,
@@ -135,6 +140,13 @@ class SavedPlan {
           cloudSeed: json.containsKey('cloudSeed')
               ? json['cloudSeed'] as int
               : 0,
+          aerosolType: json.containsKey('aerosolType')
+              ? AerosolType.values.byName(json['aerosolType'] as String)
+              : AerosolType.continental,
+          aerosolOpticalDepth:
+              (json['aerosolOpticalDepth'] as num?)?.toDouble() ?? 0.005,
+          humidity: (json['humidity'] as num?)?.toDouble() ?? 40,
+          ozoneColumnDu: (json['ozoneColumnDu'] as num?)?.toDouble() ?? 300,
           depthOfField: json['depthOfField'] as bool? ?? false,
           aperture: (json['aperture'] as num?)?.toDouble() ?? 8,
           focusDistance: (json['focusDistance'] as num?)?.toDouble() ?? 1000,

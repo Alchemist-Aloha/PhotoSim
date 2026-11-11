@@ -2,6 +2,7 @@ import 'package:flutter_scene/scene.dart' as scene;
 import 'package:flutter_scene/gpu.dart' as gpu;
 import 'package:vector_math/vector_math.dart' as vm;
 
+import '../core/atmosphere.dart';
 import '../core/sunlight.dart';
 
 /// Spherical scattering with ozone and precomputed isotropic multiple scattering.
@@ -15,7 +16,7 @@ class AtmosphereSky extends scene.PhysicalSkySource {
           clearSkyRayleigh.green,
           clearSkyRayleigh.blue,
         ),
-        mieCoefficient: clearSkyMie,
+        mieCoefficient: 0,
         mieEccentricity: 0.76,
       );
 
@@ -39,6 +40,9 @@ class AtmosphereSky extends scene.PhysicalSkySource {
   vm.Vector3 moonDirection = vm.Vector3(0, -1, 0);
   double lunarRadiance = 0;
   double observerHeight = 2;
+  AtmosphereOptics optics = AtmosphereOptics.standard;
+  double sunFlatten = 0;
+  double sunDiskScale = 80;
   int viewSamples = 8, lightSamples = 8;
 
   @override
@@ -59,17 +63,35 @@ class AtmosphereSky extends scene.PhysicalSkySource {
       ..setVec3('sun_direction', sunDirection)
       ..setVec3('moon_direction', moonDirection)
       ..setVec3('rayleigh', rayleighColor * (rayleighCoefficient * 0.1))
-      ..setVec3('mie', mieColor * (turbidity * mieCoefficient * 0.434))
+      ..setVec3(
+        'mie',
+        vm.Vector3(
+          optics.mieScattering.red,
+          optics.mieScattering.green,
+          optics.mieScattering.blue,
+        ),
+      )
+      ..setVec3(
+        'mie_absorption',
+        vm.Vector3(
+          optics.mieAbsorption.red,
+          optics.mieAbsorption.green,
+          optics.mieAbsorption.blue,
+        ),
+      )
       ..setVec3(
         'ozone',
-        vm.Vector3(clearSkyOzone.red, clearSkyOzone.green, clearSkyOzone.blue),
+        vm.Vector3(optics.ozone.red, optics.ozone.green, optics.ozone.blue),
       )
       ..setVec3('ground_color', groundColor)
       ..setFloat('solar_radius', sunAngularRadius)
+      ..setFloat('aerosol_height', optics.aerosolHeightKm)
+      ..setFloat('sun_flatten', sunFlatten)
+      ..setFloat('sun_disk_scale', sunDiskScale)
       ..setFloat('energy', energy)
       ..setFloat('lunar_radiance', lunarRadiance)
       ..setFloat('observer_height', observerHeight.clamp(2, 10000) / 1000)
-      ..setFloat('eccentricity', mieEccentricity)
+      ..setFloat('eccentricity', optics.eccentricity)
       ..setInt('view_samples', viewSamples)
       ..setInt('light_samples', lightSamples);
     shader.bind(pass, transientsBuffer, environment);

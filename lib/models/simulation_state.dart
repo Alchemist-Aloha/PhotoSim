@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/astronomy.dart';
+import '../core/atmosphere.dart';
 import '../core/geo.dart' show radians;
 import '../core/night_sky.dart';
 import '../core/planets.dart';
@@ -151,6 +152,10 @@ class SimulationState {
     CloudType? cloudType,
     double? cloudAmount,
     this.cloudSeed = 0,
+    this.aerosolType = AerosolType.continental,
+    this.aerosolOpticalDepth = 0.005,
+    this.humidity = 40,
+    this.ozoneColumnDu = 300,
     this.depthOfField = false,
     this.aperture = 8,
     this.focusDistance = 1000,
@@ -209,6 +214,15 @@ class SimulationState {
         this.cloudAmount > 1 ||
         cloudSeed < 0 ||
         cloudSeed > 0x7fffffff ||
+        !aerosolOpticalDepth.isFinite ||
+        aerosolOpticalDepth < 0.001 ||
+        aerosolOpticalDepth > 2 ||
+        !humidity.isFinite ||
+        humidity < 0 ||
+        humidity > 100 ||
+        !ozoneColumnDu.isFinite ||
+        ozoneColumnDu < 100 ||
+        ozoneColumnDu > 500 ||
         !aperture.isFinite ||
         aperture < 1.4 ||
         aperture > 22 ||
@@ -269,6 +283,14 @@ class SimulationState {
   final CloudType cloudType;
   final double cloudAmount;
   final int cloudSeed;
+  final AerosolType aerosolType;
+  final double aerosolOpticalDepth, humidity, ozoneColumnDu;
+  AtmosphereOptics get atmosphereOptics => AtmosphereOptics.compute(
+    aerosolType: aerosolType,
+    aerosolOpticalDepth: aerosolOpticalDepth,
+    humidity: humidity,
+    ozoneColumnDu: ozoneColumnDu,
+  );
   bool get atmosphericEffects =>
       cloudAmount > 0 ||
       weather != Weather.clear ||
@@ -414,6 +436,10 @@ class SimulationState {
     CloudType? cloudType,
     double? cloudAmount,
     int? cloudSeed,
+    AerosolType? aerosolType,
+    double? aerosolOpticalDepth,
+    double? humidity,
+    double? ozoneColumnDu,
     bool? depthOfField,
     double? aperture,
     double? focusDistance,
@@ -494,6 +520,10 @@ class SimulationState {
               ? weather.cloudAmount
               : this.cloudAmount),
       cloudSeed: cloudSeed ?? this.cloudSeed,
+      aerosolType: aerosolType ?? this.aerosolType,
+      aerosolOpticalDepth: aerosolOpticalDepth ?? this.aerosolOpticalDepth,
+      humidity: humidity ?? this.humidity,
+      ozoneColumnDu: ozoneColumnDu ?? this.ozoneColumnDu,
       depthOfField: depthOfField ?? this.depthOfField,
       aperture: aperture ?? this.aperture,
       focusDistance: focusDistance ?? this.focusDistance,

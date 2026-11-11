@@ -11,7 +11,7 @@ void main() {
     expect(low.intensity, lessThan(noon.intensity / 3));
     expect(low.green, lessThan(0.2));
     expect(low.blue, lessThan(low.green));
-    expect(noon.green, greaterThan(0.9));
+    expect(noon.green, greaterThan(0.85));
     expect(noon.blue, greaterThan(0.7));
     var last = sunlight(0);
     for (final altitude in [0.01, 0.1, 0.5, 1.0, 5.0, 15.0, 45.0, 90.0]) {

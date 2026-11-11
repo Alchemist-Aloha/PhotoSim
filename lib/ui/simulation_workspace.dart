@@ -438,7 +438,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.weatherLightTransmission != next.weatherLightTransmission ||
         old.cloudType != next.cloudType ||
         old.cloudAmount != next.cloudAmount ||
-        old.cloudSeed != next.cloudSeed) {
+        old.cloudSeed != next.cloudSeed ||
+        old.aerosolType != next.aerosolType ||
+        old.aerosolOpticalDepth != next.aerosolOpticalDepth ||
+        old.humidity != next.humidity ||
+        old.ozoneColumnDu != next.ozoneColumnDu) {
       autoExposureStartFrame = null;
     }
     if (old.timestamp != next.timestamp ||
@@ -446,7 +450,11 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         old.weather != next.weather ||
         old.weatherLightTransmission != next.weatherLightTransmission ||
         old.renderQuality != next.renderQuality ||
-        old.cameraElevation != next.cameraElevation) {
+        old.cameraElevation != next.cameraElevation ||
+        old.aerosolType != next.aerosolType ||
+        old.aerosolOpticalDepth != next.aerosolOpticalDepth ||
+        old.humidity != next.humidity ||
+        old.ozoneColumnDu != next.ozoneColumnDu) {
       world?.skyEnvironment?.invalidate();
     }
     if ((old.useNasaData != next.useNasaData ||
@@ -1290,7 +1298,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       sun.direction.y,
       sun.direction.z,
     );
-    final solarLight = sunlight(sun.altitude);
+    final solarLight = sunlight(sun.altitude, optics: state.atmosphereOptics);
     // Do not retain baked daylight after jumping across the solar horizon.
     if ((skySource!.sunDirection.y > 0) != (sunDirection.y > 0)) {
       active.skyEnvironment = null;
@@ -1298,6 +1306,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     skySource!
       ..sunDirection = sunDirection
       ..sunAngularRadius = sun.angularRadius
+      ..optics = state.atmosphereOptics
+      ..sunFlatten = 0.24 * (1 - (sun.altitude / 5).clamp(0.0, 1.0))
       ..energy = state.weatherLightTransmission
       ..moonDirection = vm.Vector3(
         sky.moon.direction.x,

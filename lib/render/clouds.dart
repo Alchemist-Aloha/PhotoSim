@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter_scene/scene.dart' as scene;
 import 'package:vector_math/vector_math.dart' as vm;
 
+import '../core/atmosphere.dart';
 import '../core/sunlight.dart';
 import '../models/simulation_state.dart';
 import 'photo_framing.dart';
@@ -32,13 +33,17 @@ const cloudRenderDistanceKm = 256.0;
 /// Elevated clouds can receive sunlight while the ground is already in shadow.
 ({double red, double green, double blue}) cloudSunColor(
   double sunAltitude,
-  double altitudeKm,
-) {
+  double altitudeKm, {
+  AtmosphereOptics? optics,
+}) {
   final dip =
       math.acos(6371 / (6371 + altitudeKm.clamp(0, 30))) * 180 / math.pi;
   // No 1.5° floor: a setting deck keeps reddening through the last degree, which
   // is what turns cloud undersides from gold to crimson after ground sunset.
-  final light = sunTransmission((sunAltitude + dip).clamp(-1.0, 90.0));
+  final light = sunTransmission(
+    (sunAltitude + dip).clamp(-1.0, 90.0),
+    optics: optics,
+  );
   return (red: light.red, green: light.green, blue: light.blue);
 }
 
@@ -83,6 +88,7 @@ class CloudRenderer {
     final light = cloudSunColor(
       sky.sun.altitude,
       groundKm + layer.base + layer.thickness * 0.5,
+      optics: state.atmosphereOptics,
     );
     final day = ((sky.sun.altitude + 6) / 11).clamp(0.0, 1.0);
     final moon = sky.moon.direction;

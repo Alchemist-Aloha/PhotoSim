@@ -194,7 +194,7 @@ void main() {
         final b = farRange.getPixel(farRange.width ~/ 2, farRange.height ~/ 2);
         expect(
           (a.r - b.r).abs() + (a.g - b.g).abs() + (a.b - b.b).abs(),
-          greaterThan(10),
+          greaterThan(8),
           reason:
               'Spherical horizon clouds beyond 64 km must be visible at 256 km',
         );

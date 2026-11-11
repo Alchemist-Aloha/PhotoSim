@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/atmosphere.dart';
 import '../core/geo.dart';
 import '../models/simulation_state.dart';
 import 'terrain_range_controls.dart';
@@ -26,15 +27,16 @@ class CameraInspector extends StatelessWidget {
     double min,
     double max,
     ValueChanged<double> change,
-    String suffix,
-  ) => Column(
+    String suffix, {
+    int decimals = 1,
+  }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text('$label  ${value.toStringAsFixed(1)}$suffix'),
+      Text('$label  ${value.toStringAsFixed(decimals)}$suffix'),
       Slider(
         key: ValueKey(label),
         semanticFormatterCallback: (value) =>
-            '${value.toStringAsFixed(1)}$suffix',
+            '${value.toStringAsFixed(decimals)}$suffix',
         label: label,
         value: value,
         min: min,
@@ -396,6 +398,59 @@ class CameraInspector extends StatelessWidget {
         ),
         const Text(
           'Illustrative conditions, not a forecast. Changing presets restores their defaults. Rain intensity controls screen-space streak density, not measured precipitation.',
+        ),
+      ]),
+      section('Advanced atmosphere', Icons.air, [
+        DropdownButtonFormField<AerosolType>(
+          key: ValueKey(state.aerosolType),
+          initialValue: state.aerosolType,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Aerosol type'),
+          items: [
+            for (final type in AerosolType.values)
+              DropdownMenuItem(value: type, child: Text(type.label)),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(state.copyWith(aerosolType: value));
+          },
+        ),
+        const SizedBox(height: 8),
+        Text(state.aerosolType.description),
+        control(
+          'Aerosol optical depth',
+          state.aerosolOpticalDepth,
+          0.001,
+          2,
+          (value) => onChanged(state.copyWith(aerosolOpticalDepth: value)),
+          '',
+          decimals: 3,
+        ),
+        const Text(
+          'Dry optical depth at 550 nm: 0.005 pristine, 0.06 clear, 0.2 typical, 1+ smoke or dust.',
+        ),
+        control(
+          'Relative humidity',
+          state.humidity,
+          5,
+          100,
+          (value) => onChanged(state.copyWith(humidity: value)),
+          '%',
+          decimals: 0,
+        ),
+        const Text(
+          'Humid air grows hygroscopic aerosol, strengthening haze and the solar aureole.',
+        ),
+        control(
+          'Ozone column',
+          state.ozoneColumnDu,
+          100,
+          500,
+          (value) => onChanged(state.copyWith(ozoneColumnDu: value)),
+          ' DU',
+          decimals: 0,
+        ),
+        const Text(
+          'Ozone absorbs the orange-red Chappuis band; 300 DU is typical, 100 DU shifts twilight blue.',
         ),
       ]),
       section('Composition guides', Icons.grid_3x3, [
