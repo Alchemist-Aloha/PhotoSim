@@ -339,9 +339,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final atmosphere = assets.atmosphere,
         lunarAlbedo = assets.lunarAlbedo,
         band = assets.milkyWay,
-        clouds = CloudRenderer(
-          CloudResources(assets.cloudMaterial, assets.cloudNoise),
-        );
+        clouds = CloudRenderer(assets.cloudMaterial);
     skySource = atmosphere;
     if (!mounted) return;
     cloudRenderer = clouds;
@@ -1315,7 +1313,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         RenderQuality.high => 12,
       }
       ..lightSamples = state.renderQuality == RenderQuality.high ? 12 : 8;
-    cloudRenderer!.update(state, eye);
+    cloudRenderer!.update(state, eye, reflectionMaterial: waterMaterial);
     final cloudTransmission = cloudLightTransmission(state);
     active.environmentIntensity = cloudTransmission;
     final transmission = state.weatherLightTransmission * cloudTransmission;

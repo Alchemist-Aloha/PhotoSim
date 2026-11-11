@@ -22,7 +22,12 @@ void main() {
     final sky = await AtmosphereSky.load();
     final water = await scene.loadFmatMaterial('assets/atmosphere/water.fmat');
     final sun = vm.Vector3(0, 0.05, -1).normalized();
-    sky.sunDirection = sun;
+    sky
+      ..sunDirection = sun
+      ..sunAngularRadius = 0.0047;
+    water.parameters
+      ..setVec3('sun_direction', sun)
+      ..setVec3('sun_color', vm.Vector3(1, 0.4, 0.15));
     final world = scene.Scene()
       ..skybox = scene.Skybox(sky)
       ..skyEnvironment = scene.SkyEnvironment(sky, faceResolution: 64)
@@ -105,6 +110,28 @@ void main() {
       final flat = await pixels(0, 'calm');
       expect(await pixels(15, 'calm-later'), orderedEquals(flat));
       expect(waterDifference(initial, flat), greaterThan(1));
+      // With waves disabled, only the reflected deck can change these water pixels.
+      water.parameters.setFloat('amount', 0.8);
+      final cloudy = await pixels(0, 'cloud-reflection');
+      expect(waterDifference(flat, cloudy), greaterThan(1));
+      expect(
+        waterDifference(cloudy, await pixels(15, 'cloud-reflection-moving')),
+        greaterThan(1),
+      );
+      water.parameters.setFloat('wave_strength', 0.8);
+      final reflectedWaves = await pixels(0, 'cloudy-waves');
+      expect(waterDifference(reflectedWaves, cloudy), greaterThan(1));
+      expect(
+        waterDifference(
+          reflectedWaves,
+          await pixels(15, 'cloudy-waves-moving'),
+        ),
+        greaterThan(1),
+      );
+      water.parameters
+        ..setFloat('amount', 0)
+        ..setFloat('wave_strength', 0);
+      expect(await pixels(0, 'clear-reflection-restored'), orderedEquals(flat));
       expect(world.environment, isNotNull);
       expect(tester.takeException(), isNull);
     } finally {

@@ -37,7 +37,6 @@ flutter:
     - assets/sky/
     - assets/moon/
     - assets/terrain/
-    - assets/atmosphere/cloud_noise.png
     - assets/atmosphere/multiple_scattering.png
     - assets/fonts/OFL.txt
   fonts:

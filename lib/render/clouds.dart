@@ -46,22 +46,8 @@ const cloudRenderDistanceKm = 256.0;
 double cloudLightTransmission(SimulationState state) =>
     1 - state.cloudAmount * (state.cloudType == CloudType.cirrus ? 0.15 : 0.55);
 
-/// The material and noise texture, shared by every [CloudRenderer] instance.
-class CloudResources {
-  const CloudResources(this.material, this.noise);
-  final scene.PreprocessedMaterial material;
-  final scene.Texture2D noise;
-}
-
 class CloudRenderer {
-  CloudRenderer(CloudResources resources)
-    : material = resources.material,
-      _noise = resources.noise {
-    material.parameters.setTexture(
-      'cloud_noise',
-      _noise.gpuTexture,
-      sampler: _noise.sampledSampler,
-    );
+  CloudRenderer(this.material) {
     node =
         scene.Node(
             name: 'Clouds',
@@ -71,35 +57,25 @@ class CloudRenderer {
             ),
           )
           ..shadowCastingMode = scene.ShadowCastingMode.off
-          // Composite after the Moon/Milky Way; opaque terrain depth bounds the volume.
+          // Composite after the Moon/Milky Way; opaque terrain depth occludes the decks.
           ..renderOrder = 100;
   }
 
-  static Future<CloudResources> loadShared() async {
-    final (material, noise) = await (
-      scene.loadFmatMaterial('assets/atmosphere/clouds.fmat'),
-      scene.Texture2D.fromAsset(
-        'assets/atmosphere/cloud_noise.png',
-        content: scene.TextureContent.data,
-        sampling: const scene.TextureSampling(mipmaps: false),
-      ),
-    ).wait;
-    return CloudResources(material, noise);
-  }
-
-  static Future<CloudRenderer> load() async =>
-      CloudRenderer(await loadShared());
+  static Future<CloudRenderer> load() async => CloudRenderer(
+    await scene.loadFmatMaterial('assets/atmosphere/clouds.fmat'),
+  );
 
   final scene.PreprocessedMaterial material;
-  final scene.Texture2D _noise;
   late final scene.Node node;
-  int? lastSeed;
 
-  void update(SimulationState state, vm.Vector3 eye) {
+  void update(
+    SimulationState state,
+    vm.Vector3 eye, {
+    scene.PreprocessedMaterial? reflectionMaterial,
+  }) {
     node
       ..position = eye
       ..visible = state.cloudAmount > 0;
-    if (!node.visible) return;
     final layer = cloudLayer(state.cloudType);
     final sky = state.sky;
     final sun = sky.sun.direction;
@@ -122,44 +98,43 @@ class CloudRenderer {
       eye.y / 1000,
       -state.latitude * math.pi / 180 * 6371,
     );
-    final p = material.parameters;
-    if (lastSeed != state.cloudSeed) {
-      final random = math.Random(state.cloudSeed);
-      p.setVec3(
-        'seed_offset',
-        vm.Vector3(
-          random.nextDouble() * 200,
-          random.nextDouble() * 200,
-          random.nextDouble() * 200,
-        ),
-      );
-      lastSeed = state.cloudSeed;
+    final random = math.Random(state.cloudSeed);
+    final seed = vm.Vector3(
+      random.nextDouble() * 200,
+      random.nextDouble() * 200,
+      random.nextDouble() * 200,
+    );
+    for (final target in [material, ?reflectionMaterial]) {
+      final p = target.parameters;
+      p
+        ..setVec3('seed_offset', seed)
+        ..setVec3('cloud_origin', origin)
+        ..setVec4(
+          'layer',
+          vm.Vector4(
+            groundKm + layer.base,
+            layer.thickness,
+            layer.scale,
+            layer.extinction,
+          ),
+        )
+        ..setVec3('sun_direction', vm.Vector3(sun.x, sun.y, sun.z))
+        ..setVec3('sun_color', vm.Vector3(light.red, light.green, light.blue))
+        ..setFloat('moon_strength', moonStrength)
+        ..setFloat('energy', state.weatherLightTransmission)
+        ..setFloat('amount', state.cloudAmount)
+        ..setFloat('max_distance', cloudRenderDistanceKm)
+        ..setInt('cloud_type', state.cloudType.index)
+        ..setInt('noise_octaves', switch (state.renderQuality) {
+          RenderQuality.performance => 3,
+          RenderQuality.balanced => 4,
+          RenderQuality.high => 5,
+        });
     }
-    p
-      ..setVec3('cloud_origin', origin)
-      ..setVec4(
-        'layer',
-        vm.Vector4(
-          groundKm + layer.base,
-          layer.thickness,
-          layer.scale,
-          layer.extinction,
-        ),
-      )
-      ..setVec3('sun_direction', vm.Vector3(sun.x, sun.y, sun.z))
-      ..setVec3('sun_color', vm.Vector3(light.red, light.green, light.blue))
-      ..setVec3('moon_direction', vm.Vector3(moon.x, moon.y, moon.z))
-      ..setFloat('moon_strength', moonStrength)
-      ..setFloat('daylight', day)
-      ..setFloat('energy', state.weatherLightTransmission)
-      ..setFloat('amount', state.cloudAmount)
-      ..setFloat('max_distance', cloudRenderDistanceKm)
-      ..setFloat('scene_far', previewFarDistanceMeters)
-      ..setInt('cloud_type', state.cloudType.index)
-      ..setInt('view_steps', switch (state.renderQuality) {
-        RenderQuality.performance => 24,
-        RenderQuality.balanced => 48,
-        RenderQuality.high => 64,
-      });
+    material.parameters.setFloat('scene_far', previewFarDistanceMeters);
+    reflectionMaterial?.parameters.setFloat(
+      'solar_radius',
+      sky.sun.angularRadius,
+    );
   }
 }

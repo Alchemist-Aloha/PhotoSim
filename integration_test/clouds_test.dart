@@ -21,6 +21,9 @@ void main() {
       await scene.Scene.initializeStaticResources();
       final sky = await AtmosphereSky.load();
       final clouds = await CloudRenderer.load();
+      final water = await scene.loadFmatMaterial(
+        'assets/atmosphere/water.fmat',
+      );
       var state = SimulationState(
         timestamp: DateTime.utc(2026, 6, 22),
         azimuth: 280,
@@ -80,6 +83,7 @@ void main() {
             currentSun.direction.z,
           )
           ..sunAngularRadius = currentSun.angularRadius
+          ..observerHeight = eye.y
           ..moonDirection = vm.Vector3(
             state.sky.moon.direction.x,
             state.sky.moon.direction.y,
@@ -89,7 +93,20 @@ void main() {
               0.2 * state.sky.moonIllumination * state.sky.moonIllumination;
         final forward = state.cameraFrame.forward;
         camera.target = eye + vm.Vector3(forward.x, forward.y, forward.z);
-        clouds.update(state, eye);
+        clouds.update(state, eye, reflectionMaterial: water);
+        expect(
+          water.parameters.getFloat('amount'),
+          closeTo(state.cloudAmount, 1e-6),
+        );
+        expect(water.parameters.getInt('cloud_type'), state.cloudType.index);
+        expect(
+          water.parameters.getVec3('seed_offset'),
+          clouds.material.parameters.getVec3('seed_offset'),
+        );
+        expect(
+          water.parameters.getVec3('sun_direction'),
+          clouds.material.parameters.getVec3('sun_direction'),
+        );
         if (rangeKm != null) {
           clouds.material.parameters.setFloat('max_distance', rangeKm);
         }
@@ -182,6 +199,25 @@ void main() {
               'Spherical horizon clouds beyond 64 km must be visible at 256 km',
         );
 
+        state = state.copyWith(
+          fixedElevation: 10000,
+          groundElevation: 0,
+          pitch: -25,
+          cloudAmount: 0,
+        );
+        eye.y = 10000;
+        camera.position = eye;
+        final aboveClear = await pixels('above-clear');
+        state = state.copyWith(cloudAmount: 1);
+        expect(
+          await pixels('above-deck'),
+          isNot(orderedEquals(aboveClear)),
+          reason: 'Cloud decks must also be visible from above',
+        );
+        state = state.copyWith(fixedElevation: 2, groundElevation: 0);
+        eye.y = 2;
+        camera.position = eye;
+
         DateTime timeAtAltitude(DateTime day, bool rising, double altitude) {
           var error = double.infinity;
           var best = day;
@@ -223,7 +259,10 @@ void main() {
         expect(state.sky.sun.altitude, lessThan(-12));
         expect(state.sky.moon.altitude, greaterThan(0));
         final moonlit = img.decodePng(await pixels('night-moonlit'))!;
-        expect(clouds.material.parameters.getFloat('daylight'), 0);
+        expect(
+          clouds.material.parameters.getFloat('moon_strength'),
+          greaterThan(0),
+        );
         double brightness(img.Image image) {
           var total = 0.0, count = 0;
           for (var y = 0; y < image.height * 0.6; y += 8) {

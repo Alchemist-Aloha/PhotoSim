@@ -2,56 +2,176 @@ material {
   name: "PhotoSimWater",
   shading_model: lit,
   parameters: [
-    { type: float, name: wave_strength, default: 0.8 },
+    { type: vec3, name: cloud_origin, default: [0, 0, 0] },
+    { type: vec3, name: seed_offset, default: [0, 0, 0] },
     { type: float, name: animation_time, default: 0 },
-    { type: vec3, name: deep_color, default: [0.010, 0.032, 0.042] },
-    { type: float, name: roughness, default: 0.05 }
+    { type: vec4, name: layer, default: [2.2, 4.3, 1.3, 3.5] },
+    { type: vec3, name: sun_direction, default: [0, 1, 0] },
+    { type: vec3, name: sun_color, default: [1, 1, 1] },
+    { type: float, name: moon_strength, default: 0 },
+    { type: float, name: energy, default: 1 },
+    { type: float, name: amount, default: 0 },
+    { type: float, name: max_distance, default: 256 },
+    { type: int, name: cloud_type, default: 0 },
+    { type: int, name: noise_octaves, default: 5 },
+    { type: float, name: wave_strength, default: 0.8 },
+    { type: vec3, name: deep_color, default: [0.008, 0.022, 0.040] },
+    { type: float, name: solar_radius, default: 0.0047 },
+    { type: float, name: roughness, default: 0.025 }
   ]
 }
-
 fragment {
+  precision highp float;
+
+  // Ported from ref/atmospheric-sky-lighting-simulation.zip (computeClouds).
+  // Keep this block identical in clouds.fmat and water.fmat: visible and reflected decks.
   float Hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
     p3 += dot(p3, p3.yzx + 33.33);
     return fract((p3.x + p3.y) * p3.z);
   }
 
-  vec2 NoiseSlope(vec2 p) {
+  float Noise2(vec2 p) {
     vec2 i = floor(p), f = fract(p);
     vec2 u = f * f * (3.0 - 2.0 * f);
-    vec2 du = 6.0 * f * (1.0 - f);
-    float a = Hash12(i), b = Hash12(i + vec2(1.0, 0.0));
-    float c = Hash12(i + vec2(0.0, 1.0)), d = Hash12(i + vec2(1.0));
-    // Exact height-field derivatives keep highlights aligned with wave crests.
-    return du * vec2(mix(b - a, d - c, u.y), mix(c - a, d - b, u.x));
+    return mix(mix(Hash12(i), Hash12(i + vec2(1.0, 0.0)), u.x),
+      mix(Hash12(i + vec2(0.0, 1.0)), Hash12(i + vec2(1.0)), u.x), u.y);
   }
+
+  float CloudFbm(vec2 p) {
+    float value = 0.0, amplitude = 0.5;
+    mat2 rotation = mat2(0.80, 0.60, -0.60, 0.80);
+    for (int i = 0; i < 5; i++) {
+      if (i >= material_params.noise_octaves) break;
+      value += amplitude * Noise2(p);
+      p = rotation * p * 2.03 + vec2(17.1, 31.7);
+      amplitude *= 0.5;
+    }
+    return value;
+  }
+
+  float CloudDistance(vec3 ray, float height, float observerHeight) {
+    float radius = 6371.0 + observerHeight;
+    float b = radius * ray.y;
+    float c = (observerHeight - height) * (2.0 * 6371.0 + observerHeight + height);
+    float d = b * b - c;
+    if (d < 0.0) return -1.0;
+    float root = sqrt(d);
+    // Keep the near intersection when looking down on a deck from above.
+    return -b - root > 0.0 ? -b - root : -b + root;
+  }
+
+  vec4 CloudDeck(vec3 ray, vec3 origin, vec3 skyColor, float limitKm) {
+    if (material_params.amount <= 0.0) return vec4(0.0);
+    float lowHeight = material_params.layer.x;
+    float highHeight = max(lowHeight + material_params.layer.y, lowHeight + 4.3);
+    bool cirrus = material_params.cloud_type == 3;
+    if (cirrus) highHeight = lowHeight;
+    float lowDistance = CloudDistance(ray, lowHeight, origin.y);
+    float highDistance = CloudDistance(ray, highHeight, origin.y);
+    float wind = material_params.animation_time * 0.055;
+    vec2 anchor = origin.xz + material_params.cloud_origin.xz;
+    vec2 seed = material_params.seed_offset.xz;
+    // The reference's softened projection avoids a compressed stripe at the horizon.
+    float lowProjection = min(max(lowDistance, 0.0),
+      abs(lowHeight - origin.y) / max(0.025, abs(ray.y) + 0.035));
+    float highProjection = min(max(highDistance, 0.0),
+      abs(highHeight - origin.y) / max(0.02, abs(ray.y) + 0.03));
+    vec2 lowUv = (anchor + ray.xz * lowProjection) * 0.18 + seed + vec2(wind, wind * 0.35);
+    vec2 highUv = (anchor + ray.xz * highProjection) * 0.11 + seed + vec2(wind * 1.4, -wind * 0.25);
+    float scale = clamp(1.3 / material_params.layer.z, 0.45, 1.5);
+    float base = CloudFbm(lowUv * 1.4 * scale);
+    float detail = CloudFbm(lowUv * 3.8 * scale - vec2(wind * 0.4, 0.0));
+    float raw = mix(base, detail, 0.32);
+    float threshold = mix(0.84, 0.30, material_params.amount);
+    float low = smoothstep(threshold, threshold + 0.24, raw);
+    float highNoise = CloudFbm(highUv * vec2(2.2, 0.65));
+    float highThreshold = mix(0.82, 0.34, material_params.amount);
+    float high = smoothstep(highThreshold, highThreshold + 0.28, highNoise);
+    if (material_params.cloud_type == 1) low = min(low * 1.35, 1.0);
+    if (material_params.cloud_type == 2) low = mix(low, 1.0, material_params.amount * 0.85);
+    if (material_params.cloud_type == 4) low = min(low * 1.5, 1.0);
+    if (cirrus || lowDistance <= 0.0 || lowDistance >= limitKm) low = 0.0;
+    if (highDistance <= 0.0 || highDistance >= limitKm) high = 0.0;
+    high *= cirrus ? 1.0 : 0.35;
+    // Spherical decks remain visible at the geometric horizon, including high observers.
+    float horizonFade = origin.y > lowHeight ? 1.0 : smoothstep(-0.07, 0.09, ray.y);
+    float density = clamp(low + high * 0.72, 0.0, 1.0) * horizonFade;
+    if (density < 0.002) return vec4(0.0);
+    float height = mix(lowHeight, highHeight, high / max(0.001, low + high));
+    vec3 sun = normalize(material_params.sun_direction);
+    float dip = asin(clamp(sun.y, -1.0, 1.0));
+    float horizonDip = -sqrt(max(0.0, 2.0 * height / 6371.0)) - 0.012;
+    float sunlight = smoothstep(horizonDip - 0.055, horizonDip + 0.03, dip);
+    float mu = max(dot(ray, sun), 0.0);
+    float forwardGlow = pow(mu, 6.0) * 1.4 + pow(mu, 32.0) * 2.2;
+    float selfShadow = smoothstep(0.0, 0.85, raw);
+    float night = 1.0 - smoothstep(-0.14, 0.08, sun.y);
+    vec3 ambient = mix(skyColor * 0.55,
+      vec3(0.00004, 0.00007, 0.00014), night);
+    vec3 direct = material_params.sun_color * sunlight *
+      (2.6 + forwardGlow) * (1.15 - 0.55 * selfShadow);
+    float underlight = exp(-pow((dip + 0.025) / 0.045, 2.0));
+    direct += vec3(1.15, 0.36, 0.28) * material_params.sun_color *
+      sunlight * underlight * (cirrus ? 1.0 : 0.55) * (1.1 - 0.5 * selfShadow);
+    if (material_params.cloud_type == 4) direct *= 0.65;
+    vec3 moon = vec3(0.0010, 0.0014, 0.0022) * material_params.moon_strength;
+    vec3 color = (ambient * 0.75 + direct * 0.85 + moon) * material_params.energy;
+    color = mix(color, skyColor, exp(-max(0.0, ray.y) * 5.0) * 0.58);
+    return vec4(color, clamp(density * 0.88, 0.0, 0.94));
+  }
+  // End shared reference cloud block.
 
   void Surface(inout MaterialInputs material) {
     vec3 world = GetWorldPosition();
-    float time = material_params.animation_time;
-    vec2 uv = world.xz;
-    vec2 footprint = max(abs(dFdx(uv)), abs(dFdy(uv)));
-    vec2 f1 = vec2(0.05, 0.13), f2 = vec2(0.17, 0.31), f3 = vec2(0.52, 0.83);
-    // Filter each wavelength at its pixel footprint, not just camera distance.
-    float w1 = 1.0 - smoothstep(0.2, 0.8, length(footprint * f1));
-    float w2 = 1.0 - smoothstep(0.2, 0.8, length(footprint * f2));
-    float w3 = 1.0 - smoothstep(0.2, 0.8, length(footprint * f3));
-    vec2 slope = NoiseSlope(uv * f1 + vec2(0.055, 0.022) * time) * f1 * 1.2 * w1;
-    slope += NoiseSlope(uv * f2 - vec2(0.095, 0.040) * time) * f2 * 0.28 * w2;
-    slope += NoiseSlope(uv * f3 + vec2(0.15, -0.075) * time) * f3 * 0.06 * w3;
-    // A broad travelling swell stays legible beyond the fine wind ripples.
-    vec2 swell = normalize(vec2(0.8, 0.6));
-    slope += swell * cos(dot(uv, swell) * 0.24 - time * 0.72) * 0.028 * w1;
-    slope *= material_params.wave_strength;
+    vec3 incident = -normalize(v_viewvector);
     vec3 up = normalize(GetWorldNormal());
     vec3 tangent = normalize(vec3(1.0, 0.0, 0.0) - up * up.x);
     vec3 bitangent = normalize(cross(tangent, up));
-    material.normal = normalize(up - tangent * slope.x - bitangent * slope.y);
+    vec2 uv = world.xz * 0.3125;
+    float time = material_params.animation_time * 0.9175;
+    vec2 footprint = max(abs(dFdx(uv)), abs(dFdy(uv)));
+    vec2 f1 = vec2(1.4, 4.5), f2 = vec2(3.8, 11.0), f3 = vec2(9.0, 24.0);
+    float a1 = 1.0 - smoothstep(0.3, 1.0, length(footprint * f1));
+    float a2 = 1.0 - smoothstep(0.3, 1.0, length(footprint * f2));
+    float a3 = 1.0 - smoothstep(0.3, 1.0, length(footprint * f3));
+    float w1 = (Noise2(uv * f1 + vec2(time * 0.6, time * 0.9)) - 0.5) * a1;
+    float w2 = (Noise2(uv * f2 - vec2(time * 0.8, time * 1.2)) - 0.5) * a2;
+    float w3 = (Noise2(uv * f3 + vec2(time * 1.1, -time * 0.7)) - 0.5) * a3;
+    vec2 gradient = vec2(w1 * 0.045 + w2 * 0.032 + w3 * 0.018,
+      w2 * 0.055 + w3 * 0.035);
+    float antiAlias = smoothstep(0.0, 0.12, -dot(incident, up));
+    gradient *= material_params.wave_strength * 1.16875 * antiAlias;
+    material.normal = normalize(up + tangent * gradient.x + bitangent * gradient.y);
     material.base_color = vec4(material_params.deep_color, 1.0);
-    material.metallic = 0.0;
-    // Water's F0 is ~0.02, half the 0.04 dielectric default.
+    material.roughness = material_params.roughness;
     material.specular = 0.5;
-    material.roughness = mix(material_params.roughness, 0.18, 1.0 - (w1 + w2 + w3) / 3.0);
-    material.occlusion = 1.0;
+  }
+
+  // The reference mixes the reflected scene with deep water, not diffuse-lit paint.
+  vec4 Composite(MaterialInputs material, LightingResult result) {
+    vec3 incident = -normalize(v_viewvector);
+    vec3 reflection = reflect(incident, material.normal);
+    reflection.y = abs(reflection.y);
+    vec3 sky = SampleRadianceEnv(prefiltered_radiance, reflection, material.roughness);
+    vec3 origin = GetWorldPosition() / 1000.0;
+    vec4 clouds = CloudDeck(reflection, origin, sky, material_params.max_distance);
+    vec3 reflected = mix(sky, clouds.rgb, clouds.a);
+    // The low-resolution IBL cannot resolve the disk; integrate it analytically for glitter.
+    vec3 sun = normalize(material_params.sun_direction);
+    float angle = length(cross(reflection, sun));
+    float width = max(fwidth(angle), material_params.solar_radius * 0.1);
+    float disk = (1.0 - smoothstep(material_params.solar_radius - width,
+      material_params.solar_radius + width, angle)) * step(0.0, dot(reflection, sun));
+    reflected += material_params.sun_color * disk * 48.0 *
+      smoothstep(-0.012, 0.008, sun.y) * (1.0 - clouds.a) * material_params.energy;
+    float cosV = clamp(dot(-incident, material.normal), 0.0, 1.0);
+    float fresnel = 0.03 + 0.97 * pow(1.0 - cosV, 4.5);
+    vec3 horizon = normalize(vec3(incident.x, 0.005, incident.z));
+    vec3 haze = SampleRadianceEnv(prefiltered_radiance, horizon, 0.0);
+    vec3 deepWater = material_params.deep_color * material_params.energy + haze * 0.045;
+    vec3 color = mix(deepWater, reflected, clamp(fresnel * 1.08, 0.08, 0.98));
+    float seam = exp(-abs(incident.y) * 55.0);
+    return vec4(mix(color, haze, seam * 0.7), 1.0);
   }
 }
