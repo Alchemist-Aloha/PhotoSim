@@ -1,7 +1,7 @@
 name: photosim
 description: Landscape photography planner and simulator for Linux, Windows and Android.
 publish_to: none
-version: 1.4.0+5
+version: 1.4.1+6
 
 environment:
   sdk: ^3.13.5

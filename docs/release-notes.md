@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.4.1
+
+- Add mapped river water using cached OpenFreeMap polygons instead of Overpass queries.
+  River heights follow the terrain and remain approximate, not surveyed water levels.
+- Dim excessive sun reflections and moonlight; retain water detail at high altitudes.
+
 ## 1.4.0
 
 Sky and water rendering rework, plus place search.
