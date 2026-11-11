@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+
+import 'http_bytes.dart';
 
 class PlaceSearchResult {
   const PlaceSearchResult({
@@ -28,16 +31,16 @@ class PlaceSearchRepository {
       'limit': '5',
       'lang': 'en',
     });
-    final response = await client
-        .get(uri, headers: {'User-Agent': 'org.photosim.photosim'})
-        .timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200) {
-      throw http.ClientException(
-        'Place search HTTP ${response.statusCode}',
-        uri,
-      );
-    }
-    final body = jsonDecode(utf8.decode(response.bodyBytes));
+    final bytes = await downloadBytes(
+      client,
+      uri,
+      abort: Completer<void>().future,
+      maxBytes: 1024 * 1024,
+      timeout: const Duration(seconds: 10),
+      userAgent: 'org.photosim.photosim',
+      retryThrottled: false,
+    );
+    final body = jsonDecode(utf8.decode(bytes));
     if (body is! Map<String, dynamic> || body['features'] is! List<dynamic>) {
       throw const FormatException('Invalid place search response');
     }

@@ -22,6 +22,13 @@ Widget searchApp(http.Client client) => MaterialApp(
   ),
 );
 
+Future<void> settleSearch(WidgetTester tester) async {
+  await tester.pump();
+  // Dart's stream-cancellation future schedules outside the widget fake clock.
+  await tester.runAsync(() async {});
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('explicit search dropdown centers map without moving camera', (
     tester,
@@ -57,7 +64,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(calls, 0);
     await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
+    await settleSearch(tester);
     expect(calls, 1);
     expect(find.byType(MenuItemButton), findsOneWidget);
     expect(find.text('Chamonix-Mont-Blanc'), findsOneWidget);
@@ -101,10 +108,10 @@ void main() {
     expect(calls, 0);
     await tester.enterText(find.byType(TextField), 'Nowhere');
     await tester.tap(find.text('Search'));
-    await tester.pumpAndSettle();
+    await settleSearch(tester);
     expect(find.textContaining('No places found.'), findsOneWidget);
     await tester.tap(find.text('Search'));
-    await tester.pumpAndSettle();
+    await settleSearch(tester);
     expect(find.textContaining('Place search unavailable.'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Chamonix');
     await tester.tap(find.text('Search'));
@@ -116,11 +123,44 @@ void main() {
       isNull,
     );
     pending.complete(placeResponse([placeFeature()]));
-    await tester.pumpAndSettle();
+    await settleSearch(tester);
     expect(find.text('Chamonix-Mont-Blanc'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Paris');
     await tester.pumpAndSettle();
     expect(find.text('Chamonix-Mont-Blanc'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('search timeout cancels a stalled response body before retry', (
+    tester,
+  ) async {
+    var calls = 0, cancelled = 0;
+    final body = StreamController<List<int>>(onCancel: () => cancelled++);
+    addTearDown(body.close);
+    final client = MockClient.streaming((_, _) async {
+      if (++calls > 1) {
+        return http.StreamedResponse(
+          Stream.value(placeResponse([]).bodyBytes),
+          200,
+        );
+      }
+      body.add([123]);
+      return http.StreamedResponse(body.stream, 200);
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(searchApp(client));
+    await tester.enterText(find.byType(TextField), 'Town');
+    await tester.tap(find.text('Search'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 11));
+    await settleSearch(tester);
+    expect(find.textContaining('Place search unavailable.'), findsOneWidget);
+    expect(cancelled, 1);
+    await tester.tap(find.text('Search'));
+    await settleSearch(tester);
+    expect(calls, 2);
+    expect(find.textContaining('No places found.'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     expect(tester.takeException(), isNull);
   });
@@ -139,7 +179,7 @@ void main() {
     await tester.pump();
     await tester.pumpWidget(const SizedBox());
     pending.complete(placeResponse([placeFeature()]));
-    await tester.pumpAndSettle();
+    await settleSearch(tester);
     expect(tester.takeException(), isNull);
   });
 
@@ -179,7 +219,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField), 'Town');
       await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
+      await settleSearch(tester);
       await tester.ensureVisible(find.text('Town 4'));
       await tester.pumpAndSettle();
       expect(find.text('Town 4').hitTestable(), findsOneWidget);
@@ -188,13 +228,13 @@ void main() {
       expect(find.byType(MenuItemButton), findsNothing);
       expect(find.byType(PlaceSearch), findsOneWidget);
       await tester.tap(find.text('Search'));
-      await tester.pumpAndSettle();
+      await settleSearch(tester);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(MenuItemButton), findsNothing);
       expect(find.byType(PlaceSearch), findsOneWidget);
       await tester.tap(find.text('Search'));
-      await tester.pumpAndSettle();
+      await settleSearch(tester);
       await tester.tapAt(Offset(size.width - 8, size.height - 8));
       await tester.pumpAndSettle();
       expect(find.byType(MenuItemButton), findsNothing);

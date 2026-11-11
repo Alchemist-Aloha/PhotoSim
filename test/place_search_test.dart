@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +86,65 @@ void main() {
       expect(results.last.name, 'Place 4');
     },
   );
+
+  for (final code in [429, 503]) {
+    test('HTTP $code fails once and permits an explicit retry', () async {
+      var calls = 0;
+      final client = MockClient((_) async {
+        return ++calls == 1 ? http.Response('Busy', code) : placeResponse([]);
+      });
+      addTearDown(client.close);
+      final repository = PlaceSearchRepository(client);
+      await expectLater(
+        repository.search('town').timeout(const Duration(seconds: 1)),
+        throwsA(isA<http.ClientException>()),
+      );
+      expect(calls, 1);
+      expect(await repository.search('town'), isEmpty);
+      expect(calls, 2);
+    });
+  }
+
+  for (final declared in [true, false]) {
+    test(
+      'oversized search responses (declared: $declared) are cancelled',
+      () async {
+        var calls = 0, cancelled = 0;
+        final body = StreamController<List<int>>(onCancel: () => cancelled++);
+        addTearDown(body.close);
+        final payload = utf8.encode(
+          jsonEncode({
+            'features': [placeFeature(name: declared ? 'Town' : 'a' * 1048576)],
+          }),
+        );
+        final client = MockClient.streaming((_, _) async {
+          if (++calls > 1) {
+            return http.StreamedResponse(
+              Stream.value(utf8.encode('{"features":[]}')),
+              200,
+            );
+          }
+          return http.StreamedResponse(
+            body.stream,
+            200,
+            contentLength: declared ? 1048577 : null,
+          );
+        });
+        addTearDown(client.close);
+        final repository = PlaceSearchRepository(client);
+        final rejected = expectLater(
+          repository.search('town').timeout(const Duration(seconds: 1)),
+          throwsFormatException,
+        );
+        body.add(payload);
+        unawaited(body.close());
+        await rejected;
+        expect(cancelled, 1);
+        expect(await repository.search('another town'), isEmpty);
+        expect(calls, 2);
+      },
+    );
+  }
 
   test(
     'supports empty results and reports HTTP and malformed responses',

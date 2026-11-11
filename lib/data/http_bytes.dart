@@ -89,8 +89,9 @@ class _HostRequests {
   }
 }
 
-/// Bounded, cancellable download shared by elevation and imagery providers.
-/// Three streamed requests per origin; 429/503 share Retry-After/backoff, at most two retries.
+/// Bounded, cancellable download shared by data providers.
+/// Three streamed requests per origin; by default 429/503 share Retry-After/backoff,
+/// at most two retries. Interactive callers can disable automatic throttled retries.
 /// New calls during cooldown fail fast for provider fallback; existing retries may wait.
 /// The deadline includes queueing and retries. No fixed requests/second quota is assumed.
 Future<Uint8List> downloadBytes(
@@ -99,6 +100,9 @@ Future<Uint8List> downloadBytes(
   required Future<void> abort,
   required int maxBytes,
   Duration timeout = const Duration(seconds: 20),
+  String userAgent =
+      'PhotoSim/0.1 (+https://alchemist-aloha.github.io/PhotoSim/)',
+  bool retryThrottled = true,
 }) async {
   final origins = _hosts[client] ??= {};
   final host = origins.putIfAbsent(uri.origin, _HostRequests.new);
@@ -117,10 +121,11 @@ Future<Uint8List> downloadBytes(
       await host.acquire(stop, uri, deadline, retry: attempt > 0);
       try {
         if (stop.isCompleted) throw http.RequestAbortedException(uri);
-        final request =
-            http.AbortableRequest('GET', uri, abortTrigger: stop.future)
-              ..headers['User-Agent'] =
-                  'PhotoSim/0.1 (+https://alchemist-aloha.github.io/PhotoSim/)';
+        final request = http.AbortableRequest(
+          'GET',
+          uri,
+          abortTrigger: stop.future,
+        )..headers['User-Agent'] = userAgent;
         // Some clients only attach abort handlers after connecting; bound header acquisition too.
         final headers = Completer<http.StreamedResponse>();
         unawaited(
@@ -145,7 +150,8 @@ Future<Uint8List> downloadBytes(
         final response = await headers.future;
         if (response.statusCode != 200) {
           final throttled =
-              response.statusCode == 429 || response.statusCode == 503;
+              retryThrottled &&
+              (response.statusCode == 429 || response.statusCode == 503);
           if (throttled) {
             host.throttle(response.statusCode, response.headers['retry-after']);
             debugPrint(
