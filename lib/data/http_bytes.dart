@@ -168,9 +168,15 @@ Future<Uint8List> downloadBytes(
         }
         final builder = BytesBuilder(copy: false);
         final chunks = StreamIterator(response.stream);
-        final stopped = stop.future.then((_) => false);
+        Future<void>? cancellation;
+        // Cancel the iterator once instead of retaining a stop listener per chunk.
+        unawaited(
+          stop.future.then((_) {
+            cancellation ??= Future.sync(chunks.cancel);
+          }),
+        );
         try {
-          while (await Future.any([chunks.moveNext(), stopped])) {
+          while (await chunks.moveNext()) {
             final chunk = chunks.current;
             if (builder.length + chunk.length > maxBytes) {
               throw const FormatException('Raster response exceeds size limit');
@@ -178,7 +184,7 @@ Future<Uint8List> downloadBytes(
             builder.add(chunk);
           }
         } finally {
-          await chunks.cancel();
+          await (cancellation ??= Future.sync(chunks.cancel));
         }
         if (stop.isCompleted) throw http.RequestAbortedException(uri);
         host.failures = 0;

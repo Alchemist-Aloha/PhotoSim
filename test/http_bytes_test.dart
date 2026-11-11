@@ -92,6 +92,114 @@ void main() {
     );
   }
 
+  test('body failures propagate and release their request slots', () async {
+    final failure = http.ClientException('Body failed', uri);
+    var calls = 0, cancelled = 0;
+    final client = MockClient.streaming((_, _) async {
+      if (++calls > 3) return http.StreamedResponse(Stream.value([1]), 200);
+      final body = StreamController<List<int>>(onCancel: () => cancelled++);
+      addTearDown(body.close);
+      body.add([1]);
+      body.addError(failure);
+      return http.StreamedResponse(body.stream, 200);
+    });
+    addTearDown(client.close);
+    for (var i = 0; i < 3; i++) {
+      await expectLater(fetch(client), throwsA(same(failure)));
+    }
+    expect(cancelled, 3);
+    expect(
+      await Future.wait([
+        for (var i = 0; i < 3; i++)
+          fetch(client).timeout(const Duration(seconds: 1)),
+      ]),
+      [
+        [1],
+        [1],
+        [1],
+      ],
+    );
+  });
+
+  for (final failed in [false, true]) {
+    test('cancellation awaits body cleanup (failed: $failed)', () async {
+      final listening = Completer<void>(), cancelling = Completer<void>();
+      final cleanup = Completer<void>(), stop = Completer<void>();
+      final failure = http.ClientException('Cleanup failed', uri);
+      final body = StreamController<List<int>>(
+        onListen: listening.complete,
+        onCancel: () {
+          cancelling.complete();
+          return cleanup.future;
+        },
+      );
+      addTearDown(body.close);
+      var calls = 0, finished = false;
+      final client = MockClient.streaming((_, _) async {
+        return http.StreamedResponse(
+          ++calls == 1 ? body.stream : Stream.value([1]),
+          200,
+        );
+      });
+      addTearDown(client.close);
+      final rejected = expectLater(
+        fetch(client, abort: stop.future).whenComplete(() => finished = true),
+        failed
+            ? throwsA(same(failure))
+            : throwsA(isA<http.RequestAbortedException>()),
+      );
+      await listening.future;
+      stop.complete();
+      await cancelling.future;
+      await Future<void>.delayed(Duration.zero);
+      expect(finished, isFalse);
+      if (failed) {
+        cleanup.completeError(failure);
+      } else {
+        cleanup.complete();
+      }
+      await rejected;
+      expect(finished, isTrue);
+      expect(
+        await Future.wait([
+          for (var i = 0; i < 3; i++)
+            fetch(client).timeout(const Duration(seconds: 1)),
+        ]),
+        [
+          [1],
+          [1],
+          [1],
+        ],
+      );
+    });
+  }
+
+  for (final oversized in [false, true]) {
+    test(
+      'fragmented body retains its size bound (oversized: $oversized)',
+      () async {
+        var calls = 0;
+        final client = MockClient.streaming((_, _) async {
+          return http.StreamedResponse(
+            ++calls == 1
+                ? Stream.fromIterable(
+                    List.generate(oversized ? 1025 : 1024, (i) => [i % 256]),
+                  )
+                : Stream.value([1]),
+            200,
+          );
+        });
+        addTearDown(client.close);
+        if (oversized) {
+          await expectLater(fetch(client), throwsFormatException);
+        } else {
+          expect(await fetch(client), List.generate(1024, (i) => i % 256));
+        }
+        expect(await fetch(client), [1]);
+      },
+    );
+  }
+
   test('header failures propagate and release their request slots', () async {
     final failure = http.ClientException('Connection failed', uri);
     var calls = 0;
