@@ -242,10 +242,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     final pending = patches.keys
         .where((key) => !waterNodes.containsKey(key))
         .toList();
-    for (var start = 0; start < pending.length; start += 3) {
+    // Show camera-tile water before spending shared query slots on neighbors.
+    final cameraKey = cameraGroundTile?.key;
+    if (cameraKey != null && pending.remove(cameraKey)) {
+      pending.insert(0, cameraKey);
+    }
+    for (var start = 0; start < pending.length; start += start == 0 ? 1 : 3) {
       if (!mounted || token != generation) return;
       await Future.wait(
-        pending.skip(start).take(3).map((key) async {
+        pending.skip(start).take(start == 0 ? 1 : 3).map((key) async {
           final resident = patches[key];
           if (resident == null) return;
           try {
@@ -318,9 +323,15 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                 nodes.add(node);
               }
             }
-            setState(() => waterNodes[key] = nodes);
+            setState(() {
+              waterNodes[key] = nodes;
+              if (result.riversUnavailable) {
+                waterFailure ??= 'River water unavailable; other water is unchanged. Retry terrain to try again.';
+              }
+            });
           } catch (failure) {
             if (!mounted || token != generation) return;
+            debugPrint('PhotoSim water $key: $failure');
             setState(
               () => waterFailure = 'Water unavailable; terrain unchanged. Retry terrain to try again.',
             );
@@ -1100,7 +1111,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             'a coarse mesh and does not display native lidar detail. '
             'Global zoom-12 tiles are cropped where higher zooms are absent. '
             'Mapzen remains the independent fallback.\n\n'
-            'Static water surfaces: $waterAttribution. HydroLAKES v1.0 polygons preserve islands and share one dataset elevation per identified lake, including across atlas boundaries. Heights are pour-point estimates, not surveyed or live levels. MODIS/DEM lake masks remain an outage fallback. Coastline-classified ocean uses approximate mean sea level (0 m in the uncorrected terrain reference), with coarse historical mask coverage. No tides, waves or flowing rivers. Water is clipped to source coverage. Toggle in Settings → Data sources.\n\n'
+            'Static water surfaces: $waterAttribution. HydroLAKES v1.0 polygons preserve islands and share one dataset elevation per identified lake, including across atlas boundaries. Heights are pour-point estimates, not surveyed or live levels. MODIS/DEM lake masks remain an outage fallback. Coastline-classified ocean uses approximate mean sea level (0 m in the uncorrected terrain reference), with coarse historical mask coverage. OpenFreeMap / OpenMapTiles river polygons from OpenStreetMap follow the loaded terrain slope with animated water; river heights are approximate, not surveyed. No tides, hydraulic flow or live levels. Water is clipped to source coverage. Toggle in Settings → Data sources.\n\n'
             'Optional NASA sources (Settings → Data sources; no API key): '
             'NASA WorldWind USGS NED 10 m (contiguous US) and NASA/METI ASTER GDEM v2 30 m '
             'are tried after Mapterhorn, before Mapzen. ASTER GDEM is a product of METI and NASA. '

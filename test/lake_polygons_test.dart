@@ -370,6 +370,9 @@ void main() {
   test('polygon lake coverage survives missing MODIS pixels and mask service failure', () async {
     for (final maskFailure in [false, true]) {
       final client = MockClient((request) async {
+        if (request.url.host == 'tiles.openfreemap.org') {
+          return riverResponse(request.url, riverFixture(id, []));
+        }
         if (request.url.host == 'data-gis.unep-wcmc.org') {
           return http.Response.bytes(lakeFixture(id, [square]), 200);
         }

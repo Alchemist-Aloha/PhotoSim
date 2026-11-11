@@ -37,6 +37,37 @@ See [HydroSHEDS HydroLAKES](https://www.hydrosheds.org/products/hydrolakes).
 The UNEP-WCMC service is a third-party public distribution, not an availability guarantee.
 Oversized/truncated responses are rejected rather than silently drawing partial coverage.
 
+## River water
+
+Mapped **OpenStreetMap** river polygons come from
+[OpenFreeMap](https://openfreemap.org/) static OpenMapTiles vector tiles, without
+an API key. The current tile URL is discovered from
+`https://tiles.openfreemap.org/planet` (TileJSON), not a pinned weekly snapshot.
+Only the `water` layer's `class=river` polygons are used, including mapped canals
+and streams; waterway centerlines, lakes, oceans and underground water are excluded.
+Island rings are preserved. Invalid/oversized protobuf or geometry is rejected.
+
+Tiles use the existing water atlas zoom (up to 10), so small rivers can be omitted
+or simplified by the source. Centerlines are never given invented widths.
+Tile-cut edges stay straight and river outlines are omitted: vector features can
+be split inside a tile, and outlining those cuts would invent banks. Footprints
+are clipped to each rendered terrain triangle and lifted 8 cm above it, retaining
+animated reflections without flattening rivers or carving land.
+**These are DEM-draped approximations, not surveyed river elevations, hydraulic
+flow, flood extents or current water levels.** Terrain errors, cross-channel slopes
+and terrain tile seams remain visible; river water does not repair the DEM.
+
+Credit: **OpenFreeMap · © OpenMapTiles · Data from © OpenStreetMap contributors**,
+[ODbL 1.0](https://www.openstreetmap.org/copyright).
+The shared bounded/cancellable downloader uses at most three requests per origin,
+20-second deadlines, Retry-After/backoff and at most two retries. Camera water
+loads first. Only viewed coverage is fetched; there is no bulk/offline-area
+download. OpenFreeMap's [terms](https://openfreemap.org/tos) limit offline downloads
+to 3,000 tiles or 50 MB, at most four parallel requests, with an identifying
+User-Agent. Availability and mapped coverage vary; there is no service guarantee.
+A river outage preserves available lake/ocean water and shows a retry warning.
+Validated cached tiles work offline without contacting TileJSON or Overpass.
+
 ## Oceans and outage fallback
 
 Two PNG masks use [NASA EOSDIS GIBS WMS](https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi?SERVICE=WMS&REQUEST=GetCapabilities):
@@ -69,14 +100,18 @@ polygon or filling its islands. Near-shore ground within that narrow band can
 also be lowered; hills outside the 4 m tolerance are never excavated.
 Original cached terrain is unchanged. Larger DEM/height discrepancies can still
 occlude water. Raster ocean/fallback outlines retain their source resolution.
-Smooth opaque PBR surfaces receive scene lighting/specular sky; narrow dark
-rims distinguish shores. No waves, flowing rivers, tides or live levels are modeled.
+Water surfaces receive animated ripples, sky/cloud reflections and filtered sun
+glitter; narrow dark rims distinguish lake/ocean shores (not tile-cut rivers). No tides, hydraulic flow or live
+levels are modeled.
 
 Loading is asynchronous after terrain, without blocking imagery. Failed water
 requests preserve terrain and expose retry. Navigation, source/detail changes
 and disabling water discard stale results; disabling restores original terrain.
 
-Original GeoJSON and provenance use `hydrolakes-v10-polygons-v1`. PNG namespaces
+Original lake GeoJSON and provenance use `hydrolakes-v10-polygons-v1`; original
+OpenFreeMap PBF tiles/provenance use `openfreemap-rivers-v1`. Old Overpass
+`osm-riverbanks-v1` entries are never reused but remain eligible for LRU cleanup.
+PNG namespaces
 are `modis-water-2015-256-v1` and `osm-coast-mask-256-v1`. All count against the
 shared **Settings → Storage** LRU budget, including while water is disabled.
 Corrupt entries are replaced; cached polygons/masks and fallback DEMs work offline.
@@ -91,6 +126,28 @@ shared contours across tiles/detail levels, holes/concavity, clipping, cross-atl
 lake levels, real Rochester/Lake Ontario shoreline geometry, cache recovery/offline
 reuse and polygons with missing/unavailable MODIS coverage. `test/water_test.dart`
 covers ocean classification, raster outage fallback, curvature, bounded terrain
-adjustment and cancellation. `integration_test/water_test.dart` renders a polygon
-lake with an empty raster mask on the Linux GPU, including detail/toggle reloads;
-it writes `build/validation/linux-static-water.png`.
+adjustment and cancellation. `test/river_test.dart` covers MVT layer/class
+filtering, island rings, straight tile cuts, real Anacostia geometry, triangle-exact
+sloping surfaces, malformed protobuf/geometry, validated TileJSON discovery,
+offline cache reuse, independent outages, shared atlas requests and cancellation. The storage test includes river cache eviction
+across restarts. `integration_test/water_test.dart` renders a polygon lake and
+river with an empty raster mask on the Linux GPU, including detail/toggle reloads;
+it writes `build/validation/linux-static-water.png` and
+`build/validation/linux-river-water.png`.
+`integration_test/anacostia_water_test.dart` uses downloaded Anacostia riverbanks
+and the real central DC DEM at `38.8805,-76.971`. Synthetic green imagery isolates
+the water layer: the test checks that the visible blue river disappears when
+water is disabled. It writes `build/validation/anacostia-water.png` and
+`build/validation/anacostia-terrain.png`. The regression checks TileJSON discovery
+and camera-first tile loading. Fixtures/provenance are in `test/fixtures/README.md`.
+To exercise a cold-cache **live** river request instead of the river fixture:
+
+```sh
+flutter test integration_test/anacostia_water_test.dart -d linux --dart-define=PHOTOSIM_LIVE_RIVERS=true
+```
+
+This opt-in check fetches the camera atlas from the real river endpoint, checks
+visible water and its toggle, but does not wait for background neighboring atlases.
+It retains deterministic terrain and imagery fixtures; ordinary tests stay offline.
+Rebuild the runnable bundle
+with `flutter build linux --release` after changing providers.

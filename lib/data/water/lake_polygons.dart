@@ -13,11 +13,16 @@ List<LakeEdge> _tileEdges(LakePolygon lake, TileId id) =>
 
 /// Full lake geometry and one dataset elevation, independent of render/atlas tiles.
 class LakePolygon {
-  LakePolygon(this.id, this.height, this.rings);
+  LakePolygon(this.id, this.height, this.rings) : _tiled = false;
+  // Tile-cut polygons must retain shared straight edges, not rounded corners.
+  LakePolygon.tiled(this.id, this.rings) : height = 0, _tiled = true;
+  final bool _tiled;
   final int id;
   final double height;
   final List<List<math.Point<double>>> rings;
-  late final _curvedRings = rings.map(_curveRing).toList();
+  late final _curvedRings = rings
+      .map((ring) => _tiled ? ring.map(_mercator).toList() : _curveRing(ring))
+      .toList();
 }
 
 List<LakePolygon> decodeLakePolygons(Uint8List bytes) {
@@ -98,15 +103,19 @@ List<LakePolygon> decodeLakePolygons(Uint8List bytes) {
   return lakes;
 }
 
+math.Point<double> _mercator(math.Point<double> point) {
+  final radians = point.y * math.pi / 180;
+  return math.Point(
+    (point.x + 180) / 360,
+    (1 - math.log(math.tan(radians) + 1 / math.cos(radians)) / math.pi) / 2,
+  );
+}
+
 // Round corners in world coordinates so adjacent tiles and mesh LODs share one curve.
 List<math.Point<double>> _curveRing(List<math.Point<double>> ring) {
   final points = <math.Point<double>>[];
   for (final point in ring) {
-    final radians = point.y * math.pi / 180;
-    final projected = math.Point(
-      (point.x + 180) / 360,
-      (1 - math.log(math.tan(radians) + 1 / math.cos(radians)) / math.pi) / 2,
-    );
+    final projected = _mercator(point);
     if (points.isEmpty || points.last != projected) points.add(projected);
   }
   if (points.length > 1 && points.first == points.last) points.removeLast();

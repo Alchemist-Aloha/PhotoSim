@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'lake_polygons.dart';
 import 'lake_shore.dart';
+import 'river_mesh.dart';
 
 import 'package:latlong2/latlong.dart';
 
@@ -12,9 +13,16 @@ import '../terrain/terrain_patch.dart';
 
 /// A fixed geographic atlas keeps neighboring render tiles at the same level.
 class WaterAtlas {
-  WaterAtlas(this.id, this.levels, {this.lakes = const []});
+  WaterAtlas(
+    this.id,
+    this.levels, {
+    this.lakes = const [],
+    this.rivers = const [],
+    this.riversUnavailable = false,
+  });
   final TileId id;
-  final List<LakePolygon> lakes;
+  final List<LakePolygon> lakes, rivers;
+  final bool riversUnavailable;
 
   /// NaN is land, missing coverage, or an uncertain/sloping water body.
   final Float32List levels;
@@ -136,13 +144,32 @@ class WaterPatch {
     this.surface,
     this.outline, {
     this.adjustedTerrain = false,
+    this.riversUnavailable = false,
   });
-  final bool adjustedTerrain;
+  final bool adjustedTerrain, riversUnavailable;
   final TerrainPatch terrain;
   final WaterMesh surface, outline;
 }
 
 WaterPatch buildWaterPatch(
+  WaterAtlas atlas,
+  TerrainPatch terrain,
+  TileId id,
+  LatLng origin,
+) {
+  final result = _buildStillWaterPatch(atlas, terrain, id, origin);
+  // shortcut: DEM-draped rivers are not hydraulic levels; use surveyed profiles for flow simulation.
+  addRiverMeshes(atlas.rivers, result.terrain, result.surface);
+  return WaterPatch(
+    result.terrain,
+    result.surface,
+    result.outline,
+    adjustedTerrain: result.adjustedTerrain,
+    riversUnavailable: atlas.riversUnavailable,
+  );
+}
+
+WaterPatch _buildStillWaterPatch(
   WaterAtlas atlas,
   TerrainPatch terrain,
   TileId id,

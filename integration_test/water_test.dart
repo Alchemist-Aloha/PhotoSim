@@ -52,6 +52,31 @@ void main() {
       final requests = <Uri>[];
       final client = MockClient((request) async {
         requests.add(request.url);
+        if (request.url.host == 'tiles.openfreemap.org') {
+          return riverResponse(
+            request.url,
+            riverFixture(atlas, [
+              [
+                [0.44, 0.30],
+                [0.47, 0.30],
+                [0.48, 0.34],
+                [0.47, 0.38],
+                [0.48, 0.42],
+                [0.46, 0.43],
+                [0.45, 0.38],
+                [0.46, 0.34],
+                [0.44, 0.30],
+              ],
+              [
+                [0.462, 0.357],
+                [0.468, 0.357],
+                [0.468, 0.368],
+                [0.462, 0.368],
+                [0.462, 0.357],
+              ],
+            ]),
+          );
+        }
         if (request.url.host == 'data-gis.unep-wcmc.org') {
           return http.Response.bytes(polygons, 200);
         }
@@ -226,6 +251,46 @@ void main() {
               (uri) => uri.queryParameters['LAYERS'] == waterProvider.layer,
             ),
         isEmpty,
+      );
+      final riverLocation = atlas.point(0.465, 0.37);
+      rebuild(
+        () => state = state.copyWith(
+          latitude: riverLocation.latitude,
+          longitude: riverLocation.longitude,
+          fixedElevation: 1200,
+        ),
+      );
+      await waitFor(
+        () =>
+            workspace.loading == false &&
+            workspace.waterNodes.length == 9 &&
+            workspace.imageryLoading == false,
+      );
+      expect(workspace.waterFailure, isNull);
+      expect(
+        requests.where(
+          (uri) =>
+              uri.host == 'tiles.openfreemap.org' && uri.path.endsWith('.pbf'),
+        ),
+        hasLength(1),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      final riverImage = await boundary.toImage();
+      final riverBytes = await riverImage.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      await File('build/validation/linux-river-water.png')
+          .writeAsBytes(riverBytes!.buffer.asUint8List());
+      riverImage.dispose();
+      final decoded = image.decodePng(riverBytes.buffer.asUint8List())!;
+      var waterPixels = 0;
+      for (final pixel in decoded) {
+        if (pixel.b > pixel.r + 15 && pixel.b > pixel.g) waterPixels++;
+      }
+      expect(
+        waterPixels,
+        greaterThan(1000),
+        reason: 'Mapped river must render reflective water, not just terrain imagery',
       );
       expect(tester.takeException(), isNull);
     },

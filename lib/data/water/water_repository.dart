@@ -15,11 +15,12 @@ import '../terrain/tile_cache.dart';
 import 'water_patch.dart';
 import 'lake_polygons.dart';
 import 'lake_repository.dart';
+import 'river_repository.dart';
 
 const waterCacheKey = 'modis-water-2015-256-v1';
 const oceanCacheKey = 'osm-coast-mask-256-v1';
 const waterAttribution =
-    '$lakeAttribution · NASA EOSDIS GIBS MODIS 2015 / © OpenStreetMap contributors coastlines; mean sea level';
+    '$lakeAttribution · $riverAttribution · NASA EOSDIS GIBS MODIS 2015 / © OpenStreetMap contributors coastlines; mean sea level';
 const oceanProvider = WmsImageryProvider(
   name: 'OSM coastline land mask',
   cacheKey: oceanCacheKey,
@@ -59,11 +60,17 @@ class WaterRepository {
          client: client,
          directory: directory,
          budget: budget,
+       ),
+       rivers = RiverRepository(
+         client: client,
+         directory: directory,
+         budget: budget,
        );
   final http.Client client;
   final TerrainSources terrain;
   final TileCache cache, oceanCache;
   final LakeRepository lakes;
+  final RiverRepository rivers;
   final _atlases = <(Future<void>, String), Future<WaterAtlas>>{};
 
   Future<Uint8List> _mask(
@@ -108,27 +115,42 @@ class WaterRepository {
   }
 
   Future<WaterAtlas> _load(TileId id, Future<void> abort) async {
-    List<LakePolygon>? polygons;
-    try {
-      polygons = await lakes.load(id, abort: abort);
-    } on http.RequestAbortedException {
-      rethrow;
-    } on Exception {
-      // Polygon outages retain the existing mask/DEM fallback, never fabricated levels.
+    Future<List<LakePolygon>?> optional(
+      Future<List<LakePolygon>> request,
+    ) async {
+      try {
+        return await request;
+      } on http.RequestAbortedException {
+        rethrow;
+      } on Exception {
+        return null;
+      }
     }
+
+    final [polygons, riverPolygons] = await Future.wait([
+      optional(lakes.load(id, abort: abort)),
+      // shortcut: atlas zoom limits small-river detail; use finer MVTs when needed.
+      optional(rivers.load(id, abort: abort)),
+    ]);
     WaterAtlas atlas;
     try {
       atlas = await _raster(id, abort, inland: polygons == null);
     } on http.RequestAbortedException {
       rethrow;
     } on Exception {
-      if (polygons == null) rethrow;
+      if (polygons == null && (riverPolygons?.isEmpty ?? true)) rethrow;
       atlas = WaterAtlas(
         id,
         Float32List(256 * 256)..fillRange(0, 256 * 256, double.nan),
       );
     }
-    return WaterAtlas(id, atlas.levels, lakes: polygons ?? const []);
+    return WaterAtlas(
+      id,
+      atlas.levels,
+      lakes: polygons ?? const [],
+      rivers: riverPolygons ?? const [],
+      riversUnavailable: riverPolygons == null,
+    );
   }
 
   Future<WaterAtlas> _raster(

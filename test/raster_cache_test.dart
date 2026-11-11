@@ -61,30 +61,31 @@ void main() {
     },
   );
 
-  test(
-    'water masks and lake polygons share the budget, including after restart',
-    () async {
-      await budget.setLimitMiB(3);
-      final lakes = source('hydrolakes-v10-polygons-v1');
-      final water = source('modis-water-2015-256-v1');
-      final coast = source('osm-coast-mask-256-v1');
-      final terrain = source('mapterhorn-v1');
-      await lakes.write(a, Uint8List(600 * 1024));
-      await water.write(a, Uint8List(600 * 1024));
-      await coast.write(c, Uint8List(600 * 1024));
-      await terrain.write(b, Uint8List(600 * 1024));
-      await raster(lakes, a).setLastModified(DateTime.utc(1999));
-      await raster(water, a).setLastModified(DateTime.utc(2000));
-      await raster(coast, c).setLastModified(DateTime.utc(2001));
-      final restarted = RasterCache(budget.directory, settingsFile: settings);
-      await restarted.initialize();
-      await restarted.setLimitMiB(1);
-      expect(await raster(lakes, a).exists(), isFalse);
-      expect(await raster(water, a).exists(), isFalse);
-      expect(await raster(coast, c).exists(), isFalse);
-      expect(await raster(terrain, b).exists(), isTrue);
-    },
-  );
+  test('water masks, lake and river polygons share the budget, including after restart', () async {
+    await budget.setLimitMiB(3);
+    final lakes = source('hydrolakes-v10-polygons-v1');
+    final rivers = source('openfreemap-rivers-v1');
+    final water = source('modis-water-2015-256-v1');
+    final coast = source('osm-coast-mask-256-v1');
+    final terrain = source('mapterhorn-v1');
+    await rivers.write(a, Uint8List(300 * 1024));
+    await lakes.write(a, Uint8List(600 * 1024));
+    await water.write(a, Uint8List(600 * 1024));
+    await coast.write(c, Uint8List(600 * 1024));
+    await terrain.write(b, Uint8List(600 * 1024));
+    await raster(rivers, a).setLastModified(DateTime.utc(1998));
+    await raster(lakes, a).setLastModified(DateTime.utc(1999));
+    await raster(water, a).setLastModified(DateTime.utc(2000));
+    await raster(coast, c).setLastModified(DateTime.utc(2001));
+    final restarted = RasterCache(budget.directory, settingsFile: settings);
+    await restarted.initialize();
+    await restarted.setLimitMiB(1);
+    expect(await raster(rivers, a).exists(), isFalse);
+    expect(await raster(lakes, a).exists(), isFalse);
+    expect(await raster(water, a).exists(), isFalse);
+    expect(await raster(coast, c).exists(), isFalse);
+    expect(await raster(terrain, b).exists(), isTrue);
+  });
 
   test('one LRU cap across terrain, previews and detail, not old per-source quotas', () async {
     await budget.setLimitMiB(1);

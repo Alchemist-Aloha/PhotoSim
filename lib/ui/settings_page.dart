@@ -161,7 +161,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     onChanged: (value) =>
                         update(state.copyWith(showWater: value)),
                     subtitle: const Text(
-                      'HydroLAKES lake polygons with one estimated level per lake, plus approximate 250 m NASA/OSM ocean coverage. Raster lake coverage is used if the polygon service is unavailable. No tides or flowing rivers. Reloads the preview; independent of NASA terrain & imagery.',
+                      'HydroLAKES lakes, OpenFreeMap river polygons following approximate terrain heights, and 250 m NASA/OSM ocean coverage. Animated reflections; no tides, hydraulic flow or live levels. Raster lakes are an outage fallback. Reloads the preview; independent of NASA terrain & imagery.',
                     ),
                   ),
                   const Divider(height: 32),

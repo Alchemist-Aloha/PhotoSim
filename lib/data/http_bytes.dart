@@ -120,7 +120,7 @@ Future<Uint8List> downloadBytes(
         final request =
             http.AbortableRequest('GET', uri, abortTrigger: stop.future)
               ..headers['User-Agent'] =
-                  'PhotoSim/0.1 (landscape photography planner)';
+                  'PhotoSim/0.1 (+https://alchemist-aloha.github.io/PhotoSim/)';
         // Some clients only attach abort handlers after connecting; bound header acquisition too.
         final headers = Completer<http.StreamedResponse>();
         unawaited(

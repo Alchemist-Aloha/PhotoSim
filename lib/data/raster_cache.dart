@@ -35,6 +35,10 @@ class RasterCache {
     yield Directory('${directory.path}/modis-water-2015-256-v1');
     yield Directory('${directory.path}/osm-coast-mask-256-v1');
     yield Directory('${directory.path}/hydrolakes-v10-polygons-v1');
+    yield Directory(
+      '${directory.path}/osm-riverbanks-v1',
+    ); // Legacy cache remains evictable.
+    yield Directory('${directory.path}/openfreemap-rivers-v1');
     for (final provider in TerrainProvider.values) {
       yield Directory('${directory.path}/${provider.cacheKey}');
     }

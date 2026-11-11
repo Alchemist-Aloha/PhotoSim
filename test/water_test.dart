@@ -213,6 +213,9 @@ void main() {
   test('repository shares an atlas, caches original bytes with epoch/credit, and works offline', () async {
     final bytes = waterFixture(wet: (_, _) => true), requests = <Uri>[];
     final client = MockClient((request) async {
+      if (request.url.host == 'tiles.openfreemap.org') {
+        return riverResponse(request.url, riverFixture(id, []));
+      }
       requests.add(request.url);
       if (request.url.host == 'data-gis.unep-wcmc.org') {
         return http.Response('unavailable', 404);
@@ -270,6 +273,9 @@ void main() {
 
   test('ocean-only atlases ignore bathymetry and skip DEM downloads', () async {
     final client = MockClient((request) async {
+      if (request.url.host == 'tiles.openfreemap.org') {
+        return riverResponse(request.url, riverFixture(id, []));
+      }
       if (request.url.host == 'data-gis.unep-wcmc.org') {
         return http.Response('unavailable', 404);
       }
@@ -302,6 +308,9 @@ void main() {
       var demRequests = 0;
       final bytes = waterFixture(wet: (_, _) => false);
       final client = MockClient((request) async {
+        if (request.url.host == 'tiles.openfreemap.org') {
+          return riverResponse(request.url, riverFixture(id, []));
+        }
         if (request.url.host == 'data-gis.unep-wcmc.org') {
           return http.Response('unavailable', 404);
         }
