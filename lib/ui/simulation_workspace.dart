@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -1028,6 +1029,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       if (!mounted) return;
       var path =
           '${directory.path}/photosim-${DateTime.now().toUtc().microsecondsSinceEpoch}.png';
+      var picks = 0;
       final destination = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1042,11 +1044,36 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                     'Exports the framed photo region with weather, depth of field and source credits; no frame, lens label, crosshair or controls. Rendered again at twice the screen pixel density for the saved file. Maximum 6144 px / 20 MP. Existing files are never overwritten.',
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    initialValue: path,
-                    onChanged: (value) => path = value,
-                    decoration: const InputDecoration(
-                      labelText: 'Absolute PNG path',
+                  StatefulBuilder(
+                    builder: (context, setPath) => TextFormField(
+                      // A new key re-seeds the field after browsing.
+                      key: ValueKey(picks),
+                      initialValue: path,
+                      onChanged: (value) => path = value,
+                      onFieldSubmitted: (value) =>
+                          Navigator.pop(context, value.trim()),
+                      decoration: InputDecoration(
+                        labelText: 'Absolute PNG path',
+                        suffixIcon: IconButton(
+                          tooltip: 'Browse for save location',
+                          icon: const Icon(Icons.folder_open),
+                          onPressed: () async {
+                            final file = File(path.trim());
+                            final picked = await getSaveLocation(
+                              initialDirectory: file.parent.path,
+                              suggestedName: file.uri.pathSegments.last,
+                              acceptedTypeGroups: const [
+                                XTypeGroup(label: 'PNG', extensions: ['png']),
+                              ],
+                            );
+                            if (picked == null || !context.mounted) return;
+                            path = picked.path.toLowerCase().endsWith('.png')
+                                ? picked.path
+                                : '${picked.path}.png';
+                            setPath(() => picks++);
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ],
