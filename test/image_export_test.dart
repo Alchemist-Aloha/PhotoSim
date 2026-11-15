@@ -5,8 +5,36 @@ import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:photosim/data/image_export.dart';
+import 'package:photosim/ui/simulation_workspace.dart';
 
 void main() {
+  test('save failures read as actions, not exception dumps', () async {
+    final directory = Directory.systemTemp.createTempSync('photosim-save-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final taken = File('${directory.path}/taken.png')..writeAsBytesSync([1]);
+    Future<String> attempt(String path) async {
+      try {
+        await savePreview(path, Uint8List(1));
+      } catch (failure) {
+        return saveFailureMessage(failure);
+      }
+      fail('save should fail');
+    }
+
+    expect(
+      await attempt(taken.path),
+      'A file already exists at that path. Choose another name.',
+    );
+    expect(
+      await attempt('relative.png'),
+      'Choose an absolute path ending in .png',
+    );
+    expect(
+      await attempt('${directory.path}/missing/x.png'),
+      startsWith('Could not write the PNG there.'),
+    );
+  });
+
   testWidgets(
     'PNG preserves dimensions and burns credits without changing the source',
     (tester) async {

@@ -47,6 +47,19 @@ import '../core/camera_movement.dart';
 import '../data/terrain/terrain_patch.dart';
 import '../render/night_sky.dart';
 
+/// User-facing text for a failed PNG save; details go to the debug log.
+String saveFailureMessage(Object failure) {
+  debugPrint('PhotoSim PNG save: $failure');
+  return switch (failure) {
+    FormatException(:final message) => message,
+    // EEXIST on Linux/Android, ERROR_FILE_EXISTS on Windows.
+    FileSystemException(osError: OSError(errorCode: 17 || 80)) =>
+      'A file already exists at that path. Choose another name.',
+    FileSystemException() => 'Could not write the PNG there. Choose another folder or check its permissions.',
+    _ => 'Could not save the PNG. Choose another path or retry.',
+  };
+}
+
 class SimulationWorkspace extends StatefulWidget {
   const SimulationWorkspace({
     super.key,
@@ -142,7 +155,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   bool imageryLoading = false;
   final imageryInFlight = <(int, String)>{};
   int imageryFailures = 0;
-  String? imageryFailure;
   late final http.Client client;
   late final bool ownsClient;
   final terrainNodes = <scene.Node>[];
@@ -153,7 +165,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   TerrainPatch? cameraGroundField;
   TileId? cameraGroundTile;
   LatLng? navigationLocation;
-  String? tileFailure;
   Object? error;
   bool loading = true;
   AtmosphereSky? skySource;
@@ -645,7 +656,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       waterFailure = null;
       imageryLoading = false;
       imageryFailures = 0;
-      imageryFailure = null;
       loaded = patches.length;
       failed = 0;
       total = tiles.length;
@@ -654,7 +664,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         cameraGroundField = null;
         cameraGroundTile = null;
       }
-      tileFailure = null;
       loading = true;
     });
     final missing = tiles
@@ -737,10 +746,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
             }
           } catch (failure) {
             if (!mounted || token != generation) return;
-            setState(() {
-              failed++;
-              tileFailure = '$failure';
-            });
+            debugPrint('PhotoSim terrain ${id.key}: $failure');
+            setState(() => failed++);
           }
         }),
       );
@@ -803,7 +810,6 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     setState(() {
       imageryLoading = true;
       imageryFailures = 0;
-      imageryFailure = null;
     });
     final centerKey = TileId.at(widget.state.location).key;
     final entries =
@@ -856,10 +862,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       } catch (failure) {
         if (!mounted || token != generation) return;
         // Retain an existing preview when higher resolution cannot be fetched.
-        setState(() {
-          imageryFailures++;
-          imageryFailure = '$failure';
-        });
+        debugPrint('PhotoSim imagery ${patch.id.key}: $failure');
+        setState(() => imageryFailures++);
       } finally {
         imageryInFlight.remove(key);
       }
@@ -988,7 +992,9 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
     } catch (failure) {
       if (mounted) {
         setState(
-          () => exportError = 'Render failed: $failure. Try rendering again.',
+          () => exportError = failure is StateError
+              ? '${failure.message}. Enlarge the window and try again.'
+              : 'Could not render the PNG. Try again.',
         );
         ScaffoldMessenger.of(context)
           ..removeWorkspaceFeedback()
@@ -1102,10 +1108,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
         );
     } catch (failure) {
       if (mounted) {
-        setState(
-          () => exportError =
-              'Save failed: $failure. Choose another path or retry.',
-        );
+        setState(() => exportError = saveFailureMessage(failure));
         ScaffoldMessenger.of(context)
           ..removeWorkspaceFeedback()
           ..showWorkspaceFeedback(SnackBar(content: Text(exportError!)));
@@ -1653,7 +1656,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                         Expanded(
                                           child: Text(
                                             failed > 0
-                                                ? '$failed terrain tiles unavailable. ${tileFailure ?? ''}'
+                                                ? '$failed terrain tiles unavailable. Check your connection, then retry.'
                                                 : repository!.cacheWarning!,
                                           ),
                                         ),
@@ -1696,7 +1699,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                         Expanded(
                                           child: Text(
                                             imageryFailures > 0
-                                                ? 'Imagery unavailable or incomplete: $imageryFailure. Terrain remains usable.'
+                                                ? 'Imagery unavailable or incomplete: check your connection, then retry. Terrain remains usable.'
                                                 : imagery!.cacheWarning!,
                                           ),
                                         ),
