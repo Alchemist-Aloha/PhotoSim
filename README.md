@@ -1,149 +1,183 @@
-# PhotoSim
+<p align="center">
+  <img src="website/public/icon.svg" width="96" alt="PhotoSim icon">
+</p>
 
-Landscape photography simulator for **Linux, Windows and Android phones/tablets**, built
-with Flutter and Material 3. **The Linux MVP is complete** under the revised
-[Linux release scope](docs/linux-mvp.md). Android setup and validation are recorded
-in [Android support](docs/android.md); the long-term specification is not a claim
-of implemented features.
-Implementation beyond that baseline is underway; see the [full Linux spec progress](docs/linux-spec-progress.md)
-for delivered features and the explicitly unfinished backlog.
+<h1 align="center">PhotoSim</h1>
 
-## Website
+<p align="center">
+  <b>Scout landscape and night-sky photos before you leave home.</b><br>
+  Put a camera anywhere on the map, see what your lens would see over real terrain,
+  and find the right night for the Milky Way.
+</p>
 
-The [PhotoSim website](https://alchemist-aloha.github.io/PhotoSim/) includes real
-Linux and Android screenshots, a workflow walkthrough, and release downloads.
-See the [website README](website/README.md) for local development, GitHub Pages
-deployment, and screenshot capture instructions.
+<p align="center">
+  <a href="https://github.com/Alchemist-Aloha/PhotoSim/releases/latest">Download</a> ·
+  <a href="https://alchemist-aloha.github.io/PhotoSim/">Website</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#build-from-source">Build from source</a>
+</p>
 
-## Run on Linux
+<p align="center">
+  <img src="website/public/screenshots/linux-preview.png" width="800" alt="PhotoSim 3D preview of Yosemite Valley with optics controls">
+</p>
 
-Requires Flutter **3.47.1 or newer** (developed with 3.47.6), Clang, CMake,
-Ninja, GTK 3 development libraries, and an Impeller-compatible graphics driver.
+PhotoSim is a free, open-source photography planner for **Linux, Windows, and
+Android**. It pairs real elevation data and aerial/satellite imagery with
+offline astronomy so you can figure out where to stand, where to aim, and when
+to go before you pack your bag. No account, subscription, or API key required.
+
+## What you can do
+
+| | |
+|---|---|
+| <img src="website/public/screenshots/linux-map.png" alt="Map workspace with camera, field-of-view wedge and Sun/Moon bearings"> | **Plan on the map.** Search for a place, tap to drop your camera, and drag to aim. The field-of-view wedge matches your sensor and lens, and Sun, Moon, and Galactic-center bearings show where the light is coming from. |
+| <img src="website/public/screenshots/linux-night.png" alt="Night 3D preview with the Milky Way and constellation lines over Yosemite"> | **See the view in 3D.** Real terrain, satellite imagery, lakes and rivers, and a sky with the Sun, Moon, planets, 5,000+ stars, and the Milky Way—all at the exact time and place you choose. Scrub through the day or hit play to watch the sky move. |
+| <img src="website/public/screenshots/linux-calendar.png" alt="Night calendar with Milky Way scores for each day of June 2026"> | **Pick the right night.** The night calendar scores each evening for Milky Way photography based on moonlight, darkness, light pollution at your spot, and an optional weather forecast. |
+| <img src="website/public/screenshots/linux-export.png" alt="Export tab with a rendered PNG and AI-enhancement prompt"> | **Export your shot.** Render a high-resolution PNG with data credits, plus a ready-to-copy scene prompt if you want to feed it into an AI image tool. |
+
+**On your phone or tablet too.** The Android app has the same features with a
+touch-friendly layout: drag to aim, pinch to zoom.
+
+<p align="center">
+  <img src="website/public/screenshots/android-map.png" width="240" alt="Android map view">
+  <img src="website/public/screenshots/android-preview.png" width="240" alt="Android 3D preview">
+  <img src="website/public/screenshots/android-calendar.png" width="240" alt="Android night calendar">
+</p>
+
+### Feature highlights
+
+- **Real camera optics:** full-frame and APS-C sensors, 8–600 mm lenses, landscape or
+  portrait orientation, aperture-linked depth of field, ISO/shutter/exposure, and white balance.
+- **Accurate sky:** Sun, Moon (with phase), the seven naked-eye planets, stars,
+  constellations, and the Milky Way—all calculated offline for any date from 1900 to 2100.
+- **Local time that makes sense:** dates and times use the camera location's
+  time zone, with daylight saving handled automatically.
+- **Weather and atmosphere:** clear, cloudy, fog, and rain presets, moving
+  procedural clouds, and adjustable visibility. These are just for visual reference, not a forecast.
+- **Composition aids:** rule-of-thirds grid, level, crosshair, fullscreen preview, and
+  one-click aiming at the Sun, Moon, a planet, or the Galactic center.
+- **Save and resume:** save plans as files to reopen later. PhotoSim also
+  brings back your last session when you reopen it.
+- **Quality presets:** Performance, Balanced, or High, depending on your GPU.
+
+## Install
+
+Download the latest build from the
+[Releases page](https://github.com/Alchemist-Aloha/PhotoSim/releases/latest).
+
+| Platform | File | How to install |
+|---|---|---|
+| **Debian / Ubuntu** | `PhotoSim-<version>-x86_64.deb` | `sudo apt install ./PhotoSim-*.deb` |
+| **Arch Linux** | `PhotoSim-<version>-x86_64.pkg.tar.zst` | `sudo pacman -U PhotoSim-*.pkg.tar.zst` |
+| **Any Linux** | `PhotoSim-<version>-x86_64.AppImage` | `chmod +x PhotoSim-*.AppImage`, then run it |
+| **Windows 10/11** | `PhotoSim-<version>-windows-x64-setup.exe` | Run the installer (no admin rights needed) |
+| **Windows (portable)** | `PhotoSim-<version>-windows-x64.zip` | Extract and open `photosim.exe` |
+| **Android 10+** | `PhotoSim-<version>-arm64-v8a.apk` | Open the APK on your device (most phones use arm64) |
+
+**Requirements:** a reasonably recent GPU and driver (PhotoSim uses
+Flutter's Impeller/GPU backend) and an internet connection the first time you load
+maps, terrain, or imagery. Places you've already visited stay cached locally.
+
+## Quick start
+
+1. **Find your spot.** On the **Map** tab, search for a town or landmark,
+   or just pan around. The map starts at Yosemite.
+2. **Place the camera.** Click or tap the map to drop it. Drag the camera marker to move it,
+   and drag its green handle to aim.
+3. **Choose your lens.** Under **Optics**, pick a sensor and focal length. The map
+   wedge updates to match.
+4. **Look through it.** Switch to **3D Preview**. Drag to look around, pinch (on touch) or use
+   the focal-length slider to zoom, or click the view and hold **W A S D** to walk around on desktop.
+5. **Set the time.** Drag the timeline slider at the bottom, or use **Edit local** to
+   type an exact date and time. Press ▶ to watch the Sun, Moon, and stars move.
+6. **Find a dark night.** Open the **Calendar** tab to see which evenings are best for
+   the Milky Way at that spot.
+7. **Save or export.** Click the folder icon to save your plan, or head to **Export** to
+   render a PNG.
+
+Tip: turn on **Constellations** in the 3D preview if you want help reading the night sky.
+
+## Good to know
+
+PhotoSim is a **planning aid, not a photograph**. Keep a few limits in mind:
+
+- **Geometry is the reliable part.** Camera position, field of view, and Sun/Moon/star
+  positions are calculated. Lighting, exposure, clouds, and night-sky brightness
+  are approximations.
+- **Terrain and imagery come from free public datasets** (roughly 10–30 m terrain in most places,
+  finer in some regions). Small rock formations and distant horizons may not be exact,
+  and satellite imagery can be several years old with shadows already baked in.
+- **Weather presets are just for show.** The calendar can pull a free Open-Meteo
+  forecast, but the 3D view doesn't render live weather.
+- **Local time zones** are estimated from the camera's coordinates and work
+  for 1970–2037. Outside that range, use UTC.
+- **Android:** tested on emulators so far. Real-world performance depends on your phone's GPU.
+
+For details, see the docs on [astronomy](docs/astronomy.md),
+[terrain](docs/data-sources/terrain.md), [imagery](docs/data-sources/imagery.md),
+[water](docs/data-sources/water.md), [night sky](docs/data-sources/night-sky.md),
+[clouds](docs/clouds.md) and the [night calendar](docs/night-calendar.md).
+
+## Privacy and data sources
+
+Everything runs on your device. PhotoSim has no account, analytics or paid API.
+
+- **Map:** [OpenStreetMap](https://www.openstreetmap.org/) tiles.
+- **Place search:** [Photon](https://github.com/komoot/photon). Only the text you
+  search for is sent, never your camera location or plans.
+- **Terrain:** [Mapterhorn](https://mapterhorn.com/) (Copernicus GLO-30 and regional
+  elevation models), with Mapzen and optional NASA fallbacks.
+- **Imagery:** USGS NAIP (USA), IGN (France), swisstopo (Switzerland), and EOX
+  Sentinel-2 or NASA Landsat elsewhere.
+- **Water:** HydroLAKES, OpenFreeMap/OpenStreetMap rivers and NASA/OSM ocean masks.
+- **Forecasts:** [Open-Meteo](https://open-meteo.com/), only when you use the calendar.
+
+Saved plans are plain, unencrypted JSON files on your device. Exported PNGs and
+prompts include precise GPS coordinates and time, so check them before sharing.
+Downloaded data is cached locally (512 MiB by default, adjustable under
+**Settings → Storage**).
+
+## Build from source
+
+You need [Flutter](https://docs.flutter.dev/get-started/install) **3.47.1 or newer**.
+
+**Linux** (also needs Clang, CMake, Ninja and the GTK 3 development libraries):
 
 ```sh
 flutter pub get
 flutter run -d linux
 ```
 
-The Linux runner enables Flutter GPU permanently; no extra rendering flags
-are needed. Under Hyprland and niri, it automatically hides GTK's window header
-and client-side decorations using compositor/desktop environment variables;
-PhotoSim's own toolbar remains available. Other desktops keep their existing
-window-decoration behavior. Direct dependencies are pinned and `pubspec.lock` is included.
+**Android** (Android SDK, API 29+ device or emulator):
 
-## Run on Windows
+```sh
+flutter pub get
+flutter run -d <device-id>
+flutter build apk --release   # → build/app/outputs/flutter-apk/app-release.apk
+```
 
-Requires Windows 10/11 x64 and an Impeller-compatible graphics driver. Extract
-the portable ZIP and open `photosim.exe`, keeping its DLLs and `data` folder
-together. To build from source with Flutter and Visual Studio's C++ tools:
+**Windows** (Visual Studio C++ tools; Inno Setup 6 for the installer):
 
 ```powershell
 python tool/build_release.py windows --installer
 ```
 
-Inno Setup 6 is required for the EXE installer; omit `--installer` to build only
-the portable ZIP. Versioned packages and checksums are written to `build/dist/`. See
-[Windows build and usage](docs/windows.md) for prerequisites and controls.
+Platform notes: [Android](docs/android.md) · [Windows](docs/windows.md) ·
+[Releases and signing](docs/releases.md)
 
-## Run on Android
+<details>
+<summary><b>Linux display notes</b></summary>
 
-Requires Android **10 / API 29 or newer**, a compatible Impeller graphics driver,
-Flutter 3.47.1+, and the Android SDK.
+PhotoSim prefers X11 (XWayland on Wayland desktops) and falls back to native
+Wayland. This avoids an NVIDIA/native-Wayland freeze. Set `GDK_BACKEND=wayland` to
+use native Wayland, or `GDK_BACKEND=x11` to force XWayland. On Hyprland and niri,
+the GTK title bar is hidden automatically. When distributing a build, ship the whole
+`build/linux/x64/release/bundle/` directory, not just the executable.
 
-```sh
-flutter pub get
-flutter run -d <android-device-id>
-flutter build apk --release
-```
+</details>
 
-Install `build/app/outputs/flutter-apk/app-release.apk`. Local builds default to
-a development signing key; [tagged CI releases](docs/releases.md) require your persistent signing key.
-Flutter GPU and internet access are enabled in the release manifest.
-
-Phones use bottom navigation and a controls drawer; larger windows use a
-navigation rail and docked controls when there is enough space. Both orientations,
-split-window resizing, system light/dark theme, and larger text are supported.
-Drag the 3D view to aim and pinch to change focal length. **Export PNG** saves to
-**Pictures/PhotoSim** through MediaStore without broad storage permission.
-See [Android support](docs/android.md) for tests and device limitations.
-
-## Available now
-
-- **Night calendar** with month/week views, explained Galactic-core observing windows,
-  keyless Open-Meteo forecasts and a modeled light-pollution site baseline.
-  See [night planning, sources and limits](docs/night-calendar.md).
-- Interactive OpenStreetMap map centered on Yosemite. Enter a town, landmark, or address in the map's search field and press **Search** to see dropdown candidates from the free, keyless Photon API. Choose a result to center the map, then tap to place the camera; searching does not change your current composition.
-- Tap/click to place a camera; drag its marker to move it and its green handle to aim.
-- Geographic field-of-view wedge calculated from physical sensor and focal length.
-- Full-frame / APS-C sensor pills and a single 8–600 mm focal-length slider.
-- Shared camera position, azimuth, pitch, height, focal length, and UTC timestamp.
-- Automatic [session recovery](docs/session-recovery.md): location, UTC time, unsaved composition and UI preferences survive exit. First launch uses the current time; playback resumes paused.
-- Account-free Mapterhorn terrain: Copernicus GLO-30 plus finer open regional
-  DEMs, with Mapzen fallback, rendered in a camera-relative WGS84 frame.
-- Terrain-derived camera height, progressive loading, distance/FOV quadtree LOD, and tile skirts.
-- [Static water surfaces and shore outlines](docs/data-sources/water.md): HydroLAKES lakes, terrain-following OpenFreeMap river polygons, NASA/OSM ocean masks and static mean sea level; enabled by default under **Settings → Data sources**.
-- **Terrain range** inspector section: live surrounding radius, FOV-aware forward fetching and render distance; the map shows a dashed approximate requested-range circle.
-- Free automatic imagery: USGS NAIP, IGN France, swisstopo Switzerland and
-  a global EOX Sentinel-2 2016 fallback, progressively refined on the camera tile
-  from cached map tiles.
-- Approximate relighting enabled by default; optional natural imagery, without rebuilding terrain.
-- Collapsible inspector sections for optics, position/orientation, depth of field, weather and composition guides.
-- **Settings** page (app-bar gear) for rendering quality, antialiasing, relighting/camera light, constellation guides and disk cache.
-- Editable weather visibility, light transmission and rain intensity, preserved in saved plans.
-- [Layered procedural clouds](docs/clouds.md): two wind-driven decks with five cloud types, amount and randomization controls, 256 km range with distance-based quality, warm twilight and dark moonlit shading. Type/amount/seed survive save and restart, and water reflects the same moving clouds.
-- Persistent terrain/imagery disk caching with one adjustable size limit under **Settings → Storage** (512 MiB default), LRU eviction, corruption recovery and source metadata.
-- Drag the 3D preview to look around, with finer aiming when zoomed in; use the focal-length slider in whole millimeters or type an exact 8–600 mm value and apply it.
-- Enter decimal-degree latitude/longitude under **Position & orientation** for precise, keyboard-accessible placement. Map placement, marker drags and coordinate edits offer a one-step **Undo** for 10 seconds; undo preserves other lens/time settings.
-- Dismiss map instructions with **Hide map guidance**; the preference survives restart. **Map guide** keeps the full instructions available.
-- Click the 3D preview and hold WASD to move at 100 m/s; the camera climbs/descends with terrain while keeping its height offset.
-- Offline Sun/Moon topocentric positions, lunar phase and shared celestial readouts.
-- NASA SVS/LRO surface-textured, phase-lit Moon at its calculated position and angular size, with terrain occlusion (offline 2K albedo; no libration or crater relief).
-- UTC-driven Sun/Moon lighting, sky-driven indirect lighting, cascaded terrain shadows and sky-colored aerial perspective on approximately relit terrain. Per-state astronomy/observer caching removes duplicate ephemeris work per frame.
-- Spherical Rayleigh/Mie sky scattering for twilight and moonlit nights, with air-mass extinction for dimmer, redder sunrise/sunset.
-- Blended terrain shadow cascades; High quality adds PCSS/contact shadows, denser 256/128/64 terrain meshes, 1.25× supersampling and terrain-scale GTAO with bent-normal indirect lighting.
-- Progressive imagery: 256px tile previews, then a 1024px mosaic of cached detail tiles; High refines up to nine nearest tiles inside the focal-length detail band with bounded three-request concurrency. Failed detail requests retain previews.
-- **Settings → Rendering → Camera light**: camera-positioned terrain fill, adjustable 0–100% (off by default), without lighting the sky. Requires approximate relighting; Auto exposure is held while active, with two unfilled metering frames after time/weather changes to avoid retaining the previous lighting's exposure.
-- **Settings → Rendering** antialiasing: FXAA by default, MSAA 4× with fallback, Auto or Off.
-- Sun/Moon map bearing guides with altitude labels and below-horizontal styling.
-- Persistent navigation rail for Map/3D Preview/Calendar/Export; compact floating terrain/stars/export controls and compact top loading status and a fixed single-line bottom credit, with grouped timeline controls and astronomy readouts.
-- Collapsible inspector with camera, weather and composition controls in the right panel; app-bar **Settings** page for rendering and cache options; camera-local date/time controls and a **00:00–24:00 local-day slider** with DST-aware UTC conversion.
-- Estimated offline local clock with timezone, UTC offset and daylight-saving rules.
-- Play/pause at five simulated minutes per second, with lifecycle/date-limit cleanup.
-- 5,044 bundled stars, licensed simplified Milky Way brightness contours, and the seven naked-eye planets from offline VSOP87 ephemerides (light-time corrected).
-- Time/location-driven sky rotation, approximate twilight/moonlight visibility and terrain occlusion.
-- Sun/Moon/planet/Galactic-center targeting, aim action and rectangular lens-FOV readout; planet names label in 3D.
-- Toggleable constellation names and blue connecting figures in 3D, depth-tested against terrain.
-- Named versioned JSON snapshots, with local save/open and restoration after app restart.
-- **Export** tab: render and review the high-resolution PNG before saving, with an editable, copyable AI-enhancement prompt containing the captured location, UTC/estimated local time, optics, weather, astronomy, render settings and source credits. Rendering uses the current quality preset at twice screen pixel density, bounded to 6144 px / 20 MP. The preview and saved file use identical PNG bytes. No AI service is called; attach the saved PNG to your own model. Review precise GPS/time before sharing. Prompt edits are temporary (retained between 3D and Export, not across Map/Calendar or app restart); re-rendering resets them.
-- **Export PNG** remains available as a quick-export shortcut in 3D Preview: current photographic viewport with source credits, weather and DOF; no application controls.
-- **Performance / Balanced / High** render-quality presets (render scale, AA, shadows and DOF quality).
-- Manual **Clear / Cloudy / Fog / Rain** presets, explicitly illustrative rather than forecast weather.
-- Depth-buffer **depth of field** linked to aperture (f/1.4–f/22), focal length, sensor and focus distance.
-- Enhanced/Manual/Auto exposure with ISO, shutter, exposure compensation and approximate white balance.
-- Full-area 3D context preview with a sensor-aspect photo rectangle and focal-length/aperture/DOF label; portrait/roll, composition guides and fullscreen preview (Esc exits).
-- Adjustable 1/5/30/60 min/s playback and target angular-offset readout.
-
-See [Linux MVP photography controls and export](docs/linux-mvp.md) for usage, limits and validation.
-
-The inset photo rectangle matches the sensor's aspect ratio and map FOV; the
-surrounding 3D context fills the available canvas. Lens/roll controls preserve
-position; WASD moves explicitly. PNG export crops to the photo rectangle.
-
-## License
-
-PhotoSim is licensed under the [GNU General Public License, version 3 only](LICENSE)
-(`GPL-3.0-only`). Copyright © 2026 PhotoSim contributors.
-Bundled third-party components and data retain their own licenses and attribution.
-
-## Automated releases
-
-[GitHub Actions](.github/workflows/build.yml) builds Linux `.deb`, pacman and
-AppImage packages, Windows x64 portable ZIP and EXE installer, plus per-ABI
-Android APKs. Matching `v<version>` tags upload
-`PhotoSim-<version>-<arch>.<ext>` assets and checksums to GitHub Releases.
-Configure persistent Android signing secrets first; see [release setup](docs/releases.md).
-
-## Build and verify
+<details>
+<summary><b>For contributors: checks and tests</b></summary>
 
 ```sh
 dart format --output=none --set-exit-if-changed lib test integration_test
@@ -161,105 +195,25 @@ flutter test integration_test/camera_light_test.dart -d linux
 flutter test integration_test/water_test.dart -d linux
 flutter test integration_test/linux_planning_ui_test.dart -d linux
 flutter build linux --release
-./build/linux/x64/release/bundle/photosim
 ```
 
-`analysis_options.yaml` enables strict casts, inference and raw-type checking,
-plus correctness/async lints (including dynamic-call and discarded-future checks).
-Warnings and lint infos are fatal in the analysis command above; tests and native
-integration tests are analyzed too. No extra lint dependency is required.
+Native integration tests need a live graphical session and internet access on the
+first run. They write screenshots to `build/validation/`. Screenshots in this README
+are regenerated with `integration_test/showcase_test.dart` and
+`integration_test/readme_showcase_test.dart`; see the
+[website README](website/README.md#screenshots).
 
-Linux prefers X11 (XWayland on Wayland desktops), falling back to native Wayland.
-This avoids a reproduced NVIDIA/native-Wayland presentation freeze where terrain
-loads internally but the whole window stays on an old frame. `GDK_BACKEND=wayland`
-explicitly opts back into native Wayland; `GDK_BACKEND=x11` forces XWayland.
+[GitHub Actions](.github/workflows/build.yml) builds all release packages and
+uploads them when a `v<version>` tag is pushed.
 
-Ship the **entire bundle directory**, not just its executable. The integration
-test requires a live Linux graphical session and internet access on its first
-terrain/imagery visit. Subsequent visits reuse the source-separated disk caches within the shared size limit. It writes screenshots to
-`build/validation/`.
+More project docs: [implementation status](docs/implementation-status.md) ·
+[performance](docs/performance.md) · [Linux MVP scope](docs/linux-mvp.md) ·
+[spec progress](docs/linux-spec-progress.md) · [roadmap](docs/roadmap.md)
 
-Frame-time and cold-start measurements, method and remaining bottlenecks are in the
-[performance audit](docs/performance.md).
+</details>
 
-See [implementation status](docs/implementation-status.md) for validation
-evidence, rendering limitations, and future work.
+## License
 
-## Important limitations
-
-The 3D surface uses **real elevation and automatically selected free imagery**:
-NAIP in the conterminous US, IGN in France, swisstopo in Switzerland, and the
-approximately 10 m EOX Sentinel-2 **2016** global mosaic elsewhere or as fallback.
-Regional aerial sources can be sub-meter, but current terrain textures downsample
-them; native aerial detail is not displayed. High uses more GPU time and texture
-memory (about 48 MiB for nine 1024px RGBA textures with mipmaps, plus other tiles
-and render targets). Refined textures remain resident when lowering quality until
-their terrain tiles unload. GTAO is an approximate, screen-space effect on relit
-terrain only; it is not a terrain-horizon visibility calculation. Pixels missing from every source use
-a labeled green fallback material. Sun/Moon calculations and solar lighting now
-work locally, including a phase-lit lunar sphere and approximate moonlight.
-Lunar surface detail remains unimplemented. PNG export captures the current viewport,
-not an independent high-resolution render. Night-sky
-brightness and stellar point sizes are artistic, not calibrated exposure;
-proper motion, aberration and atmospheric extinction are omitted. See
-[night-sky data notes](docs/data-sources/night-sky.md). Saved plans are local,
-unencrypted JSON snapshots; see [saving and reopening](docs/saved-plans.md).
-Map rays indicate bearings, not rise/set or terrain visibility predictions.
-UTC dates are limited to 1900–2100. Estimated local display supports only
-1970–2037 because the bundled timezone transitions stop in 2037; other dates
-show an explicit warning. Coordinate-to-zone boundaries are approximate.
-The timeline groups the estimated local date/time with the local-day slider.
-**Edit local** opens date/time pickers in the camera location's estimated timezone,
-not the computer's timezone. The UTC equivalent is previewed before **Apply time**;
-**Cancel** leaves simulation time unchanged. Nonexistent daylight-saving times
-are rejected; repeated times require an explicit occurrence choice.
-UTC remains the internal time basis. Explicit UTC editing preserves the full
-1900–2100 range and is the fallback when local rules are unavailable.
-See [astronomy notes](docs/astronomy.md) for reference
-tests and accuracy/lighting/timezone limitations.
-
-Natural imagery preserves existing colors and baked-in shadows. Opt-in
-relighting is approximate and may double those shadows. Imagery dates do not
-follow simulation time; source acquisition dates are not queried yet. See
-[imagery data notes](docs/data-sources/imagery.md).
-
-Terrain defaults to the original 3×3 zoom-13 region. The **Terrain range** section
-in the right inspector (controls drawer on phones) adjusts
-surrounding coverage (1–3 tile rings), forward reach (0–100 km, off by default),
-and terrain rendering (2–100 km, whole-tile cutoff plus view-frustum culling).
-Forward coverage follows sensor/focal length, pitch and azimuth after a 400 ms
-pause; long lenses prefer finer tiles, subject to a 256-tile budget. Far terrain
-and imagery step down to coarser meshes and 256px previews beyond a
-focal-length-scaled distance, so a wide lens coarsens distant slopes earlier than
-a telephoto. Overlapping meshes/textures stay resident. Settings apply live and persist in saved plans/session recovery.
-The map's dashed circle approximates the nearby tile envelope or forward reach,
-whichever is larger. Zoom out to see its full extent. It is not an exact tile
-boundary or download-status indicator; render distance does not shrink the fetch circle.
-
-**Settings → Data sources → NASA terrain & imagery** optionally adds account-free NASA WorldWind NED/ASTER elevation fallbacks and NASA GIBS Landsat imagery. It is enabled by default and can be switched off; no NASA API key is needed. Regional aerial imagery stays preferred. NASA's historical 30 m Landsat mosaic is not necessarily sharper than the default Sentinel-2 or regional imagery. The preference persists in plans/session recovery and reloads the preview when changed.
-
-Lakes use HydroLAKES polygons and one approximate dataset elevation per identified lake, preserving islands and cross-tile continuity. OpenFreeMap / OpenMapTiles river polygons from OpenStreetMap receive animated reflective water draped over the terrain slope, preserving islands without inventing widths from centerlines. Oceans retain coarse (~250 m) NASA/OSM masks; raster lake/DEM coverage is an outage fallback. Heights are not surveyed or live levels, and ocean mean sea level is not datum-corrected. River heights are DEM approximations, not surveyed levels. No tides, hydraulic flow or live water levels are modeled. See [water data notes](docs/data-sources/water.md).
-
-Terrain, imagery, lake polygons and water masks share a persistent LRU disk budget configured under **Settings → Storage → Total disk cache limit (MiB)**: 512 MiB by default, 0–65,536 MiB; zero disables disk caching. Where regional tiles are absent, the
-loader crops the global zoom-12 parent. Upstream regional grids can be 1–10 m,
-but current mesh density does not display their finest native detail. Cached terrain works without network access, but this is not a complete
-offline-region feature. Source vertical datums are uncorrected; do not use the
-coarse preview for precise distant-horizon predictions. See
-[terrain data notes](docs/data-sources/terrain.md).
-
-Map tiles require internet access. This prototype uses the public OSM standard
-tile service with attribution and an identifying user agent; it does not bulk
-download or prefetch regions. Review [OSM's usage policy](https://operations.osmfoundation.org/policies/tiles/)
-before distribution or scaling. No paid API or credentials are required.
-
-Place search uses [Photon](https://github.com/komoot/photon)'s free public demo
-API with OpenStreetMap data. Only explicitly submitted search terms are sent to
-`photon.komoot.io`; camera coordinates and saved plans are not sent. The service
-may throttle or block heavy use and provides no availability guarantee. Use a
-hosted/self-hosted instance before scaling; search needs internet access.
-
-Linux remains the completed MVP baseline. The Android phone/tablet version
-shares its planning/rendering core and has emulator workflow coverage; physical
-Android hardware performance is not yet characterized. Windows has a local x64
-build; graphics-driver compatibility and performance need validation on other
-machines. Web, macOS and iOS remain outside the supported build claims.
+PhotoSim is licensed under the [GNU General Public License v3.0 only](LICENSE)
+(`GPL-3.0-only`). Copyright © 2026 PhotoSim contributors. Bundled third-party
+components and data keep their own licenses and attribution.

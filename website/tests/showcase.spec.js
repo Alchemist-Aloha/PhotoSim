@@ -12,9 +12,9 @@ test('showcase works at desktop and phone sizes', async ({ page }, testInfo) => 
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Before you go')
   for (const [name, image] of [
-    ['Follow the light', '3D Yosemite'],
-    ['Choose your moment', 'June 2026'],
-    ['Find your position', 'Yosemite map'],
+    ['Preview the view', '3D Yosemite'],
+    ['Check the calendar', 'June 2026'],
+    ['Pick your spot', 'Yosemite map'],
   ]) {
     const button = page.getByRole('button', { name: new RegExp(name) })
     await button.click()

@@ -42,14 +42,14 @@ manually from GitHub Actions → Deploy website. Repository Pages settings use
 
 ## Screenshots
 
-`public/screenshots/` contains six real application captures, not generated mockups:
+`public/screenshots/` contains real application captures, not generated mockups:
 
 | Platform | Screens | Capture |
 | --- | --- | --- |
-| Linux | Map, 3D preview, night calendar | Flutter Linux application, 1259 × 1021 |
-| Android | Map, 3D preview, night calendar | Android emulator via `adb screencap`, 1080 × 2400 |
+| Linux | Map, 3D preview, night calendar, night sky, export | Flutter Linux application, 1259 × 1021 |
+| Android | Map, 3D preview, night calendar | Android emulator via `adb screencap`, 1080 × 2424 |
 
-Captured November 2, 2026 from this development checkout. The scene is Yosemite, June 21, 2026 at 19:00 UTC, with a 24 mm lens. Map and terrain attribution is retained in the app UI. The calendar reflects the selected date's actual computed result; it is not an invented “perfect night.” The screenshots do not claim to be photographs or weather forecasts.
+Captured November 14, 2026 from this development checkout. The scene is Yosemite, June 21, 2026 at 19:00 UTC, with a 24 mm lens. The README-only `linux-night.png` and `linux-export.png` show Glacier Point on June 13, 2026 at 07:30 UTC with a 16 mm lens and constellations on; regenerate them with `flutter test integration_test/readme_showcase_test.dart -d linux`. Map and terrain attribution is retained in the app UI. The calendar reflects the selected date's actual computed result; it is not an invented “perfect night.” The screenshots do not claim to be photographs or weather forecasts.
 
 The capture test uses temporary saved plans and does not persist an app session. Run it from the repository root with the project's Flutter prerequisites installed and working graphics/network access:
 
