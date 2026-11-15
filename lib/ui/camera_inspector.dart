@@ -118,6 +118,16 @@ class CameraInspector extends StatelessWidget {
           'Field of view: ${(state.horizontalFov / radians).toStringAsFixed(1)}° × '
           '${(state.verticalFov / radians).toStringAsFixed(1)}°',
         ),
+        const SizedBox(height: 16),
+        // One aperture drives both Manual exposure and depth of field.
+        control(
+          'Aperture (f-number)',
+          state.aperture,
+          1.4,
+          22,
+          (value) => onChanged(state.copyWith(aperture: value)),
+          '',
+        ),
       ], expanded: true),
       section('Position & orientation', Icons.explore_outlined, [
         NumericSettingField(
@@ -214,14 +224,6 @@ class CameraInspector extends StatelessWidget {
           },
         ),
         const SizedBox(height: 16),
-        control(
-          'Exposure aperture',
-          state.aperture,
-          1.4,
-          22,
-          (value) => onChanged(state.copyWith(aperture: value)),
-          ' f-number',
-        ),
         if (state.exposureMode == ExposureMode.manual) ...[
           Text('ISO ${state.iso.round()}'),
           Slider(
@@ -268,7 +270,7 @@ class CameraInspector extends StatelessWidget {
           ' K',
         ),
         const Text(
-          'Manual exposure uses photographic stop ratios relative to f/8, 1/125 s, ISO 100. Auto meters scene luminance. Enhanced visibility also adapts through twilight without dimming daylight; both ignore ISO/shutter. Brightness and white balance are approximate, not calibrated; no noise or motion blur.',
+          'Aperture is in Optics. Manual exposure uses photographic stop ratios relative to f/8, 1/125 s, ISO 100. Auto meters scene luminance. Enhanced visibility also adapts through twilight without dimming daylight; both ignore ISO/shutter. Brightness and white balance are approximate, not calibrated; no noise or motion blur.',
         ),
       ]),
       section('Depth of field', Icons.blur_on, [
@@ -277,14 +279,6 @@ class CameraInspector extends StatelessWidget {
           title: const Text('Enable depth of field'),
           value: state.depthOfField,
           onChanged: (value) => onChanged(state.copyWith(depthOfField: value)),
-        ),
-        control(
-          'Aperture (f-number)',
-          state.aperture,
-          1.4,
-          22,
-          (value) => onChanged(state.copyWith(aperture: value)),
-          '',
         ),
         Text(
           'Focus distance: ${state.focusDistance >= 1000000 ? '∞ (1,000 km)' : '${state.focusDistance.toStringAsFixed(1)} m'}',
@@ -302,7 +296,7 @@ class CameraInspector extends StatelessWidget {
           ),
         ),
         const Text(
-          'Smaller f-numbers increase out-of-focus blur and brighten Manual exposure. ISO/shutter controls are in Exposure.',
+          'Aperture is in Optics: smaller f-numbers increase out-of-focus blur and brighten Manual exposure. ISO/shutter controls are in Exposure.',
         ),
       ]),
       section('Weather', Icons.cloud_outlined, [

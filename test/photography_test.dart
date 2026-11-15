@@ -107,11 +107,22 @@ void main() {
       await tester.tap(find.byType(SwitchListTile));
       await tester.pump();
       expect(state.depthOfField, isTrue);
-      final aperture = tester
-          .widgetList<Slider>(find.byType(Slider))
-          .singleWhere((slider) => slider.label == 'Aperture (f-number)');
+      // The single aperture control lives in Optics and drives DOF too.
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('Aperture (f-number)')),
+        -200,
+        scrollable: inspectorScroll,
+      );
+      final aperture = tester.widget<Slider>(
+        find.byKey(const ValueKey('Aperture (f-number)')),
+      );
       aperture.onChanged!(2.8);
       await tester.pump();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('focus-distance')),
+        200,
+        scrollable: inspectorScroll,
+      );
       tester
           .widget<Slider>(find.byKey(const ValueKey('focus-distance')))
           .onChanged!(2);
