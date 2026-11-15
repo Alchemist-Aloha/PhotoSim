@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/app/app.dart';
 import 'package:photosim/data/saved_plans.dart';
@@ -35,7 +36,87 @@ class MemoryPlans extends PlanRepository {
   }
 }
 
+class DeletablePlans extends MemoryPlans {
+  final deleted = <String>[];
+  late final stored = [
+    SavedPlan('Old scout', destination.state, file: File('/unused/a.json')),
+    SavedPlan('Keep me', destination.state, file: File('/unused/b.json')),
+  ];
+
+  @override
+  Future<({List<SavedPlan> plans, int unreadable})> loadAll() async =>
+      (plans: stored, unreadable: 0);
+
+  @override
+  Future<void> delete(SavedPlan plan) async => deleted.add(plan.name);
+}
+
 void main() {
+  testWidgets('saved plans can be deleted after confirmation', (tester) async {
+    tester.view.physicalSize = const Size(1600, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = DeletablePlans();
+    await tester.pumpWidget(PhotoSimApp(plans: store));
+    await tester.tap(find.byTooltip('Photography plans'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open plan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete Old scout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel').last);
+    await tester.pumpAndSettle();
+    expect(store.deleted, isEmpty);
+    await tester.tap(find.byTooltip('Delete Old scout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(store.deleted, ['Old scout']);
+    expect(find.text('Old scout'), findsNothing);
+    expect(find.text('Keep me'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Ctrl+S saves with Enter and Ctrl+O lists local plan times', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = MemoryPlans();
+    await tester.pumpWidget(PhotoSimApp(plans: store));
+    await tester.pumpAndSettle();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('Save photography plan'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextFormField),
+      ),
+      'Quick save',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(store.saved.single.name, 'Quick save');
+    expect(find.text('Saved Quick save'), findsOneWidget);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyO);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('Open photography plan'), findsOneWidget);
+    // Default camera is in California: 12:00 UTC shows as Pacific daylight time.
+    expect(find.textContaining('2026-06-21 05:00 PDT'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
   for (final action in [
     'Cancel',
     'Discard changes',

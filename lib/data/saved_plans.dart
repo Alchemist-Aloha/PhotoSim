@@ -5,13 +5,16 @@ import '../core/atmosphere.dart';
 import '../models/simulation_state.dart';
 
 class SavedPlan {
-  SavedPlan(this.name, this.state) {
+  SavedPlan(this.name, this.state, {this.file}) {
     if (name.trim().isEmpty || name.length > 80) {
       throw const FormatException('Plan name must contain 1–80 characters');
     }
   }
   final String name;
   final SimulationState state;
+
+  /// The file a loaded plan came from; not serialized.
+  final File? file;
 
   /// Shared by [encode] and [AppSession], which nests this map directly instead of
   /// pretty-printing to a string and parsing it back on every session save.
@@ -186,6 +189,15 @@ class PlanRepository {
     }
   }
 
+  /// Removes a plan returned by [loadAll]; other snapshots are untouched.
+  Future<void> delete(SavedPlan plan) async {
+    final file = plan.file;
+    if (file == null || file.parent.absolute.path != directory.absolute.path) {
+      throw ArgumentError('Plan is not stored in this repository');
+    }
+    await file.delete();
+  }
+
   Future<({List<SavedPlan> plans, int unreadable})> loadAll() async {
     if (!await directory.exists()) return (plans: <SavedPlan>[], unreadable: 0);
     final plans = <SavedPlan>[];
@@ -198,7 +210,8 @@ class PlanRepository {
         if (await file.length() > 32768) {
           throw const FormatException('Plan exceeds 32 KiB');
         }
-        plans.add(SavedPlan.decode(await file.readAsString()));
+        final plan = SavedPlan.decode(await file.readAsString());
+        plans.add(SavedPlan(plan.name, plan.state, file: file));
       } on Object {
         unreadable++;
       }

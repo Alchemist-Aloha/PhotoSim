@@ -334,6 +334,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
         content: TextFormField(
           initialValue: planName,
           onChanged: (value) => planName = value,
+          onFieldSubmitted: (value) {
+            if (value.trim().isNotEmpty) Navigator.pop(context, value.trim());
+          },
           autofocus: true,
           maxLength: 80,
           autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -360,7 +363,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     );
     if (!mounted || name == null) return false;
     final snapshot = SavedPlan(name, state);
-    final file = await store.save(snapshot);
+    await store.save(snapshot);
     if (!mounted) return false;
     setState(() {
       cleanComposition = SavedPlan('Composition', snapshot.state).encode();
@@ -375,7 +378,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           content: Text(
             hasUnsavedChanges
                 ? 'Snapshot saved. Newer changes remain unsaved; save them before opening another plan.'
-                : 'Saved $name · ${file.path}',
+                : 'Saved $name',
           ),
         ),
       );
@@ -402,43 +405,106 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       } else {
         final loaded = await store.loadAll();
         if (!mounted) return;
+        final plans = List.of(loaded.plans);
+        String when(SimulationState plan) {
+          final local = localClock(
+            timestamp: plan.timestamp,
+            latitude: plan.latitude,
+            longitude: plan.longitude,
+          ).time;
+          final shown = local ?? plan.timestamp;
+          return '${shown.toIso8601String().substring(0, 16).replaceAll('T', ' ')} '
+              '${local == null ? 'UTC' : local.timeZoneName}';
+        }
+
         final selected = await showDialog<SavedPlan>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Open photography plan'),
-            content: SizedBox(
-              width: 520,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (loaded.unreadable > 0)
-                    Text(
-                      '${loaded.unreadable} unreadable plans left unchanged.',
-                    ),
-                  if (loaded.plans.isEmpty) const Text('No saved plans found.'),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: loaded.plans.length,
-                      itemBuilder: (_, i) => ListTile(
-                        title: Text(loaded.plans[i].name),
-                        subtitle: Text(
-                          '${loaded.plans[i].state.timestamp.toIso8601String()} · ${loaded.plans[i].state.target.label}',
+          builder: (context) => StatefulBuilder(
+            builder: (context, setPlans) => AlertDialog(
+              title: const Text('Open photography plan'),
+              content: SizedBox(
+                width: 520,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (loaded.unreadable > 0)
+                      Text(
+                        '${loaded.unreadable} unreadable plans left unchanged.',
+                      ),
+                    if (plans.isEmpty) const Text('No saved plans found.'),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: plans.length,
+                        itemBuilder: (_, i) => ListTile(
+                          title: Text(plans[i].name),
+                          subtitle: Text(
+                            '${when(plans[i].state)} · ${plans[i].state.target.label}',
+                          ),
+                          onTap: () => Navigator.pop(context, plans[i]),
+                          trailing: plans[i].file == null
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Delete ${plans[i].name}',
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () async {
+                                    final plan = plans[i];
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: Text('Delete "${plan.name}"?'),
+                                        content: const Text(
+                                          'This removes the saved plan file. It cannot be undone.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed != true) return;
+                                    try {
+                                      await store.delete(plan);
+                                    } on Object {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                        ..removeWorkspaceFeedback()
+                                        ..showWorkspaceFeedback(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Could not delete the plan. Check folder permissions.',
+                                            ),
+                                          ),
+                                        );
+                                      return;
+                                    }
+                                    if (context.mounted) {
+                                      setPlans(() => plans.remove(plan));
+                                    }
+                                  },
+                                ),
                         ),
-                        onTap: () => Navigator.pop(context, loaded.plans[i]),
                       ),
                     ),
-                  ),
-                  SelectableText('Storage: ${store.directory.path}'),
-                ],
+                    SelectableText('Storage: ${store.directory.path}'),
+                  ],
+                ),
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-            ],
           ),
         );
         if (selected != null && mounted) {
@@ -1501,6 +1567,10 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           const SingleActivator(LogicalKeyboardKey.escape): () {
             if (cleanPreview) unawaited(setCleanPreview(false));
           },
+          const SingleActivator(LogicalKeyboardKey.keyS, control: true): () =>
+              unawaited(managePlans(true)),
+          const SingleActivator(LogicalKeyboardKey.keyO, control: true): () =>
+              unawaited(managePlans(false)),
         },
         child: Focus(autofocus: true, child: scaffold),
       ),

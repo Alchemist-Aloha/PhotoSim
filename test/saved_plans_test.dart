@@ -213,6 +213,15 @@ void main() {
       expect(withCorruption.unreadable, 2);
       expect(await files.first.readAsString(), original);
       expect(await File('${directory.path}/broken.json').exists(), isTrue);
+      // Deleting removes only that snapshot.
+      final doomed = withCorruption.plans.firstWhere((p) => p.name == 'Plan 1');
+      await store.delete(doomed);
+      final remaining = await store.loadAll();
+      expect(remaining.plans.map((p) => p.name).toSet(), {'Plan 0', 'Plan 2'});
+      expect(
+        () => store.delete(SavedPlan('Elsewhere', state)),
+        throwsArgumentError,
+      );
     },
   );
 
