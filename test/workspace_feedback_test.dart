@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/ui/workspace_feedback.dart';
@@ -10,6 +12,36 @@ Future<ScaffoldMessengerState> host(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('feedback shows under a pushed Scaffold without key clashes', (
+    tester,
+  ) async {
+    final messenger = await host(tester);
+    unawaited(
+      Navigator.of(tester.element(find.text('Workspace'))).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('Settings')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    messenger.showWorkspaceFeedback(
+      const SnackBar(
+        content: Text('Camera moved'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    Navigator.of(tester.element(find.text('Settings'))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Camera moved'), findsOneWidget);
+    // One expiry shared by every copy still hides it on time.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Camera moved'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('transient feedback expires after its visible duration', (
     tester,
   ) async {

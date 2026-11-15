@@ -5,15 +5,14 @@ import 'package:flutter/material.dart';
 /// Keeps workspace feedback out of the canvas, inspector and timeline.
 extension WorkspaceFeedback on ScaffoldMessengerState {
   void showWorkspaceFeedback(SnackBar message) {
-    final contentKey = GlobalKey<_FeedbackContentState>();
+    // The messenger renders a banner in every registered Scaffold (e.g. under
+    // the Settings route), so its content must not carry a GlobalKey; the
+    // auto-hide timer is shared by every copy instead.
+    final expiry = _Expiry();
     final controller = showMaterialBanner(
       MaterialBanner(
         elevation: 0,
-        content: _FeedbackContent(
-          key: contentKey,
-          message: message,
-          onTimeout: hideCurrentMaterialBanner,
-        ),
+        content: _FeedbackContent(message: message, expiry: expiry),
         actions: [
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -31,45 +30,45 @@ extension WorkspaceFeedback on ScaffoldMessengerState {
           ),
         ],
         onVisible: () {
-          contentKey.currentState?.start();
+          // Preserve native SnackBar persistence, including action messages that need acknowledgement.
+          if (!message.persist) {
+            expiry.timer ??= Timer(message.duration, hideCurrentMaterialBanner);
+          }
           message.onVisible?.call();
         },
       ),
     );
-    unawaited(controller.closed.then((_) => contentKey.currentState?.cancel()));
+    unawaited(controller.closed.then((_) => expiry.timer?.cancel()));
   }
 
   void removeWorkspaceFeedback() => removeCurrentMaterialBanner();
 }
 
+class _Expiry {
+  Timer? timer;
+  int copies = 0;
+}
+
 class _FeedbackContent extends StatefulWidget {
-  const _FeedbackContent({
-    super.key,
-    required this.message,
-    required this.onTimeout,
-  });
+  const _FeedbackContent({required this.message, required this.expiry});
   final SnackBar message;
-  final VoidCallback onTimeout;
+  final _Expiry expiry;
 
   @override
   State<_FeedbackContent> createState() => _FeedbackContentState();
 }
 
 class _FeedbackContentState extends State<_FeedbackContent> {
-  Timer? timer;
-
-  void start() {
-    // Preserve native SnackBar persistence, including action messages that need acknowledgement.
-    if (!widget.message.persist) {
-      timer = Timer(widget.message.duration, widget.onTimeout);
-    }
+  @override
+  void initState() {
+    super.initState();
+    widget.expiry.copies++;
   }
-
-  void cancel() => timer?.cancel();
 
   @override
   void dispose() {
-    cancel();
+    // Tearing down the tree does not close the banner; stop its timer here.
+    if (--widget.expiry.copies == 0) widget.expiry.timer?.cancel();
     super.dispose();
   }
 
