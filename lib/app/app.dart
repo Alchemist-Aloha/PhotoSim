@@ -150,6 +150,10 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   AppLifecycleListener? exitListener;
   String? lastSession, sessionWarning;
   bool disposing = false;
+  // Desktop keeps the 3D scene resident across workspace switches; Android
+  // releases it to bound GPU memory.
+  final keepPreview = !Platform.isAndroid;
+  SimulationState? hiddenPreviewState;
 
   AppSession get session => AppSession(
     state: state,
@@ -457,6 +461,10 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           }
           ScaffoldMessenger.of(context).removeWorkspaceFeedback();
           setState(() {
+            if (workspace == Workspace.simulation ||
+                workspace == Workspace.export) {
+              hiddenPreviewState = state;
+            }
             state = selected.state;
             cleanComposition = composition;
             currentPlanName = selected.name;
@@ -1032,7 +1040,13 @@ class _WorkspaceShellState extends State<WorkspaceShell>
           setState(() => expandedSections[title] = expanded),
     );
     void changeWorkspace(int index) {
+      final leaving =
+          (workspace == Workspace.simulation ||
+              workspace == Workspace.export) &&
+          (Workspace.values[index] == Workspace.map ||
+              Workspace.values[index] == Workspace.calendar);
       setState(() {
+        hiddenPreviewState = leaving ? state : null;
         if (Workspace.values[index] == Workspace.calendar ||
             Workspace.values[index] == Workspace.export) {
           stopPlayback();
@@ -1071,7 +1085,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
       );
     }
 
-    final viewport = workspace == Workspace.calendar
+    final otherViewport = workspace == Workspace.calendar
         ? NightCalendar(
             state: state,
             weekView: calendarWeekView,
@@ -1119,22 +1133,44 @@ class _WorkspaceShellState extends State<WorkspaceShell>
             },
             onChanged: update,
           )
-        : rasterCache == null
-        ? Center(child: Text(cacheError ?? 'Loading disk cache settings…'))
-        : SimulationWorkspace(
-            rasterCache: rasterCache,
-            httpClient: terrainClient,
-            state: state,
-            cleanPreview: cleanPreview,
-            exportMode: workspace == Workspace.export,
-            onChanged: update,
-            onGroundElevationChanged: (location, elevation) {
-              if (state.location == location) {
-                update(state.copyWith(groundElevation: elevation));
-              }
-            },
-            onPausePlayback: () => setState(stopPlayback),
-          );
+        : null;
+    final showingPreview = otherViewport == null;
+    final cache = rasterCache;
+    final viewport = Stack(
+      fit: StackFit.expand,
+      children: [
+        if (cache != null &&
+            (showingPreview || (keepPreview && hiddenPreviewState != null)))
+          Offstage(
+            key: const ValueKey('preview-slot'),
+            offstage: !showingPreview,
+            child: TickerMode(
+              enabled: showingPreview,
+              child: ExcludeFocus(
+                excluding: !showingPreview,
+                child: SimulationWorkspace(
+                  rasterCache: cache,
+                  httpClient: terrainClient,
+                  // Hidden previews keep the last shown state so map drags do not restart tile loads.
+                  state: showingPreview ? state : hiddenPreviewState!,
+                  cleanPreview: cleanPreview,
+                  exportMode: workspace == Workspace.export,
+                  onChanged: update,
+                  onGroundElevationChanged: (location, elevation) {
+                    if (state.location == location) {
+                      update(state.copyWith(groundElevation: elevation));
+                    }
+                  },
+                  onPausePlayback: () => setState(stopPlayback),
+                ),
+              ),
+            ),
+          ),
+        ?otherViewport,
+        if (showingPreview && cache == null)
+          Center(child: Text(cacheError ?? 'Loading disk cache settings…')),
+      ],
+    );
     final scaffold = Scaffold(
       key: scaffoldKey,
       floatingActionButton: cleanPreview

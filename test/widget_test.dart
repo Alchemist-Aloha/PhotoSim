@@ -78,6 +78,28 @@ void main() {
       current = tester.widget<CameraInspector>(find.byType(CameraInspector));
       expect(current.state.latitude, next.latitude + 1);
       expect(current.state.groundElevation, isNull);
+      // Desktop keeps the 3D scene resident while the map is shown.
+      final scene = tester.state(find.byType(SimulationWorkspace));
+      await tester.tap(find.text('Map'));
+      await tester.pump();
+      final hidden = find.byType(SimulationWorkspace, skipOffstage: false);
+      expect(find.byType(SimulationWorkspace), findsNothing);
+      expect(tester.state(hidden), same(scene));
+      final frozen = tester.widget<SimulationWorkspace>(hidden).state;
+      current = tester.widget<CameraInspector>(find.byType(CameraInspector));
+      current.onChanged(current.state.copyWith(azimuth: 42));
+      await tester.pump();
+      expect(tester.widget<SimulationWorkspace>(hidden).state, same(frozen));
+      await tester.tap(find.text('3D Preview'));
+      await tester.pump();
+      expect(tester.state(find.byType(SimulationWorkspace)), same(scene));
+      expect(
+        tester
+            .widget<SimulationWorkspace>(find.byType(SimulationWorkspace))
+            .state
+            .azimuth,
+        42,
+      );
       await tester.pumpWidget(const SizedBox());
       expect(tester.takeException(), isNull);
     },
