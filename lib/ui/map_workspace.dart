@@ -40,6 +40,8 @@ class _MapWorkspaceState extends State<MapWorkspace> {
   final controller = MapController();
   final mapKey = GlobalKey();
   bool tileError = false;
+  // A new layer key refetches tiles that failed.
+  int tileAttempt = 0;
   SimulationState? moveStart;
 
   void locatePlace(PlaceSearchResult result) {
@@ -141,6 +143,7 @@ class _MapWorkspaceState extends State<MapWorkspace> {
           ),
           children: [
             TileLayer(
+              key: ValueKey(tileAttempt),
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'org.photosim.photosim',
               maxNativeZoom: 19,
@@ -325,8 +328,21 @@ class _MapWorkspaceState extends State<MapWorkspace> {
                       ),
                       const SizedBox(height: 8),
                       if (tileError)
-                        const Text(
-                          'Map tiles unavailable. Check your connection. Camera controls still work; switch workspaces to retry.',
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Map tiles unavailable. Check your connection. Camera controls still work.',
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(() {
+                                tileError = false;
+                                tileAttempt++;
+                              }),
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
                       if (!widget.guideDismissed)
                         Row(
