@@ -1,5 +1,43 @@
 # Release notes
 
+## 1.5.0
+
+Faster workspace switching, smoother playback and a round of usability fixes.
+
+### Performance
+
+- Desktop keeps the 3D scene loaded while you use Map or Calendar, so returning
+  to 3D Preview no longer re-reads terrain and imagery.
+- Time playback advances every frame instead of five times a second, and stops
+  exactly at the end of 2100.
+- Dragging Light transmission and editing settings no longer rebuild terrain
+  materials or re-encode the plan on every frame.
+- HTTP downloads and place search cancel stalled response bodies at their
+  deadline; terrain height decoding is faster.
+
+### Usability
+
+- Plans: Ctrl+S saves and Ctrl+O opens; Enter saves from the name field; the
+  open list shows local times; saved plans can be deleted.
+- PNG export: a Browse button picks the save location on desktop, and a
+  disabled Export button now says what it is waiting for.
+- The mouse wheel zooms focal length in the 3D preview.
+- A single Aperture control in Optics replaces the duplicate sliders in Exposure
+  and Depth of field.
+- Latitude/longitude fields show clean values and apply valid edits when you
+  leave the field.
+- The 3D status panel can collapse to a menu button, which flags loading
+  problems with a warning icon.
+- Failed map tiles can be retried from the map.
+- Error messages describe what to do next instead of showing raw exceptions.
+
+### Fixes and assets
+
+- Messages shown while Settings is open no longer cause a duplicate-key error.
+- The Milky Way uses NASA/Goddard SVS Deep Star Maps 2020 (Gaia DR2) with
+  updated licensing, and night-scene exposure is refined.
+- Refreshed README, website download links and screenshots.
+
 ## 1.4.1
 
 - Add mapped river water using cached OpenFreeMap polygons instead of Overpass queries.
