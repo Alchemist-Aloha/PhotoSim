@@ -7,7 +7,11 @@ class PreviewTools extends StatelessWidget {
     required this.onConstellations,
     required this.constellations,
     this.onExport,
+    this.exportBlocked,
   });
+
+  /// Why export is unavailable, shown under the disabled menu item.
+  final String? exportBlocked;
   final VoidCallback onConstellations;
   final VoidCallback? onExport;
   final bool constellations;
@@ -25,7 +29,19 @@ class PreviewTools extends StatelessWidget {
       PopupMenuItem(
         value: 2,
         enabled: onExport != null,
-        child: const Text('Export PNG'),
+        child: exportBlocked == null || onExport != null
+            ? const Text('Export PNG')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Export PNG'),
+                  Text(
+                    exportBlocked!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
       ),
     ],
     onSelected: (value) {

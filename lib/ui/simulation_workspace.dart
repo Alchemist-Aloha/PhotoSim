@@ -1408,6 +1408,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
       ..color = sun.altitude > 0
           ? vm.Vector3(solarLight.red, solarLight.green, solarLight.blue)
           : vm.Vector3(0.85, 0.90, 1);
+    final exportBlocked = exporting
+        ? 'Export in progress'
+        : ground == null || loading
+        ? 'Available once terrain has loaded'
+        : imageryLoading
+        ? 'Available once imagery has finished loading'
+        : null;
     return LayoutBuilder(
       builder: (context, bounds) => Stack(
         fit: StackFit.expand,
@@ -1526,13 +1533,8 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                             showConstellations: !state.showConstellations,
                           ),
                         ),
-                        onExport:
-                            ground == null ||
-                                loading ||
-                                imageryLoading ||
-                                exporting
-                            ? null
-                            : exportImage,
+                        onExport: exportBlocked == null ? exportImage : null,
+                        exportBlocked: exportBlocked,
                       ),
                     )
                   : ConstrainedBox(
@@ -1623,17 +1625,18 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                         ),
                                       ),
                                     ),
-                                    OutlinedButton.icon(
-                                      onPressed:
-                                          ground == null ||
-                                              loading ||
-                                              imageryLoading ||
-                                              exporting
-                                          ? null
-                                          : exportImage,
-                                      icon: const Icon(Icons.image_outlined),
-                                      label: Text(
-                                        exporting ? 'Exporting…' : 'Export PNG',
+                                    Tooltip(
+                                      message: exportBlocked ?? 'Render and save the framed photo as a PNG',
+                                      child: OutlinedButton.icon(
+                                        onPressed: exportBlocked == null
+                                            ? exportImage
+                                            : null,
+                                        icon: const Icon(Icons.image_outlined),
+                                        label: Text(
+                                          exporting
+                                              ? 'Exporting…'
+                                              : 'Export PNG',
+                                        ),
                                       ),
                                     ),
                                   ],

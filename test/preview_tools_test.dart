@@ -33,7 +33,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: PreviewTools(onConstellations: () {}, constellations: false),
+          body: PreviewTools(
+            onConstellations: () {},
+            constellations: false,
+            exportBlocked: 'Available once terrain has loaded',
+          ),
         ),
       ),
     );
@@ -47,6 +51,7 @@ void main() {
           .enabled,
       isFalse,
     );
+    expect(find.text('Available once terrain has loaded'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     expect(tester.takeException(), isNull);
   });
