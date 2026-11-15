@@ -18,6 +18,7 @@
   --copper: #8f4c33;
   --muted: #655a53;
   --line: #d8cec5;
+  --ease: cubic-bezier(.16, 1, .3, 1);
   scroll-behavior: smooth;
   scrollbar-color: #8f4c33 #eee7df;
 }
@@ -82,13 +83,28 @@ img { display: block; max-width: 100%; height: auto; }
 .step-number { font-variant-numeric: tabular-nums; font-size: 1rem; color: var(--copper); }
 .step-body { flex: 1; }
 .step-title { display: block; font-size: 1.4rem; font-weight: 600; line-height: 1.2; }
-.step-description { display: block; margin-top: 14px; color: var(--muted); font-size: 1.1rem; line-height: 1.5; }
-.step-arrow { font-size: 1.4rem; color: var(--copper); }
+/* Collapsed descriptions stay rendered so they can animate; visibility keeps them out of the button's name. */
+.step-reveal { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 240ms var(--ease), visibility 0s 240ms; }
+.step-reveal > span { min-height: 0; overflow: hidden; }
+.steps button[aria-pressed='true'] .step-reveal { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 420ms var(--ease); }
+.step-description { display: block; margin-top: 14px; color: var(--muted); font-size: 1.1rem; line-height: 1.5; opacity: 0; transition: opacity 160ms ease-out; }
+.steps button[aria-pressed='true'] .step-description { opacity: 1; transition: opacity 320ms ease-out 100ms; }
+.step-arrow { position: relative; flex-shrink: 0; align-self: flex-start; width: 14px; height: 1.68rem; color: var(--copper); }
+.step-arrow::before, .step-arrow::after { content: ''; position: absolute; top: 50%; left: 0; width: 14px; height: 2px; margin-top: -1px; background: currentColor; transition: transform 320ms var(--ease); }
+.step-arrow::after { transform: rotate(90deg); }
+.steps button[aria-pressed='true'] .step-arrow::after { transform: rotate(180deg); }
 .button { display: inline-flex; justify-content: center; align-items: center; gap: 24px; background: var(--copper); color: #fff; padding: 14px 22px; min-height: 52px; font-size: 1.1rem; font-weight: 600; text-decoration: none; transition: background-color 160ms ease-out; }
 .button:hover { background: #703721; color: #fff; }
+/* Link arrows nudge the way they lead: down for in-page jumps, out for external pages. */
+a > span[aria-hidden='true'] { display: inline-block; transition: transform 200ms var(--ease); }
+a:hover > span[aria-hidden='true'] { transform: translate(2px, -2px); }
+a[href^='#']:hover > span[aria-hidden='true'] { transform: translateY(3px); }
 .small-note { margin-top: 13px; font-size: .95rem; color: var(--muted); line-height: 1.5; }
-.desktop-screen { background: #19191b; }
-.desktop-screen img { width: 100%; }
+/* Step changes pull focus: the old view blurs out fast, the new one sharpens in. On load the view resolves just after "lens" locks. */
+.desktop-screen { display: grid; overflow: hidden; background: #19191b; animation: rack-focus 900ms var(--ease) 700ms both; }
+.desktop-screen img { grid-area: 1 / 1; width: 100%; opacity: 0; filter: blur(14px); transform: scale(1.03); visibility: hidden; transition: opacity 240ms ease-out, filter 240ms ease-out, transform 240ms ease-out, visibility 0s 240ms; }
+.desktop-screen img.active { opacity: 1; filter: none; transform: none; visibility: visible; transition: opacity 360ms var(--ease), filter 560ms var(--ease), transform 560ms var(--ease); }
+@keyframes rack-focus { from { filter: blur(10px); } to { filter: none; } }
 .workspace-preview figcaption { display: flex; gap: 18px; justify-content: space-between; color: var(--muted); margin-top: 14px; font-size: .95rem; line-height: 1.4; }
 .platform-label { flex-shrink: 0; color: #19191b; font-weight: 600; }
 .location-note { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid var(--line); margin-top: 38px; padding: 18px 0; font-size: .95rem; color: var(--muted); }
@@ -165,7 +181,20 @@ img { display: block; max-width: 100%; height: auto; }
   .site-footer { gap: 14px 22px; }
   .site-footer p { flex-basis: calc(100% - 120px); }
 }
+@media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    /* The phones rise into their stagger as the section scrolls in, each a step further than the last. */
+    .phone-gallery figure { animation: phone-rise linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; }
+    .phone-gallery figure:nth-child(1) { --rise: 60px; }
+    .phone-gallery figure:nth-child(2) { --rise: 130px; }
+    .phone-gallery figure:nth-child(3) { --rise: 200px; }
+    @keyframes phone-rise { from { transform: translateY(var(--rise)); } to { transform: none; } }
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   :root { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
+  /* Keep the screenshot change legible as a short crossfade, without blur or scale. */
+  .desktop-screen img { filter: none; transform: none; transition: opacity 180ms ease-out, visibility 0s 180ms !important; }
+  .desktop-screen img.active { transition: opacity 180ms ease-out !important; }
 }

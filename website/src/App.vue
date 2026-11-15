@@ -72,9 +72,9 @@ const steps = [
                 <span class="step-number" aria-hidden="true">0{{ index + 1 }}</span>
                 <span class="step-body">
                   <span class="step-title">{{ step.title }}</span>
-                  <span v-if="activeStep === index" class="step-description">{{ step.description }}</span>
+                  <span class="step-reveal"><span><span class="step-description">{{ step.description }}</span></span></span>
                 </span>
-                <span class="step-arrow" aria-hidden="true">{{ activeStep === index ? '−' : '+' }}</span>
+                <span class="step-arrow" aria-hidden="true"></span>
               </button>
             </li>
           </ol>
@@ -85,8 +85,8 @@ const steps = [
           <div class="desktop-screen">
             <img
               v-for="(step, index) in steps"
-              v-show="activeStep === index"
               :key="step.screen"
+              :class="{ active: activeStep === index }"
               :src="asset(`screenshots/linux-${step.screen}.png`)"
               :alt="step.alt"
               width="1259"
