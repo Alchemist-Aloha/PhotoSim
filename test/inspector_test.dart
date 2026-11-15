@@ -31,14 +31,14 @@ void main() {
     expect(slider.semanticFormatterCallback!(24), '24 mm');
     expect(
       tester.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
-      '24.0',
+      '24',
     );
     slider.onChanged!(85.6);
     await tester.pump();
     expect(state.focalLength, 86);
     expect(
       tester.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
-      '86.0',
+      '86',
     );
     expect(tester.widget<Slider>(finder).value, 86);
   });

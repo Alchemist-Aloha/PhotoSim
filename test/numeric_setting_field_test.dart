@@ -45,7 +45,7 @@ void main() {
         await tester.pump();
         expect(value, 24);
         expect(calls, 0);
-        expect(find.text('Enter a number from 8.0 to 600.0'), findsOneWidget);
+        expect(find.text('Enter a number from 8 to 600'), findsOneWidget);
       }
       await tester.enterText(find.byType(TextFormField), '35.5');
       rebuild(() {});
@@ -69,8 +69,16 @@ void main() {
             .widget<TextFormField>(find.byType(TextFormField))
             .controller!
             .text,
-        '85.0',
+        '85',
       );
+      // Leaving the field applies a valid draft.
+      await tester.enterText(find.byType(TextFormField), '50');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      expect(value, 50);
+      expect(formatSetting(37.744000000000004), '37.744');
+      expect(formatSetting(-0.0000001), '0');
+      expect(formatSetting(-122.5), '-122.5');
       expect(tester.takeException(), isNull);
     },
   );
