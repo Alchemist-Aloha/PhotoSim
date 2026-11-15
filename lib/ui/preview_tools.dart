@@ -8,7 +8,15 @@ class PreviewTools extends StatelessWidget {
     required this.constellations,
     this.onExport,
     this.exportBlocked,
+    this.onShowStatus,
+    this.warning = false,
   });
+
+  /// Restores the full status panel when the user collapsed it.
+  final VoidCallback? onShowStatus;
+
+  /// Loading problems are hidden while collapsed; flag them on the button.
+  final bool warning;
 
   /// Why export is unavailable, shown under the disabled menu item.
   final String? exportBlocked;
@@ -18,8 +26,8 @@ class PreviewTools extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PopupMenuButton<int>(
-    tooltip: 'Preview tools',
-    icon: const Icon(Icons.more_horiz),
+    tooltip: warning ? 'Preview tools · loading problems' : 'Preview tools',
+    icon: Icon(warning ? Icons.warning_amber : Icons.more_horiz),
     itemBuilder: (_) => [
       CheckedPopupMenuItem(
         value: 1,
@@ -43,6 +51,8 @@ class PreviewTools extends StatelessWidget {
                 ],
               ),
       ),
+      if (onShowStatus != null)
+        const PopupMenuItem(value: 3, child: Text('Show status panel')),
     ],
     onSelected: (value) {
       switch (value) {
@@ -50,6 +60,8 @@ class PreviewTools extends StatelessWidget {
           onConstellations();
         case 2:
           onExport?.call();
+        case 3:
+          onShowStatus?.call();
       }
     },
   );

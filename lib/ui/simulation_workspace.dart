@@ -174,6 +174,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   int? autoExposureStartFrame;
   NightSkyRenderer? nightRenderer;
   bool constellationsLoading = false;
+  bool statusCollapsed = false;
 
   @override
   void initState() {
@@ -1525,7 +1526,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
           if (!widget.cleanPreview)
             Align(
               alignment: Alignment.topRight,
-              child: bounds.maxHeight < 400
+              child: bounds.maxHeight < 400 || statusCollapsed
                   ? Card(
                       key: const ValueKey('preview-actions'),
                       margin: const EdgeInsets.all(12),
@@ -1538,6 +1539,13 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                         ),
                         onExport: exportBlocked == null ? exportImage : null,
                         exportBlocked: exportBlocked,
+                        warning:
+                            failed > 0 ||
+                            waterFailure != null ||
+                            imageryFailures > 0,
+                        onShowStatus: statusCollapsed
+                            ? () => setState(() => statusCollapsed = false)
+                            : null,
                       ),
                     )
                   : ConstrainedBox(
@@ -1595,6 +1603,16 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                           message: 'Fallback surface where imagery is missing',
                                           child: Text('Partial imagery'),
                                         ),
+                                      IconButton(
+                                        key: const ValueKey('collapse-status'),
+                                        tooltip: 'Collapse status panel',
+                                        visualDensity: VisualDensity.compact,
+                                        iconSize: 18,
+                                        onPressed: () => setState(
+                                          () => statusCollapsed = true,
+                                        ),
+                                        icon: const Icon(Icons.unfold_less),
+                                      ),
                                       Tooltip(
                                         message: Platform.isAndroid
                                             ? 'Drag to aim · Pinch to zoom · Place the camera on the map to move'

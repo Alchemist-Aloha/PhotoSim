@@ -55,4 +55,28 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('collapsed status panel can be restored and flags problems', (
+    tester,
+  ) async {
+    var restored = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PreviewTools(
+            onConstellations: () {},
+            constellations: false,
+            warning: true,
+            onShowStatus: () => restored++,
+          ),
+        ),
+      ),
+    );
+    expect(find.byIcon(Icons.warning_amber), findsOneWidget);
+    await tester.tap(find.byTooltip('Preview tools · loading problems'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show status panel'));
+    await tester.pumpAndSettle();
+    expect(restored, 1);
+  });
 }
