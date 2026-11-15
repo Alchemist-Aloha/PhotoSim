@@ -518,6 +518,7 @@ void main() {
       const play = 'Play time (5 simulated minutes per second)';
       final original = camera().timestamp;
       await tester.tap(find.byTooltip(play));
+      await tester.pump(); // First ticker frame starts the clock.
       await tester.pump(const Duration(milliseconds: 600));
       expect(camera().timestamp, original.add(const Duration(minutes: 3)));
       tester
@@ -558,8 +559,13 @@ void main() {
           );
       await tester.pump();
       await tester.tap(find.byTooltip(play));
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(camera().timestamp, DateTime.utc(2100, 12, 31, 23, 59, 30));
+      // Playback stops on the last supported instant instead of overshooting.
+      expect(
+        camera().timestamp,
+        DateTime.utc(2101).subtract(const Duration(microseconds: 1)),
+      );
       expect(
         tester
             .widget<IconButton>(

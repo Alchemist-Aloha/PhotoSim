@@ -4,6 +4,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -124,7 +125,7 @@ class WorkspaceShell extends StatefulWidget {
 }
 
 class _WorkspaceShellState extends State<WorkspaceShell>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   // Keep service cooldowns/connections alive across Map/3D workspace recreation.
   final terrainClient = http.Client();
   SimulationState state = SimulationState(
@@ -301,7 +302,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     }
   }
 
-  Timer? playback;
+  Ticker? playback;
   int playbackSpeed = 5;
   DateTime get nextPlaybackTime =>
       state.timestamp.add(Duration(seconds: playbackSpeed * 12));
@@ -545,7 +546,7 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   }
 
   void stopPlayback() {
-    playback?.cancel();
+    playback?.dispose();
     playback = null;
   }
 
@@ -553,14 +554,25 @@ class _WorkspaceShellState extends State<WorkspaceShell>
     if (playback != null) {
       stopPlayback();
     } else {
-      playback = Timer.periodic(const Duration(milliseconds: 200), (_) {
-        final next = nextPlaybackTime;
+      // Frame-driven so the sky moves smoothly; the rate stays playbackSpeed
+      // simulated minutes per real second.
+      var last = Duration.zero;
+      playback = createTicker((elapsed) {
+        final step = elapsed - last;
+        last = elapsed;
+        final next = state.timestamp.add(step * (playbackSpeed * 60));
         if (next.year > 2100) {
-          setState(stopPlayback);
-        } else {
+          setState(() {
+            stopPlayback();
+            state = state.copyWith(
+              timestamp: DateTime.utc(2101)
+                  .subtract(const Duration(microseconds: 1)),
+            );
+          });
+        } else if (step > Duration.zero) {
           setState(() => state = state.copyWith(timestamp: next));
         }
-      });
+      })..start();
     }
   });
 

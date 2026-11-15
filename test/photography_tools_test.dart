@@ -31,6 +31,7 @@ void main() {
       await tester.tap(
         find.byTooltip('Play time (30 simulated minutes per second)'),
       );
+      await tester.pump(); // First ticker frame starts the clock.
       await tester.pump(const Duration(seconds: 1));
       expect(
         current().timestamp.difference(original.timestamp),
