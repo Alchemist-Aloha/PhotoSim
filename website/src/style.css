@@ -29,7 +29,7 @@ a { color: inherit; text-underline-offset: .22em; text-decoration-thickness: 1px
 a:hover { color: var(--copper); }
 :focus-visible { outline: 3px solid var(--copper); outline-offset: 5px; }
 ::selection { background: #8f4c33; color: #fff; }
-.page-width { width: min(1312px, calc(100% - 112px)); margin-inline: auto; }
+.page-width { width: min(1440px, calc(100% - 112px)); margin-inline: auto; }
 section { scroll-margin-top: 32px; }
 h1, h2, h3, p, figure { margin: 0; }
 h1, h2 { font-weight: 600; text-wrap: balance; }
@@ -44,9 +44,35 @@ img { display: block; max-width: 100%; height: auto; }
 .site-header nav { display: flex; gap: 32px; align-items: center; }
 .site-header nav a { padding-block: 12px; font-size: 1.05rem; text-decoration: none; }
 .site-header nav a:hover { text-decoration: underline; }
-.intro { padding-top: 45px; }
-.intro-copy { margin-top: 20px; color: var(--muted); }
-.workflow-layout { display: grid; grid-template-columns: 315px minmax(0, 1fr); gap: 64px; margin-top: 36px; }
+.intro { padding-top: 72px; }
+.intro h1 { font-size: clamp(3rem, 6.9vw, 6rem); line-height: .96; letter-spacing: -.038em; max-width: none; }
+.intro-accent { color: var(--copper); }
+/* "lens" sits inside autofocus brackets that lock onto it once, like a viewfinder acquiring focus. */
+.lens { position: relative; display: inline-block; margin-inline: .14em; color: #19191b; }
+.lens::after {
+  --t: .045em; --l: .2em; --c: var(--copper);
+  content: ''; position: absolute; inset: .15em -.13em .07em; pointer-events: none;
+  background:
+    linear-gradient(var(--c) 0 0) left top / var(--l) var(--t),
+    linear-gradient(var(--c) 0 0) left top / var(--t) var(--l),
+    linear-gradient(var(--c) 0 0) right top / var(--l) var(--t),
+    linear-gradient(var(--c) 0 0) right top / var(--t) var(--l),
+    linear-gradient(var(--c) 0 0) left bottom / var(--l) var(--t),
+    linear-gradient(var(--c) 0 0) left bottom / var(--t) var(--l),
+    linear-gradient(var(--c) 0 0) right bottom / var(--l) var(--t),
+    linear-gradient(var(--c) 0 0) right bottom / var(--t) var(--l);
+  background-repeat: no-repeat;
+  animation: focus-lock 900ms cubic-bezier(.16, 1, .3, 1) 300ms both;
+}
+@keyframes focus-lock {
+  from { transform: scale(1.35, 1.6); opacity: 0; }
+  60% { opacity: 1; }
+  to { transform: none; opacity: 1; }
+}
+.intro-copy { margin-top: 32px; font-size: clamp(1.3rem, 1.85vw, 1.65rem); line-height: 1.4; color: var(--muted); }
+.intro-copy strong { color: #19191b; font-weight: 600; }
+.workflow-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 56px; margin-top: 56px; }
+.workflow-controls { position: sticky; top: 32px; align-self: start; }
 .steps { list-style: none; margin: 0 0 28px; padding: 0; }
 .steps li { border-top: 1px solid var(--line); }
 .steps li:last-child { border-bottom: 1px solid var(--line); }
@@ -61,13 +87,13 @@ img { display: block; max-width: 100%; height: auto; }
 .button { display: inline-flex; justify-content: center; align-items: center; gap: 24px; background: var(--copper); color: #fff; padding: 14px 22px; min-height: 52px; font-size: 1.1rem; font-weight: 600; text-decoration: none; transition: background-color 160ms ease-out; }
 .button:hover { background: #703721; color: #fff; }
 .small-note { margin-top: 13px; font-size: .95rem; color: var(--muted); line-height: 1.5; }
-.desktop-screen { display: flex; align-items: center; justify-content: center; background: #19191b; min-height: 0; }
-.desktop-screen img { width: auto; max-height: 470px; object-fit: contain; }
+.desktop-screen { background: #19191b; }
+.desktop-screen img { width: 100%; }
 .workspace-preview figcaption { display: flex; gap: 18px; justify-content: space-between; color: var(--muted); margin-top: 14px; font-size: .95rem; line-height: 1.4; }
 .platform-label { flex-shrink: 0; color: #19191b; font-weight: 600; }
 .location-note { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid var(--line); margin-top: 38px; padding: 18px 0; font-size: .95rem; color: var(--muted); }
 .android-section { margin-top: 64px; background: #19191b; color: #faf8f5; padding: 88px 0 75px; }
-.android-layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 65px; align-items: center; }
+.android-layout { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 64px; align-items: center; }
 .android-copy p { color: #d2c5bb; font-size: 1.1rem; margin-top: 24px; }
 .android-copy .text-link { color: #ffb59a; }
 .text-link { display: inline-block; margin-top: 25px; font-size: 1.1rem; font-weight: 600; text-decoration: underline; }
@@ -101,7 +127,6 @@ img { display: block; max-width: 100%; height: auto; }
   .android-layout { grid-template-columns: 280px minmax(0, 1fr); gap: 35px; }
   .phone-gallery { gap: 12px; }
   .field-notes { gap: 45px; }
-  .desktop-screen img { width: 100%; max-height: none; }
 }
 @media (max-width: 760px) {
   .page-width { width: calc(100% - 40px); }
@@ -111,11 +136,14 @@ img { display: block; max-width: 100%; height: auto; }
   .site-header nav { gap: 16px; }
   .site-header nav a { font-size: .95rem; }
   .site-header nav a:first-child { display: none; }
-  .intro { padding-top: 34px; }
-  h1 { font-size: clamp(2.6rem, 8.5vw, 4rem); }
-  .intro-copy { font-size: 1.15rem; margin-top: 20px; }
+  .intro { padding-top: 40px; }
+  .intro h1 { font-size: clamp(2.6rem, 10.4vw, 4rem); line-height: 1; }
+  .intro-copy { font-size: 1.25rem; margin-top: 22px; }
   .desktop-break { display: none; }
   .workflow-layout { grid-template-columns: 1fr; gap: 28px; margin-top: 30px; }
+  .workflow-controls { position: static; }
+  .desktop-screen { margin-inline: -20px; }
+  .workspace-preview figcaption { margin-top: 12px; }
   .steps { margin-bottom: 22px; }
   .steps button { padding: 17px 0; }
   .step-description { margin-top: 9px; }
@@ -125,9 +153,9 @@ img { display: block; max-width: 100%; height: auto; }
   .android-section { margin-top: 38px; padding-block: 50px; }
   .android-layout { grid-template-columns: 1fr; gap: 38px; }
   .android-copy { max-width: 60ch; }
-  .phone-gallery { gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .phone-gallery figure:nth-child(2) { margin-top: 35px; }
-  .phone-gallery figure:nth-child(3) { grid-column: 1 / -1; width: calc(50% - 7px); margin: 0 auto; }
+  /* Swipeable strip: three phones side by side, each large enough to read. */
+  .phone-gallery { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; margin-inline: -20px; padding: 0 20px 16px; scroll-padding-inline: 20px; scrollbar-color: #8f4c33 #2b2a2c; }
+  .phone-gallery figure, .phone-gallery figure:nth-child(n) { flex: 0 0 64%; margin-top: 0; scroll-snap-align: start; }
   .field-notes { grid-template-columns: 1fr; gap: 26px; padding-block: 55px; }
   .download-section { padding-top: 42px; }
   .download-heading { display: block; }
@@ -139,5 +167,5 @@ img { display: block; max-width: 100%; height: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   :root { scroll-behavior: auto; }
-  *, *::before, *::after { transition: none !important; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
 }

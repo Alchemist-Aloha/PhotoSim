@@ -1,8 +1,20 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 const repository = 'https://github.com/Alchemist-Aloha/PhotoSim'
-const release = `${repository}/releases/download/v1.1.1`
+// Fallback when the GitHub API is unreachable or rate-limited; asset names follow PhotoSim-<version>-<suffix>.
+const version = ref('1.4.1')
+const release = computed(() => `${repository}/releases/download/v${version.value}`)
+const file = (suffix) => `${release.value}/PhotoSim-${version.value}-${suffix}`
+onMounted(async () => {
+  try {
+    const response = await fetch('https://api.github.com/repos/Alchemist-Aloha/PhotoSim/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    const tag = response.ok && (await response.json()).tag_name
+    if (/^v\d+\.\d+\.\d+$/.test(tag)) version.value = tag.slice(1)
+  } catch {
+    // Keep the fallback version.
+  }
+})
 const asset = (path) => `${import.meta.env.BASE_URL}${path}`
 const activeStep = ref(0)
 const steps = [
@@ -46,8 +58,8 @@ const steps = [
 
   <main id="main">
     <section id="workflow" class="intro page-width" aria-labelledby="intro-title">
-      <h1 id="intro-title">Before you go,<br />see what your lens will see.</h1>
-      <p class="intro-copy">A free, open-source photography planner for Linux and Android.<br class="desktop-break" /> Check sightlines over real terrain and time the Sun, Moon, and Milky Way.</p>
+      <h1 id="intro-title">Before you go,<br /><span class="intro-accent">see what your <span class="lens">lens</span> will see.</span></h1>
+      <p class="intro-copy"><strong>A free, open-source photography planner for Linux and Android.</strong><br class="desktop-break" /> Check sightlines over real terrain and time the Sun, Moon, and Milky Way.</p>
       <div class="workflow-layout">
         <div class="workflow-controls">
           <ol class="steps" aria-label="Explore the photography workflow">
@@ -126,31 +138,31 @@ const steps = [
     <section id="download" class="download-section page-width" aria-labelledby="download-title">
       <div class="download-heading">
         <h2 id="download-title">Download PhotoSim</h2>
-        <p>Choose your platform.<br />Latest release: <a :href="`${repository}/releases/tag/v1.1.1`">v1.1.1</a></p>
+        <p>Choose your platform.<br />Latest release: <a :href="`${repository}/releases/tag/v${version}`">v{{ version }}</a></p>
       </div>
       <div class="downloads">
         <article>
           <h3>Linux</h3>
           <p>Desktop app for scouting locations and testing compositions on a larger screen.</p>
-          <a class="button" :href="`${release}/PhotoSim-1.1.1-x86_64.AppImage`">Download AppImage <span aria-hidden="true">↓</span></a>
+          <a class="button" :href="file('x86_64.AppImage')">Download AppImage <span aria-hidden="true">↓</span></a>
           <div class="package-links">
-            <a :href="`${release}/PhotoSim-1.1.1-x86_64.deb`">Debian / Ubuntu (.deb)</a>
-            <a :href="`${release}/PhotoSim-1.1.1-x86_64.pkg.tar.zst`">Arch (.pkg.tar.zst)</a>
+            <a :href="file('x86_64.deb')">Debian / Ubuntu (.deb)</a>
+            <a :href="file('x86_64.pkg.tar.zst')">Arch (.pkg.tar.zst)</a>
           </div>
           <p class="small-note">x86_64 · glibc 2.39+, GTK 3, and a compatible GPU.<br />For the AppImage, mark it executable and run.</p>
         </article>
         <article>
           <h3>Android</h3>
           <p>The same tools with touch controls for phones and tablets.</p>
-          <a class="button" :href="`${release}/PhotoSim-1.1.1-arm64-v8a.apk`">Download APK · ARM64 <span aria-hidden="true">↓</span></a>
+          <a class="button" :href="file('arm64-v8a.apk')">Download APK · ARM64 <span aria-hidden="true">↓</span></a>
           <div class="package-links">
-            <a :href="`${release}/PhotoSim-1.1.1-armeabi-v7a.apk`">ARMv7 APK</a>
-            <a :href="`${release}/PhotoSim-1.1.1-x86_64.apk`">x86_64 APK</a>
+            <a :href="file('armeabi-v7a.apk')">ARMv7 APK</a>
+            <a :href="file('x86_64.apk')">x86_64 APK</a>
           </div>
           <p class="small-note">Android 10+ · Sideloaded APK (not on Google Play).<br />Allow installs from your browser or file manager when prompted.</p>
         </article>
       </div>
-      <p class="release-note">Screenshots are from a development build, so the v1.1.1 release may look slightly different. <a :href="`${repository}/releases`">All releases & checksums</a> · <a :href="`${repository}/blob/main/docs/releases.md`">Install & build notes</a></p>
+      <p class="release-note">Screenshots are from a development build, so the v{{ version }} release may look slightly different. <a :href="`${repository}/releases`">All releases & checksums</a> · <a :href="`${repository}/blob/main/docs/releases.md`">Install & build notes</a></p>
     </section>
   </main>
 

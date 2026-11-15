@@ -9,6 +9,7 @@ test('showcase works at desktop and phone sizes', async ({ page }, testInfo) => 
       errors.push(`${response.status()} ${response.url()}`)
     }
   })
+  await page.route('https://api.github.com/repos/Alchemist-Aloha/PhotoSim/releases/latest', (route) => route.fulfill({ json: { tag_name: 'v9.8.7' } }))
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Before you go')
   for (const [name, image] of [
@@ -23,7 +24,7 @@ test('showcase works at desktop and phone sizes', async ({ page }, testInfo) => 
   }
   await page.getByRole('link', { name: 'Get PhotoSim', exact: false }).click()
   await expect(page).toHaveURL(/#download$/)
-  await expect(page.getByRole('link', { name: 'Download AppImage' })).toHaveAttribute('href', /\/v1\.1\.1\/PhotoSim-1\.1\.1-x86_64\.AppImage$/)
+  await expect(page.getByRole('link', { name: 'Download AppImage' })).toHaveAttribute('href', /\/v9\.8\.7\/PhotoSim-9\.8\.7-x86_64\.AppImage$/)
   await expect(page.getByRole('link', { name: 'Download APK' })).toHaveAttribute('href', /arm64-v8a\.apk$/)
   await expect(page.getByRole('link', { name: /View full-size Android/ })).toHaveCount(3)
   await page.evaluate(async () => {

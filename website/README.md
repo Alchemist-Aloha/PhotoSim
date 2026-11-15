@@ -73,6 +73,6 @@ Inspect each new screenshot for loaded terrain/imagery and retained attribution.
 
 ## Updates and licenses
 
-Download URLs are deliberately pinned to the verified published **v1.1.1** assets in `src/App.vue`. Update the version and asset names together after confirming a new release. The page explicitly distinguishes development screenshots from the published release.
+Download links follow the latest GitHub release, fetched in the browser from the GitHub API on page load. If that request fails (offline, rate-limited), they fall back to the **v1.4.1** set in `src/App.vue`. Asset names must keep the `PhotoSim-<version>-<suffix>` pattern. The page explicitly distinguishes development screenshots from the published release.
 
 Typography is the app's bundled Source Sans 3; its license is in `public/fonts/OFL.txt`. App icon and screenshot UI are from this repository. Project license: [GPL-3.0-only](../LICENSE).
