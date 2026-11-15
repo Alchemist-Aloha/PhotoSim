@@ -311,7 +311,17 @@ class _WorkspaceShellState extends State<WorkspaceShell>
 
   late String cleanComposition;
   String? currentPlanName;
-  String get composition => SavedPlan('Composition', state).encode();
+  // Every edit makes a new state, so identity is a safe cache key for the JSON.
+  SimulationState? encodedState;
+  String? encodedComposition;
+  String get composition {
+    if (!identical(encodedState, state)) {
+      encodedState = state;
+      encodedComposition = SavedPlan('Composition', state).encode();
+    }
+    return encodedComposition!;
+  }
+
   bool get hasUnsavedChanges => composition != cleanComposition;
 
   Future<bool> savePlan(PlanRepository store) async {
