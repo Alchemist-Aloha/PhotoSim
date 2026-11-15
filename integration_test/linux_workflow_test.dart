@@ -216,6 +216,30 @@ void main() {
     await waitForImagery();
     final texturedMeshes = world.root.children.where(isTerrain).toList();
     expect(texturedMeshes.length, 9);
+    // Lens changes move the focal-length detail band and rebuild outer tiles
+    // at a new mesh resolution. Wait for that, then re-baseline the buffers
+    // that later sky/time changes must reuse.
+    Future<void> settleTerrain() async {
+      // Lens-driven reloads start after a 400 ms debounce.
+      await tester.pump(const Duration(milliseconds: 500));
+      for (
+        var i = 0;
+        i < 120 && find.textContaining('· loading').evaluate().isNotEmpty;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      expect(find.textContaining('· loading'), findsNothing);
+      await waitForImagery();
+      // Rebuilt patches keep their nodes, so only the geometry baseline moves.
+      expect(texturedMeshes.every(world.root.children.contains), isTrue);
+      meshes
+        ..clear()
+        ..addAll(
+          texturedMeshes.map((node) => node.mesh!.primitives.single.geometry),
+        );
+    }
+
     for (var i = 0; i < meshes.length; i++) {
       expect(
         texturedMeshes[i].mesh!.primitives.single.geometry,
@@ -264,17 +288,15 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
-    await tester.scrollUntilVisible(
-      find.text('Rendering'),
-      300,
-      scrollable: inspectorScroll,
-    );
-    await tester.tap(find.text('Rendering'));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.ensureVisible(find.text('Approximate relighting'));
+    // Relighting is an app setting on the Settings page.
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('Approximate relighting'));
     await tester.pump();
+    await tester.pageBack();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.scrollUntilVisible(
       find.text('Optics'),
       -300,
@@ -363,7 +385,11 @@ void main() {
     expect(find.textContaining('America/Los_Angeles'), findsOneWidget);
     expect(
       world.directionalLight!.intensity,
-      closeTo(moonlightIntensity(camera().sky), 1e-12),
+      // Night light carries moonlight plus the overhead skyglow term.
+      closeTo(
+        moonlightIntensity(camera().sky) + skyglowIntensity(camera().sky),
+        1e-12,
+      ),
     );
     expect(
       world.directionalLight!.direction.y,
@@ -462,38 +488,40 @@ void main() {
     }
     await tester.pump(const Duration(seconds: 1));
     await capture('linux-moon-phase');
-    final moonBrightness = await viewportBrightness(tester, captureKey);
     final phaseColors = moonGeometry.extractMeshData().colors!;
-    final phaseImage =
-        await (captureKey.currentContext!.findRenderObject()!
-                as RenderRepaintBoundary)
-            .toImage();
-    final phasePixels = (await phaseImage.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    ))!;
     final center = tester.getCenter(find.byType(scene.SceneView));
-    var left = 0, right = 0;
-    for (var y = -30; y <= 30; y += 5) {
-      for (var x = 15; x <= 45; x += 5) {
-        left += phasePixels.getUint8(
-          ((center.dy.toInt() + y) * phaseImage.width + center.dx.toInt() - x) *
-              4,
-        );
-        right += phasePixels.getUint8(
-          ((center.dy.toInt() + y) * phaseImage.width + center.dx.toInt() + x) *
-              4,
-        );
+    // Red-channel sums either side of the Moon's center, in the same pixels.
+    Future<({int left, int right})> limbs() async {
+      final image =
+          await (captureKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary)
+              .toImage();
+      final pixels = (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      var left = 0, right = 0;
+      for (var y = -30; y <= 30; y += 5) {
+        for (var x = 15; x <= 45; x += 5) {
+          left += pixels.getUint8(
+            ((center.dy.toInt() + y) * image.width + center.dx.toInt() - x) * 4,
+          );
+          right += pixels.getUint8(
+            ((center.dy.toInt() + y) * image.width + center.dx.toInt() + x) * 4,
+          );
+        }
       }
+      image.dispose();
+      return (left: left, right: right);
     }
-    phaseImage.dispose();
+
+    final phase = await limbs();
     // The Sun lies to the right of the Moon at this northern-site waxing phase.
-    expect(right, greaterThan(left * 2));
+    expect(phase.right, greaterThan(phase.left * 2));
     moonNode.visible = false;
     await tester.pump(const Duration(seconds: 1));
-    expect(
-      moonBrightness,
-      greaterThan(await viewportBrightness(tester, captureKey) + 0.3),
-    );
+    // Adaptive exposure re-meters the whole frame once the Moon is hidden, so
+    // compare the lit limb's own pixels rather than whole-frame averages.
+    expect(phase.right, greaterThan((await limbs()).right * 1.4));
     moonNode.visible = true;
     // A foreground opaque blocker exercises the same depth test as terrain.
     final moonEye =
@@ -506,13 +534,12 @@ void main() {
     )..position = moonEye + (moonNode.position - moonEye).normalized() * 1000;
     world.add(blocker);
     await tester.pump(const Duration(seconds: 1));
-    final blocked = await viewportBrightness(tester, captureKey);
-    moonNode.visible = false;
-    await tester.pump(const Duration(seconds: 1));
-    expect(
-      await viewportBrightness(tester, captureKey),
-      closeTo(blocked, 0.05),
-    );
+    // Exposure keeps adapting between frames, so whole-frame brightness drifts
+    // even with a static scene. Behind the blocker the lit/dark limb asymmetry
+    // must vanish: the Moon's phase is no longer visible through it.
+    final blocked = await limbs();
+    expect(blocked.right, closeTo(blocked.left, blocked.left * 0.02));
+    expect(phase.right - phase.left, greaterThan(blocked.right - blocked.left));
     world.remove(blocker);
     for (final node in texturedMeshes) {
       node.visible = true;
@@ -524,12 +551,9 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(moonNode.mesh!.primitives.single.geometry, same(moonGeometry));
     expect(moonGeometry.extractMeshData().colors, isNot(phaseColors));
-    for (var i = 0; i < meshes.length; i++) {
-      expect(
-        texturedMeshes[i].mesh!.primitives.single.geometry,
-        same(meshes[i]),
-      );
-    }
+    // The 600 mm detour moved the focal-length detail band, so outer tiles
+    // legitimately rebuild at a new mesh resolution.
+    await settleTerrain();
     // Real native sky rendering: immutable batches rotate, dim in daylight,
     // and depth-test against terrain and a controlled foreground blocker.
     final night = beforeMoon.copyWith(
@@ -719,8 +743,16 @@ void main() {
     for (final node in texturedMeshes) {
       node.visible = true;
     }
+    // The 16 mm night lens rebuilt outer tiles; a pure time step must not.
+    await settleTerrain();
     await tester.tap(find.byTooltip('Later by one hour'));
     await tester.pump(const Duration(seconds: 1));
+    for (var i = 0; i < meshes.length; i++) {
+      expect(
+        texturedMeshes[i].mesh!.primitives.single.geometry,
+        same(meshes[i]),
+      );
+    }
     expect(nightRoot.localTransform, isNot(rotation));
     expect(stars.mesh!.primitives.single.geometry, same(starGeometry));
     expect(band.mesh!.primitives.single.geometry, same(bandGeometry));
@@ -739,12 +771,6 @@ void main() {
     expect(stars.visible, isFalse);
     expect(band.visible, isFalse);
     expect(marker.visible, isFalse);
-    for (var i = 0; i < meshes.length; i++) {
-      expect(
-        texturedMeshes[i].mesh!.primitives.single.geometry,
-        same(meshes[i]),
-      );
-    }
     await tester.drag(find.byType(scene.SceneView), const Offset(100, -20));
     await tester.pump();
     final rotated = camera();
@@ -772,6 +798,12 @@ void main() {
     );
     expect(find.text('Terrain 9/9'), findsOneWidget);
     await capture('linux-preview');
+    // The APS-C switch above re-resolves outer tiles; finish that first.
+    await settleTerrain();
+    String cacheCount(String key) =>
+        tester.widget<Tooltip>(find.byKey(ValueKey(key))).message!;
+    final terrainCount = cacheCount('terrain-cache-count');
+    final imageryCount = cacheCount('imagery-cache-count');
     await openWorkspace(tester, 'Map');
     await tester.pump(const Duration(seconds: 1));
     expect(camera().azimuth, rotated.azimuth);
@@ -790,14 +822,16 @@ void main() {
     ) {
       await tester.pump(const Duration(milliseconds: 500));
     }
+    // Desktop keeps the scene resident across Map: nothing is re-read or
+    // downloaded on return, and the same GPU world is shown.
     expect(
-      tester
-          .widget<Tooltip>(find.byKey(const ValueKey('terrain-cache-count')))
-          .message,
-      '9 cached · 0 downloaded',
+      tester.widget<scene.SceneView>(find.byType(scene.SceneView)).scene,
+      same(world),
     );
     await waitForImagery();
-    expect(find.byTooltip('10 cached · 0 downloaded'), findsOneWidget);
+    expect(cacheCount('terrain-cache-count'), terrainCount);
+    expect(cacheCount('imagery-cache-count'), imageryCount);
+    expect(terrainCount, endsWith('· 0 downloaded'));
     expect(camera().relitImagery, isTrue);
     expect(camera().groundElevation, isNotNull);
     await openWorkspace(tester, 'Map');

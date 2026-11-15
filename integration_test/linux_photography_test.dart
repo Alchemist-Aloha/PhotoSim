@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -11,6 +12,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:photosim/models/simulation_state.dart';
 import 'package:photosim/ui/simulation_workspace.dart';
 import 'package:photosim/ui/camera_inspector.dart';
+import 'package:photosim/ui/settings_page.dart';
 import 'package:photosim/ui/rain_overlay.dart';
 import 'package:photosim/render/photo_framing.dart';
 import 'package:vector_math/vector_math.dart' as vm;
@@ -230,7 +232,19 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(world.fog.enabled, isFalse);
       await toggleSection('Weather');
-      await toggleSection('Rendering');
+      // Render quality lives on the Settings page, not in the camera inspector.
+      unawaited(
+        Navigator.of(tester.element(find.byType(CameraInspector))).push(
+          MaterialPageRoute<void>(
+            builder: (_) => SettingsPage(
+              state: state,
+              onChanged: (next) => rebuild(() => state = next),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       for (final quality in RenderQuality.values) {
         tester
             .widget<DropdownButtonFormField<RenderQuality>>(
@@ -253,6 +267,9 @@ void main() {
         );
         expect(tester.takeException(), isNull);
       }
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       rebuild(
         () => state = state.copyWith(
           weather: Weather.clear,
