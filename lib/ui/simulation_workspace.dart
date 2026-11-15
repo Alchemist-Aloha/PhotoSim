@@ -761,21 +761,32 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
   }
 
   void applyTexture(scene.Node node, scene.Texture2D texture) {
-    final geometry = node.mesh!.primitives.single.geometry;
-    final material = widget.state.relitImagery
+    final primitive = node.mesh!.primitives.single;
+    final geometry = primitive.geometry;
+    final state = widget.state;
+    // Display-referred surfaces bypass the backend's fog and depth-of-field passes.
+    final displayReferred =
+        !state.atmosphericEffects &&
+        !state.depthOfField &&
+        !state.exposureProcessing;
+    final tint = vm.Vector4.all(state.weatherLightTransmission)..a = 1;
+    final current = primitive.material;
+    // The tint is a per-draw uniform: retint in place while dragging Light
+    // transmission instead of allocating a material per tile per frame.
+    if (!state.relitImagery &&
+        current is scene.UnlitMaterial &&
+        identical(current.baseColorTexture, texture) &&
+        current.displayReferred == displayReferred) {
+      current.baseColorFactor = tint;
+      return;
+    }
+    final material = state.relitImagery
         ? (scene.PhysicallyBasedMaterial(baseColorTexture: texture)
             ..roughnessFactor = 1
             ..metallicFactor = 0)
         : (scene.UnlitMaterial(colorTexture: texture)
-            // Display-referred surfaces bypass the backend's fog and depth-of-field passes.
-            ..displayReferred =
-                !widget.state.atmosphericEffects &&
-                !widget.state.depthOfField &&
-                !widget.state.exposureProcessing
-            ..baseColorFactor = vm.Vector4.all(
-              widget.state.weatherLightTransmission,
-            )
-            ..baseColorFactor.a = 1);
+            ..displayReferred = displayReferred
+            ..baseColorFactor = tint);
     // Reassign the mesh to notify Scene of the material change; geometry stays resident.
     node.mesh = scene.Mesh(geometry, material);
   }
