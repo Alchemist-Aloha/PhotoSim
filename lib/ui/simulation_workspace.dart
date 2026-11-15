@@ -1598,7 +1598,7 @@ class _SimulationWorkspaceState extends State<SimulationWorkspace> {
                                       Tooltip(
                                         message: Platform.isAndroid
                                             ? 'Drag to aim · Pinch to zoom · Place the camera on the map to move'
-                                            : 'Click preview · Drag to aim · WASD: 100 m/s, follows terrain',
+                                            : 'Click preview · Drag to aim · Scroll to zoom · WASD: 100 m/s, follows terrain',
                                         child: const Icon(
                                           Icons.help_outline,
                                           size: 16,

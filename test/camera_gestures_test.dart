@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photosim/models/simulation_state.dart';
@@ -190,4 +191,33 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('mouse wheel zooms focal length and compounds within a frame', (
+    tester,
+  ) async {
+    var state = SimulationState(focalLength: 24);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) => CameraGestures(
+            state: state,
+            onChanged: (next) => setState(() => state = next),
+            child: const ColoredBox(color: Colors.black),
+          ),
+        ),
+      ),
+    );
+    final pointer = TestPointer(1, PointerDeviceKind.mouse);
+    final center = tester.getCenter(find.byType(CameraGestures));
+    pointer.hover(center);
+    // Two notches before the rebuild: 24 → 26 → 29.
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, -50)));
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, -50)));
+    await tester.pump();
+    expect(state.focalLength, 29);
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, 50)));
+    await tester.pump();
+    expect(state.focalLength, 26);
+    expect(state.azimuth, SimulationState().azimuth);
+  });
 }

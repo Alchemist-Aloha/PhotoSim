@@ -1,10 +1,14 @@
+import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/geo.dart';
 import '../models/simulation_state.dart';
 import '../render/photo_framing.dart';
 
-/// One finger aims; two fingers change optical focal length without moving the camera.
+/// One finger aims; two fingers or the mouse wheel change optical focal length
+/// without moving the camera.
 class CameraGestures extends StatefulWidget {
   const CameraGestures({
     super.key,
@@ -30,6 +34,26 @@ class _CameraGesturesState extends State<CameraGestures> {
   SimulationState? origin;
   var drag = Offset.zero;
 
+  /// Wheel notches within one frame compound from here, for the same reason.
+  double? wheelFocal;
+
+  void zoom(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || event.scrollDelta.dy == 0) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      final base = wheelFocal ?? widget.state.focalLength;
+      // ~10% focal length per notch; scrolling up zooms in.
+      final next = (base * math.pow(1.1, -event.scrollDelta.dy.sign))
+          .clamp(SimulationState.minFocalLength, SimulationState.maxFocalLength)
+          .roundToDouble();
+      if (next == base) return;
+      if (wheelFocal == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => wheelFocal = null);
+      }
+      wheelFocal = next;
+      widget.onChanged(widget.state.copyWith(focalLength: next));
+    });
+  }
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
@@ -39,34 +63,37 @@ class _CameraGesturesState extends State<CameraGestures> {
                 radians /
                 bounds.maxHeight
           : 0.0;
-      return GestureDetector(
-        onScaleStart: (_) {
-          focalLength = widget.state.focalLength;
-          origin = widget.state;
-          drag = Offset.zero;
-        },
-        onScaleEnd: (_) {
-          origin = null;
-          drag = Offset.zero;
-        },
-        onScaleUpdate: (details) {
-          final base = origin ??= widget.state;
-          if (details.pointerCount == 1) drag += details.focalPointDelta;
-          final next = base.copyWith(
-            azimuth: base.azimuth + drag.dx * degreesPerPixel,
-            pitch: base.pitch - drag.dy * degreesPerPixel,
-            focalLength: details.pointerCount > 1
-                ? (focalLength * details.scale)
-                      .clamp(
-                        SimulationState.minFocalLength,
-                        SimulationState.maxFocalLength,
-                      )
-                      .roundToDouble()
-                : null,
-          );
-          widget.onChanged(next);
-        },
-        child: widget.child,
+      return Listener(
+        onPointerSignal: zoom,
+        child: GestureDetector(
+          onScaleStart: (_) {
+            focalLength = widget.state.focalLength;
+            origin = widget.state;
+            drag = Offset.zero;
+          },
+          onScaleEnd: (_) {
+            origin = null;
+            drag = Offset.zero;
+          },
+          onScaleUpdate: (details) {
+            final base = origin ??= widget.state;
+            if (details.pointerCount == 1) drag += details.focalPointDelta;
+            final next = base.copyWith(
+              azimuth: base.azimuth + drag.dx * degreesPerPixel,
+              pitch: base.pitch - drag.dy * degreesPerPixel,
+              focalLength: details.pointerCount > 1
+                  ? (focalLength * details.scale)
+                        .clamp(
+                          SimulationState.minFocalLength,
+                          SimulationState.maxFocalLength,
+                        )
+                        .roundToDouble()
+                  : null,
+            );
+            widget.onChanged(next);
+          },
+          child: widget.child,
+        ),
       );
     },
   );
